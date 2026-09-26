@@ -1,3 +1,5 @@
+{{-- resoureces/veiws/tarot.blade.php --}}
+
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
@@ -9,8 +11,13 @@
 
     <p>質問を入力してください。</p>
 
-    <form>
-        <input type="text" placeholder="質問を入力">
+    <form method="POST" action="{{ route('tarot.draw') }}">
+        @csrf
+        <input
+            type="text"
+            name="question"
+            placeholder="質問を入力してください"
+        >
         <button type="submit">占う</button>
     </form>
 </body>
