@@ -13,6 +13,9 @@
     <h2>引いたカード</h2>
     <p>{{ $card }}</p>
 
+    <h2>リーディング結果</h2>
+    <p>{{ $interpretation }}</p>
+
     <a href="{{ route('tarot') }}">
         もう一度占う
     </a>
