@@ -2,22 +2,48 @@
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>タロット結果</title>
+    @vite(['resources/css/app.css'])
 </head>
 <body>
-    <h1>タロット結果</h1>
+    <div class="page-frame">
+        @include('partials.site-header')
 
-    <h2>あなたの質問</h2>
-    <p>{{ $question }}</p>
+        <main class="page-content">
+            <section class="result-panel">
+                <div class="result-visual" aria-hidden="true">
+                    <div class="tarot-card-art">
+                        <span class="card-number">{{ $cardNumber }}</span>
+                        <span class="card-sun">{{ $cardSymbol }}</span>
+                        <span class="card-label">{{ $cardEnglishName }}</span>
+                    </div>
+                </div>
+                <div class="result-copy">
+                    <p class="eyebrow">YOUR READING</p>
+                    <h1 class="result-heading">カードからのメッセージ</h1>
 
-    <h2>引いたカード</h2>
-    <p>{{ $card }}</p>
+                    <section class="result-section">
+                        <h2 class="section-label">あなたの質問</h2>
+                        <p class="question-quote">{{ $question }}</p>
+                    </section>
 
-    <h2>リーディング結果</h2>
-    <p>{{ $interpretation }}</p>
+                    <section class="result-section">
+                        <h2 class="section-label">引いたカード</h2>
+                        <p class="drawn-card-name">{{ $card }}</p>
+                    </section>
 
-    <a href="{{ route('tarot') }}">
-        もう一度占う
-    </a>
+                    <section class="result-section">
+                        <h2 class="section-label">リーディング結果</h2>
+                        <p class="reading-copy">{{ $interpretation }}</p>
+                    </section>
+
+                    <a class="text-link" href="{{ route('tarot') }}">もう一度占う</a>
+                </div>
+            </section>
+        </main>
+
+        <footer class="site-footer">YOUR MOMENT, YOUR MEANING</footer>
+    </div>
 </body>
 </html>
