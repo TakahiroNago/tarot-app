@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
+use App\Services\SessionReadingPersister;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -15,7 +17,7 @@ class AuthenticatedSessionController extends Controller
         return view('auth.login');
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, SessionReadingPersister $sessionReadingPersister): RedirectResponse
     {
         $credentials = $request->validate([
             'email' => ['required', 'email'],
@@ -29,6 +31,9 @@ class AuthenticatedSessionController extends Controller
         }
 
         $request->session()->regenerate();
+        $user = $request->user();
+        abort_unless($user instanceof User, 403);
+        $sessionReadingPersister->persist($user, $request);
 
         return redirect()->intended(route('home'));
     }

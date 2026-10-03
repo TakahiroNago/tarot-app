@@ -26,6 +26,30 @@ test('a visitor can register and is assigned the user role', function () {
     ]);
 });
 
+test('registration saves the current session readings to the new account', function () {
+    $this->withSession([
+        'tarot_readings' => [[
+            'question' => 'Before registration?',
+            'card' => 'The Fool',
+            'interpretation' => 'A reading before registration.',
+        ]],
+    ])->post(route('register.store'), [
+        'name' => 'New User',
+        'email' => 'new-reader@example.com',
+        'password' => 'A-strong-password-2026',
+        'password_confirmation' => 'A-strong-password-2026',
+    ])->assertRedirect(route('home'))
+        ->assertSessionMissing('tarot_readings');
+
+    $user = User::where('email', 'new-reader@example.com')->sole();
+    $this->assertDatabaseHas('tarot_readings', [
+        'user_id' => $user->id,
+        'question' => 'Before registration?',
+        'card' => 'The Fool',
+        'interpretation' => 'A reading before registration.',
+    ]);
+});
+
 test('the welcome page shows navigation for guests and signed-in admins', function () {
     $this->get(route('home'))
         ->assertOk()
@@ -64,6 +88,32 @@ test('a registered user can log in', function () {
     ])->assertRedirect(route('home'));
 
     $this->assertAuthenticatedAs($user);
+});
+
+test('login saves the current session readings to the account', function () {
+    $user = User::factory()->create([
+        'email' => 'reader@example.com',
+        'password' => Hash::make('A-strong-password-2026'),
+    ]);
+
+    $this->withSession([
+        'tarot_readings' => [[
+            'question' => 'Before login?',
+            'card' => 'The Star',
+            'interpretation' => 'A reading before login.',
+        ]],
+    ])->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'A-strong-password-2026',
+    ])->assertRedirect(route('home'))
+        ->assertSessionMissing('tarot_readings');
+
+    $this->assertDatabaseHas('tarot_readings', [
+        'user_id' => $user->id,
+        'question' => 'Before login?',
+        'card' => 'The Star',
+        'interpretation' => 'A reading before login.',
+    ]);
 });
 
 test('a user can reset their password from the email notification', function () {

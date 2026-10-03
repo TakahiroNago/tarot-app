@@ -24,10 +24,6 @@ Route::middleware('active')->group(function () {
     Route::get('/readings/{reading}', [ReadingHistoryController::class, 'show'])->name('readings.show');
 });
 
-Route::post('/readings/{reading}/save', [ReadingHistoryController::class, 'save'])
-    ->middleware(['auth', 'active'])
-    ->name('readings.save');
-
 Route::middleware('guest')->group(function () {
     Route::get('/register', [RegisteredUserController::class, 'create'])->name('register');
     Route::post('/register', [RegisteredUserController::class, 'store'])->name('register.store');
