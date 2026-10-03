@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\SessionReadingPersister;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,7 +18,7 @@ class RegisteredUserController extends Controller
         return view('auth.register');
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, SessionReadingPersister $sessionReadingPersister): RedirectResponse
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -36,6 +37,7 @@ class RegisteredUserController extends Controller
         event(new Registered($user));
         Auth::login($user);
         $request->session()->regenerate();
+        $sessionReadingPersister->persist($user, $request);
 
         return redirect()->intended(route('home'));
     }

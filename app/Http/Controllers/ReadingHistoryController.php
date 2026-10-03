@@ -43,31 +43,6 @@ class ReadingHistoryController extends Controller
         return view('readings.show', ['reading' => $readingData]);
     }
 
-    public function save(Request $request, string $reading): RedirectResponse
-    {
-        if (preg_match('/^session-(\d+)$/', $reading, $matches) !== 1) {
-            abort(404);
-        }
-
-        $sessionReadings = $request->session()->get('tarot_readings', []);
-        $sessionReading = $sessionReadings[$matches[1]] ?? null;
-        abort_unless($this->isReading($sessionReading), 404);
-
-        $user = $request->user();
-        abort_unless($user instanceof User, 403);
-
-        $user->tarotReadings()->create([
-            'question' => $sessionReading['question'],
-            'card' => $sessionReading['card'],
-            'interpretation' => $sessionReading['interpretation'],
-        ]);
-
-        unset($sessionReadings[$matches[1]]);
-        $request->session()->put('tarot_readings', $sessionReadings);
-
-        return redirect()->route('readings.index');
-    }
-
     /** @return Collection<int, array{id: string, question: string, card: string, interpretation: string}> */
     private function sessionReadings(Request $request): Collection
     {

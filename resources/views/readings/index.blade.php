@@ -23,12 +23,6 @@
                                     <a class="reading-question" href="{{ route('readings.show', $reading['id']) }}">{{ $reading['question'] }}</a>
                                     <span class="reading-card">{{ $reading['card'] }}</span>
                                     <a class="reading-open" href="{{ route('readings.show', $reading['id']) }}">詳細 <span aria-hidden="true">→</span></a>
-                                    @auth
-                                        <form class="reading-save-form" method="POST" action="{{ route('readings.save', $reading['id']) }}">
-                                            @csrf
-                                            <button class="reading-save-button" type="submit">タロット履歴に保存</button>
-                                        </form>
-                                    @endauth
                                 </div>
                             @endforeach
                         </div>

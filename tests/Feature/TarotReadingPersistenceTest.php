@@ -101,58 +101,6 @@ test('users can view only their own database readings and session readings', fun
         ->assertSee('A session answer.');
 });
 
-test('users can save a session reading to their history', function () {
-    $user = User::factory()->create();
-    $this->actingAs($user)->withSession([
-        'tarot_readings' => [
-            [
-                'question' => 'First session question?',
-                'card' => 'The Fool',
-                'interpretation' => 'First session answer.',
-            ],
-            [
-                'question' => 'Second session question?',
-                'card' => 'The Star',
-                'interpretation' => 'Second session answer.',
-            ],
-        ],
-    ]);
-
-    $this->post(route('readings.save', 'session-0'))
-        ->assertRedirect(route('readings.index'));
-
-    $this->assertDatabaseHas('tarot_readings', [
-        'user_id' => $user->id,
-        'question' => 'First session question?',
-        'card' => 'The Fool',
-        'interpretation' => 'First session answer.',
-    ]);
-    expect(session('tarot_readings'))
-        ->toHaveCount(1)
-        ->and(session('tarot_readings.1.question'))->toBe('Second session question?');
-
-    $this->get(route('readings.index'))
-        ->assertOk()
-        ->assertSee('Second session question?')
-        ->assertSee('First session question?')
-        ->assertSee('保存');
-});
-
-test('guests cannot save session readings to a database account', function () {
-    $this->withSession([
-        'tarot_readings' => [[
-            'question' => 'Guest session question?',
-            'card' => 'The Sun',
-            'interpretation' => 'Guest session answer.',
-        ]],
-    ])
-        ->post(route('readings.save', 'session-0'))
-        ->assertRedirect(route('login'));
-
-    $this->assertDatabaseCount('tarot_readings', 0);
-    expect(session('tarot_readings'))->toHaveCount(1);
-});
-
 test('guests can view session readings but cannot open database reading ids', function () {
     $user = User::factory()->create();
     $reading = $user->tarotReadings()->create([
@@ -171,7 +119,6 @@ test('guests can view session readings but cannot open database reading ids', fu
         ->get(route('readings.index'))
         ->assertOk()
         ->assertSee('Guest question?')
-        ->assertDontSee('保存')
         ->assertDontSee('Account-only question?');
 
     $this->get(route('readings.show', 'session-0'))
