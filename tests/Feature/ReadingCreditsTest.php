@@ -16,7 +16,7 @@ test('the plans page shows the planned credit pack and subscription prices', fun
         ->assertSee('10回')
         ->assertSee('100回')
         ->assertSee('月額280円')
-        ->assertSee('月額1,980円')
+        ->assertSee('月額980円')
         ->assertSee('Stripe');
 });
 
@@ -184,6 +184,7 @@ test('paid plans accrue daily credits up to their cap while keeping purchased cr
     $user = User::factory()->create();
     $user->forceFill([
         'plan' => User::PLAN_LITE,
+        'daily_credits_plan' => User::PLAN_LITE,
         'daily_credits' => 148,
         'daily_credits_refreshed_at' => now()->subDays(2)->toDateString(),
         'purchased_credits' => 105,
@@ -197,6 +198,44 @@ test('paid plans accrue daily credits up to their cap while keeping purchased cr
 
     expect($user->fresh()->daily_credits)->toBe(150)
         ->and($user->fresh()->purchased_credits)->toBe(105);
+});
+
+test('upgrading a plan restores daily credits to the new plan allowance', function () {
+    $upgrades = [
+        [User::PLAN_FREE, User::PLAN_LITE, 5],
+        [User::PLAN_FREE, User::PLAN_PREMIUM, 10],
+        [User::PLAN_LITE, User::PLAN_PREMIUM, 10],
+    ];
+    $creditService = app(ReadingCreditService::class);
+
+    foreach ($upgrades as [$previousPlan, $newPlan, $expectedCredits]) {
+        $user = User::factory()->create();
+        $user->forceFill([
+            'plan' => $previousPlan,
+            'daily_credits_plan' => $previousPlan,
+            'daily_credits' => 0,
+            'daily_credits_refreshed_at' => now()->toDateString(),
+        ])->save();
+        $user->forceFill(['plan' => $newPlan])->save();
+
+        expect($creditService->balance($user)['daily'])->toBe($expectedCredits)
+            ->and($user->fresh()->daily_credits_plan)->toBe($newPlan)
+            ->and($user->fresh()->daily_credits_refreshed_at->toDateString())->toBe(now()->toDateString());
+    }
+});
+
+test('plan upgrades do not grant paid daily credits for days before the upgrade', function () {
+    $user = User::factory()->create();
+    $user->forceFill([
+        'plan' => User::PLAN_FREE,
+        'daily_credits_plan' => User::PLAN_FREE,
+        'daily_credits' => 1,
+        'daily_credits_refreshed_at' => now()->subDays(5)->toDateString(),
+    ])->save();
+    $user->forceFill(['plan' => User::PLAN_PREMIUM])->save();
+
+    expect(app(ReadingCreditService::class)->balance($user)['daily'])->toBe(10)
+        ->and($user->fresh()->daily_credits_refreshed_at->toDateString())->toBe(now()->toDateString());
 });
 
 test('free members see only recent readings within the fifty-reading cap and receive an upgrade prompt', function () {
@@ -226,15 +265,17 @@ test('free members see only recent readings within the fifty-reading cap and rec
 
     expect($user->plan)->toBe(User::PLAN_FREE)
         ->and($user->tarotReadings()->where('created_at', '>=', now()->subMonths(3))->count())->toBe(55);
-    $response = $this->actingAs($user)->get(route('readings.index', ['page' => 4]));
+    $response = $this->actingAs($user)->get(route('readings.index', ['page' => 3]));
     $response->assertOk();
     expect($response->viewData('historyUpgradePrompt'))->toBeTrue()
         ->and($response->viewData('databaseReadings')->total())->toBe(50)
-        ->and($response->viewData('databaseReadings')->count())->toBe(5);
-    $response->assertSee('有料プランを見る');
+        ->and($response->viewData('databaseReadings')->perPage())->toBe(20)
+        ->and($response->viewData('databaseReadings')->count())->toBe(10);
+    $response->assertSee('有料プランを見る')
+        ->assertSee('page=2');
     $readingsOnPage = $response->viewData('databaseReadings');
     expect($readingsOnPage->total())->toBe(50)
-        ->and($readingsOnPage->count())->toBe(5)
+        ->and($readingsOnPage->count())->toBe(10)
         ->and($readingsOnPage->getCollection()->pluck('question')->all())
         ->toContain('Inside-cap marker')
         ->not->toContain('Outside-cap marker', 'Older question');

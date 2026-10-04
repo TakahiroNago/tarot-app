@@ -45,6 +45,9 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'is_active' => 'boolean',
             'daily_credits_refreshed_at' => 'date',
+            'stripe_current_period_end' => 'datetime',
+            'stripe_subscription_event_created_at' => 'datetime',
+            'stripe_cancel_at_period_end' => 'boolean',
             'password' => 'hashed',
         ];
     }
