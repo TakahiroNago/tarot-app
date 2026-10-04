@@ -2,19 +2,41 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
+use App\Services\GuestTrialCreditService;
+use App\Services\ReadingCreditService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cookie;
 use OpenAI\Laravel\Facades\OpenAI;
+use Throwable;
 
 class TarotController extends Controller
 {
-    public function index(): View
-    {
-        return view('tarot');
+    private const GUEST_DEVICE_COOKIE = 'guest_trial_device';
+
+    public function index(
+        Request $request,
+        ReadingCreditService $creditService,
+        GuestTrialCreditService $guestTrialCreditService,
+    ): View {
+        $user = $request->user();
+        $creditSummary = $user instanceof User ? $creditService->balance($user) : null;
+        $guestCredits = null;
+        if ($user === null) {
+            $deviceToken = $this->guestDeviceToken($request);
+            $guestCredits = $guestTrialCreditService->remaining($deviceToken);
+        }
+
+        return view('tarot', compact('creditSummary', 'guestCredits'));
     }
 
-    public function draw(Request $request): View
-    {
+    public function draw(
+        Request $request,
+        ReadingCreditService $creditService,
+        GuestTrialCreditService $guestTrialCreditService,
+    ): View|RedirectResponse {
         $validated = $request->validate([
             'question' => [
                 'required',
@@ -23,6 +45,21 @@ class TarotController extends Controller
             ],
         ]);
         $question = $validated['question'];
+        $user = $request->user();
+        $creditBucket = null;
+        $guestDeviceToken = null;
+
+        if ($user instanceof User) {
+            $creditBucket = $creditService->consume($user);
+            if ($creditBucket === null) {
+                return redirect()->route('tarot')->with('credit_exhausted', '本日利用可能なクレジットを使い切りました。クレジット購入または有料プランをご検討ください。');
+            }
+        } else {
+            $guestDeviceToken = $this->guestDeviceToken($request);
+            if (! $guestTrialCreditService->consume($guestDeviceToken)) {
+                return redirect()->route('tarot')->with('credit_exhausted', '無料体験を使い切りました。会員登録すると毎日3回占えます。');
+            }
+        }
 
         $cards = [
             ['number' => '0', 'symbol' => '✧', 'name' => '愚者', 'english_name' => 'THE FOOL'],
@@ -51,40 +88,77 @@ class TarotController extends Controller
 
         $selectedCard = $cards[array_rand($cards)];
 
-        $response = OpenAI::chat()->create([
-            'model' => 'gpt-5.6-luna',
-            'messages' => [
-                [
-                    'role' => 'system',
-                    'content' => '[REDACTED]',
+        try {
+            $response = OpenAI::chat()->create([
+                'model' => 'gpt-5.6-luna',
+                'messages' => [
+                    [
+                        'role' => 'system',
+                        'content' => '[REDACTED]',
+                    ],
+                    [
+                        'role' => 'user',
+                        'content' => "質問：{$question}\nカード：{$selectedCard['name']}",
+                    ],
                 ],
-                [
-                    'role' => 'user',
-                    'content' => "質問：{$question}\nカード：{$selectedCard['name']}",
-                ],
-            ],
-        ]);
+            ]);
 
-        $interpretation = $response->choices[0]->message->content;
-        $reading = [
-            'question' => $question,
-            'card' => $selectedCard['name'],
-            'interpretation' => $interpretation,
-        ];
+            $interpretation = $response->choices[0]->message->content;
+            $reading = [
+                'question' => $question,
+                'card' => $selectedCard['name'],
+                'interpretation' => $interpretation,
+            ];
 
-        if ($request->user() !== null) {
-            $request->user()->tarotReadings()->create($reading);
-        } else {
-            $sessionReadings = $request->session()->get('tarot_readings', []);
-            $sessionReadings[] = $reading;
-            $request->session()->put('tarot_readings', $sessionReadings);
+            if ($user instanceof User) {
+                $creditSummary = $creditService->balance($user);
+                $creditsRemaining = $creditSummary['total'];
+                $user->tarotReadings()->create($reading);
+            } else {
+                $creditsRemaining = $guestTrialCreditService->remaining($guestDeviceToken);
+                $sessionReadings = $request->session()->get('tarot_readings', []);
+                $sessionReadings[] = $reading;
+                $request->session()->put('tarot_readings', $sessionReadings);
+            }
+        } catch (Throwable $exception) {
+            if ($user instanceof User && $creditBucket !== null) {
+                $creditService->refund($user, $creditBucket);
+            } elseif ($guestDeviceToken !== null) {
+                $guestTrialCreditService->refund($guestDeviceToken);
+            }
+
+            throw $exception;
         }
 
         return view('tarot-result', [
             ...$reading,
+            'creditsRemaining' => $creditsRemaining,
+            'isGuest' => ! $user instanceof User,
             'cardNumber' => $selectedCard['number'],
             'cardSymbol' => $selectedCard['symbol'],
             'cardEnglishName' => $selectedCard['english_name'],
         ]);
+    }
+
+    private function guestDeviceToken(Request $request): string
+    {
+        $token = $request->cookie(self::GUEST_DEVICE_COOKIE);
+
+        if (! is_string($token) || preg_match('/\A[a-f0-9]{64}\z/', $token) !== 1) {
+            $token = bin2hex(random_bytes(32));
+            Cookie::queue(cookie(
+                self::GUEST_DEVICE_COOKIE,
+                $token,
+                60 * 24 * 365 * 5,
+                '/',
+                null,
+                $request->isSecure(),
+                true,
+                false,
+                'lax',
+            ));
+        }
+
+        return $token;
     }
 }

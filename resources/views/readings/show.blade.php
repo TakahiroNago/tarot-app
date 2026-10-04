@@ -32,7 +32,7 @@
                 </section>
                 <div class="history-actions">
                     <a class="text-link" href="{{ route('readings.index') }}">履歴一覧へ戻る</a>
-                    <a class="text-link" href="{{ route('tarot') }}">もう一度占う</a>
+                    <a class="text-link" href="{{ route('tarot') }}">心の問いを占う</a>
                 </div>
             </article>
         </main>
