@@ -21,12 +21,12 @@ test('the plans page shows the planned credit pack and subscription prices', fun
 });
 
 test('guests can use three trial readings and are prompted to register afterwards', function () {
-    OpenAI::fake([
-        CreateResponse::fake(['choices' => [['message' => ['content' => 'First result.']]]]),
-        CreateResponse::fake(['choices' => [['message' => ['content' => 'Second result.']]]]),
-        CreateResponse::fake(['choices' => [['message' => ['content' => 'Third result.']]]]),
-        CreateResponse::fake(['choices' => [['message' => ['content' => 'New device result.']]]]),
-    ]);
+    $responses = [];
+    foreach (['First result.', 'Second result.', 'Third result.', 'New device result.'] as $interpretation) {
+        $responses[] = CreateResponse::fake(['choices' => [['message' => ['content' => $interpretation]]]]);
+        $responses[] = CreateResponse::fake(['choices' => [['message' => ['content' => '{"category":"その他","summary":"テスト要約"}']]]]);
+    }
+    OpenAI::fake($responses);
 
     $tarotPage = $this->withServerVariables(['REMOTE_ADDR' => '192.0.2.10'])
         ->get(route('tarot'));
@@ -100,6 +100,24 @@ test('free members receive three readings per day without carrying unused credit
     expect($user->fresh()->daily_credits)->toBe(3);
 });
 
+test('only premium members do not see the plans link on the tarot page', function () {
+    $plansLink = '<a class="text-link" href="'.route('plans').'">料金・プランを見る</a>';
+    $freeMember = User::factory()->create();
+
+    $this->actingAs($freeMember)
+        ->get(route('tarot'))
+        ->assertOk()
+        ->assertSee($plansLink, false);
+
+    $premiumMember = User::factory()->create();
+    $premiumMember->forceFill(['plan' => User::PLAN_PREMIUM])->save();
+
+    $this->actingAs($premiumMember)
+        ->get(route('tarot'))
+        ->assertOk()
+        ->assertDontSee($plansLink, false);
+});
+
 test('legacy users with a null plan are treated as free members', function () {
     $dailyCreditLimit = new ReflectionMethod(ReadingCreditService::class, 'dailyCreditLimit');
 
@@ -109,6 +127,7 @@ test('legacy users with a null plan are treated as free members', function () {
 test('purchased credits remain separate and can be spent after daily credits run out', function () {
     OpenAI::fake([
         CreateResponse::fake(['choices' => [['message' => ['content' => 'Purchased result.']]]]),
+        CreateResponse::fake(['choices' => [['message' => ['content' => '{"category":"その他","summary":"テスト要約"}']]]]),
     ]);
     $user = User::factory()->create();
     $user->forceFill([
@@ -145,6 +164,7 @@ test('members with no credits see a full-width plans link and cannot draw a card
 test('the result page links the entire exhausted member-credit notice to plans', function () {
     OpenAI::fake([
         CreateResponse::fake(['choices' => [['message' => ['content' => 'Last credit result.']]]]),
+        CreateResponse::fake(['choices' => [['message' => ['content' => '{"category":"その他","summary":"テスト要約"}']]]]),
     ]);
     $user = User::factory()->create();
     $user->forceFill([

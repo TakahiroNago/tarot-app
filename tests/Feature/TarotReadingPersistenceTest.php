@@ -4,16 +4,24 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 use OpenAI\Laravel\Facades\OpenAI;
+use OpenAI\Resources\Chat;
 use OpenAI\Responses\Chat\CreateResponse;
 
 uses(RefreshDatabase::class);
 
-test('authenticated readings are stored with only the requested result fields', function () {
+test('authenticated readings are stored with their category and summary', function () {
     OpenAI::fake([
         CreateResponse::fake([
             'choices' => [[
                 'message' => [
                     'content' => 'A useful interpretation.',
+                ],
+            ]],
+        ]),
+        CreateResponse::fake([
+            'choices' => [[
+                'message' => [
+                    'content' => '{"category":"仕事","summary":"仕事に関する前向きな助言です。"}',
                 ],
             ]],
         ]),
@@ -24,16 +32,102 @@ test('authenticated readings are stored with only the requested result fields', 
         ->post(route('tarot.draw'), ['question' => 'What should I focus on?'])
         ->assertOk()
         ->assertViewHas('question', 'What should I focus on?')
-        ->assertViewHas('interpretation', 'A useful interpretation.');
+        ->assertViewHas('interpretation', 'A useful interpretation.')
+        ->assertViewHas('category', '仕事')
+        ->assertViewHas('summary', '仕事に関する前向きな助言です。');
 
     $reading = $user->tarotReadings()->sole();
 
     expect($reading->question)->toBe('What should I focus on?')
         ->and($reading->card)->toBeString()
-        ->and($reading->interpretation)->toBe('A useful interpretation.');
+        ->and($reading->interpretation)->toBe('A useful interpretation.')
+        ->and($reading->category)->toBe('仕事')
+        ->and($reading->summary)->toBe('仕事に関する前向きな助言です。');
 
     expect(Schema::getColumnListing('tarot_readings'))
-        ->toEqualCanonicalizing(['id', 'user_id', 'question', 'card', 'interpretation', 'created_at', 'updated_at']);
+        ->toEqualCanonicalizing(['id', 'user_id', 'question', 'card', 'interpretation', 'category', 'summary', 'created_at', 'updated_at']);
+});
+
+test('premium readings use the three latest summaries from the question category', function () {
+    $openAiFake = OpenAI::fake([
+        CreateResponse::fake([
+            'choices' => [['message' => ['content' => '仕事']]],
+        ]),
+        CreateResponse::fake([
+            'choices' => [['message' => ['content' => 'A history-informed interpretation.']]],
+        ]),
+        CreateResponse::fake([
+            'choices' => [['message' => ['content' => '{"summary":"今後に活かせる仕事の助言です。"}']]],
+        ]),
+    ]);
+    $user = User::factory()->create();
+    $user->forceFill(['plan' => User::PLAN_PREMIUM])->save();
+
+    foreach ([
+        ['summary' => 'Excluded oldest summary.', 'days_ago' => 4],
+        ['summary' => 'Included third summary.', 'days_ago' => 3],
+        ['summary' => 'Included second summary.', 'days_ago' => 2],
+        ['summary' => 'Included latest summary.', 'days_ago' => 1],
+    ] as $pastReading) {
+        $createdAt = now()->subDays($pastReading['days_ago']);
+        $reading = $user->tarotReadings()->create([
+            'question' => 'A past work question?',
+            'card' => 'The Star',
+            'interpretation' => 'A past answer.',
+            'category' => '仕事',
+            'summary' => $pastReading['summary'],
+        ]);
+        $reading->forceFill(['created_at' => $createdAt, 'updated_at' => $createdAt])->save();
+    }
+
+    $user->tarotReadings()->create([
+        'question' => 'A past love question?',
+        'card' => 'The Lovers',
+        'interpretation' => 'A love answer.',
+        'category' => '恋愛',
+        'summary' => 'Excluded different category summary.',
+    ]);
+    User::factory()->create()->tarotReadings()->create([
+        'question' => 'Another user work question?',
+        'card' => 'The Sun',
+        'interpretation' => 'Another user answer.',
+        'category' => '仕事',
+        'summary' => 'Excluded another user summary.',
+    ]);
+
+    $this->actingAs($user)
+        ->post(route('tarot.draw'), ['question' => 'How can I grow in my career?'])
+        ->assertOk()
+        ->assertViewHas('interpretation', 'A history-informed interpretation.')
+        ->assertViewHas('category', '仕事')
+        ->assertViewHas('summary', '今後に活かせる仕事の助言です。');
+
+    $openAiFake->assertSent(Chat::class, function (string $method, array $parameters): bool {
+        return $method === 'create'
+            && $parameters['messages'][0]['content'] === '質問文を「仕事」「恋愛」「人間関係」「お金」「健康」「将来」「その他」のいずれか1つに分類してください。分類結果のカテゴリ名だけを返してください。'
+            && $parameters['messages'][1]['content'] === 'How can I grow in my career?';
+    });
+    $openAiFake->assertSent(Chat::class, function (string $method, array $parameters): bool {
+        $prompt = $parameters['messages'][1]['content'];
+
+        if ($method !== 'create' || ! str_contains($parameters['messages'][0]['content'], '提示された過去')) {
+            return false;
+        }
+
+        expect($prompt)
+            ->toContain('Included latest summary.')
+            ->toContain('Included second summary.')
+            ->toContain('Included third summary.')
+            ->not->toContain('Excluded oldest summary.')
+            ->not->toContain('Excluded different category summary.')
+            ->not->toContain('Excluded another user summary.')
+            ->toContain(now()->subDay()->format('Y/m/d H:i'))
+            ->toContain(now()->subDays(2)->format('Y/m/d H:i'))
+            ->toContain(now()->subDays(3)->format('Y/m/d H:i'));
+
+        return true;
+    });
+    $openAiFake->assertSent(Chat::class, 3);
 });
 
 test('guest readings stay in the same session and are not written to the database', function () {
@@ -42,7 +136,13 @@ test('guest readings stay in the same session and are not written to the databas
             'choices' => [['message' => ['content' => 'First interpretation.']]],
         ]),
         CreateResponse::fake([
+            'choices' => [['message' => ['content' => '{"category":"恋愛","summary":"恋愛に関する助言です。"}']]],
+        ]),
+        CreateResponse::fake([
             'choices' => [['message' => ['content' => 'Second interpretation.']]],
+        ]),
+        CreateResponse::fake([
+            'choices' => [['message' => ['content' => '{"category":"その他","summary":"全体に関する助言です。"}']]],
         ]),
     ]);
 
@@ -52,12 +152,49 @@ test('guest readings stay in the same session and are not written to the databas
     $readings = session('tarot_readings');
 
     expect($readings)->toHaveCount(2)
-        ->and($readings[0])->toHaveKeys(['question', 'card', 'interpretation'])
+        ->and($readings[0])->toHaveKeys(['question', 'card', 'interpretation', 'category', 'summary'])
         ->and($readings[0]['question'])->toBe('First question?')
+        ->and($readings[0]['category'])->toBe('恋愛')
+        ->and($readings[0]['summary'])->toBe('恋愛に関する助言です。')
         ->and($readings[1]['question'])->toBe('Second question?');
     expect(array_key_exists('cardNumber', $readings[0]))->toBeFalse()
         ->and(array_key_exists('cardSymbol', $readings[0]))->toBeFalse()
         ->and(array_key_exists('cardEnglishName', $readings[0]))->toBeFalse();
+
+    $this->assertDatabaseCount('tarot_readings', 0);
+});
+
+test('reading metadata outside the allowed category and summary limits is rejected', function () {
+    $this->withoutExceptionHandling();
+
+    OpenAI::fake([
+        CreateResponse::fake([
+            'choices' => [['message' => ['content' => 'An interpretation.']]],
+        ]),
+        CreateResponse::fake([
+            'choices' => [['message' => ['content' => '{"category":"旅行","summary":"有効な要約"}']]],
+        ]),
+    ]);
+
+    expect(fn () => $this->post(route('tarot.draw'), ['question' => 'A question?']))
+        ->toThrow(UnexpectedValueException::class);
+
+    $this->assertDatabaseCount('tarot_readings', 0);
+
+    OpenAI::fake([
+        CreateResponse::fake([
+            'choices' => [['message' => ['content' => 'Another interpretation.']]],
+        ]),
+        CreateResponse::fake([
+            'choices' => [['message' => ['content' => json_encode([
+                'category' => 'その他',
+                'summary' => str_repeat('あ', 151),
+            ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)]]],
+        ]),
+    ]);
+
+    expect(fn () => $this->post(route('tarot.draw'), ['question' => 'Another question?']))
+        ->toThrow(UnexpectedValueException::class);
 
     $this->assertDatabaseCount('tarot_readings', 0);
 });

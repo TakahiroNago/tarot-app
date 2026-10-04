@@ -35,6 +35,8 @@ test('registration saves the current session readings to the new account', funct
             'question' => 'Before registration?',
             'card' => 'The Fool',
             'interpretation' => 'A reading before registration.',
+            'category' => '将来',
+            'summary' => '登録前のリーディングの要約です。',
         ]],
     ])->post(route('register.store'), [
         'name' => 'New User',
@@ -50,6 +52,8 @@ test('registration saves the current session readings to the new account', funct
         'question' => 'Before registration?',
         'card' => 'The Fool',
         'interpretation' => 'A reading before registration.',
+        'category' => '将来',
+        'summary' => '登録前のリーディングの要約です。',
     ]);
 });
 

@@ -21,17 +21,19 @@
                         <p class="plan-price">10回 <strong>100円</strong></p>
                         <p class="plan-price">50回 <strong>400円</strong></p>
                         <p class="plan-price">100回 <strong>500円</strong></p>
-                        <p>購入したクレジットは日次分とは別に管理します。</p>
                     </section>
                     <section class="plan-card">
                         <h2>ライトプラン</h2>
                         <p class="plan-price"><strong>月額280円</strong></p>
-                        <p>1日5回、最大150回まで繰り越し。履歴は直近3か月分。</p>
+                        <p>・1日5回（最大150回まで引継ぎ）</p>
+                        <p>・過去3か月のリーディング履歴</p>
                     </section>
                     <section class="plan-card">
                         <h2>プレミアムプラン</h2>
                         <p class="plan-price"><strong>月額1,980円</strong></p>
-                        <p>1日10回、最大300回まで繰り越し。履歴をすべて表示。</p>
+                        <p>・1日10回（最大300回まで引継ぎ）</p>
+                        <p>・すべてのリーディング履歴</p>
+                        <p>・過去のリーディング結果をもとにした、さらに深いリーディング結果</p>
                     </section>
                 </div>
 
