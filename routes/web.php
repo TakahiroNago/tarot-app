@@ -4,6 +4,7 @@
 
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
@@ -19,6 +20,8 @@ Route::get('/tarot', [TarotController::class, 'index'])->name('tarot');
 
 Route::post('/tarot/draw', [TarotController::class, 'draw'])->name('tarot.draw');
 
+Route::view('/plans', 'plans')->name('plans');
+
 Route::middleware('active')->group(function () {
     Route::get('/readings', [ReadingHistoryController::class, 'index'])->name('readings.index');
     Route::get('/readings/{reading}', [ReadingHistoryController::class, 'show'])->name('readings.show');
@@ -29,6 +32,8 @@ Route::middleware('guest')->group(function () {
     Route::post('/register', [RegisteredUserController::class, 'store'])->name('register.store');
     Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('login');
     Route::post('/login', [AuthenticatedSessionController::class, 'store'])->middleware('throttle:5,1')->name('login.store');
+    Route::get('/auth/google', [GoogleAuthController::class, 'redirect'])->name('login.google');
+    Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback'])->name('login.google.callback');
     Route::get('/forgot-password', [PasswordResetLinkController::class, 'create'])->name('password.request');
     Route::post('/forgot-password', [PasswordResetLinkController::class, 'store'])->name('password.email');
     Route::get('/reset-password/{token}', [NewPasswordController::class, 'create'])->name('password.reset');

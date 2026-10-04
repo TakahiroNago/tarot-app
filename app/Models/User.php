@@ -11,13 +11,25 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password', 'role', 'is_active'])]
+#[Fillable(['name', 'email', 'password', 'role', 'is_active', 'google_id'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
     public const ROLE_USER = 'user';
 
     public const ROLE_ADMIN = 'admin';
+
+    public const PLAN_FREE = 'free';
+
+    public const PLAN_LITE = 'lite';
+
+    public const PLAN_PREMIUM = 'premium';
+
+    protected $attributes = [
+        'plan' => self::PLAN_FREE,
+        'daily_credits' => 0,
+        'purchased_credits' => 0,
+    ];
 
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
@@ -32,6 +44,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'is_active' => 'boolean',
+            'daily_credits_refreshed_at' => 'date',
             'password' => 'hashed',
         ];
     }

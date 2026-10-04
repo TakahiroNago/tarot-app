@@ -13,6 +13,12 @@
             <section class="history-panel">
                 <p class="eyebrow">READING JOURNAL</p>
                 <h1>占い履歴</h1>
+                @if ($historyUpgradePrompt)
+                    <p class="form-notice credit-notice">
+                        無料会員の履歴表示は直近3か月の50件までです。有料プランで、より多くの履歴を確認できます。
+                        <a href="{{ route('plans') }}">有料プランを見る</a>
+                    </p>
+                @endif
 
                 @if ($sessionReadings->isNotEmpty())
                     <section class="history-group">
