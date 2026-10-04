@@ -66,7 +66,9 @@
                     </button>
                 </form>
 
-                <a class="text-link" href="{{ route('plans') }}">料金・プランを見る</a>
+                @if (! auth()->check() || auth()->user()->plan !== \App\Models\User::PLAN_PREMIUM)
+                    <a class="text-link" href="{{ route('plans') }}">料金・プランを見る</a>
+                @endif
                 <a class="text-link tarot-home-link" href="{{ route('home') }}">トップページへ戻る</a>
             </section>
         </main>

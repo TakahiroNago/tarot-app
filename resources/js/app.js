@@ -8,6 +8,6 @@ if (questionForm) {
 		questionForm.classList.add('is-submitting');
 		questionForm.setAttribute('aria-busy', 'true');
 		submitButton.disabled = true;
-		submitLabel.textContent = 'カードを広げています...';
+		submitLabel.textContent = 'あなたの問いを読み解いています...';
 	});
 }

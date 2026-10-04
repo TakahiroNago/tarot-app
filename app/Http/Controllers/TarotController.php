@@ -2,15 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\TarotReading;
 use App\Models\User;
 use App\Services\GuestTrialCreditService;
 use App\Services\ReadingCreditService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cookie;
 use OpenAI\Laravel\Facades\OpenAI;
 use Throwable;
+use UnexpectedValueException;
 
 class TarotController extends Controller
 {
@@ -89,25 +92,51 @@ class TarotController extends Controller
         $selectedCard = $cards[array_rand($cards)];
 
         try {
+            $isPremiumMember = $user instanceof User && $user->plan === User::PLAN_PREMIUM;
+            $category = null;
+            $history = collect();
+
+            if ($isPremiumMember) {
+                $category = $this->readingCategory($question);
+                $history = $user->tarotReadings()
+                    ->where('category', $category)
+                    ->whereNotNull('summary')
+                    ->orderByDesc('created_at')
+                    ->orderByDesc('id')
+                    ->limit(3)
+                    ->get(['summary', 'created_at']);
+            }
+
             $response = OpenAI::chat()->create([
                 'model' => 'gpt-5.6-luna',
                 'messages' => [
                     [
                         'role' => 'system',
-                        'content' => 'あなたはタロット占い師です。カードの象徴をもとに、相談者に分かりやすく占い結果を説明してください。',
+                        'content' => $isPremiumMember
+                            ? 'あなたはタロット占い師です。カードの象徴をもとに、相談者に分かりやすく占い結果を説明してください。提示された過去の同カテゴリの要約と日時を踏まえ、過去の流れとのつながりを考慮して今回の質問に答えてください。過去の要約にない事実は推測せず、今回の質問への回答を中心にしてください。'
+                            : 'あなたはタロット占い師です。カードの象徴をもとに、相談者に分かりやすく占い結果を説明してください。',
                     ],
                     [
                         'role' => 'user',
-                        'content' => "質問：{$question}\nカード：{$selectedCard['name']}",
+                        'content' => $isPremiumMember
+                            ? $this->premiumReadingPrompt($question, $selectedCard['name'], $history)
+                            : "質問：{$question}\nカード：{$selectedCard['name']}",
                     ],
                 ],
             ]);
 
             $interpretation = $response->choices[0]->message->content;
+            $metadata = $isPremiumMember
+                ? [
+                    'category' => $category,
+                    'summary' => $this->readingSummary($question, $selectedCard['name'], $interpretation),
+                ]
+                : $this->readingMetadata($question, $selectedCard['name'], $interpretation);
             $reading = [
                 'question' => $question,
                 'card' => $selectedCard['name'],
                 'interpretation' => $interpretation,
+                ...$metadata,
             ];
 
             if ($user instanceof User) {
@@ -138,6 +167,124 @@ class TarotController extends Controller
             'cardSymbol' => $selectedCard['symbol'],
             'cardEnglishName' => $selectedCard['english_name'],
         ]);
+    }
+
+    private function readingCategory(string $question): string
+    {
+        $response = OpenAI::chat()->create([
+            'model' => 'gpt-5.6-luna',
+            'messages' => [
+                [
+                    'role' => 'system',
+                    'content' => '質問文を「仕事」「恋愛」「人間関係」「お金」「健康」「将来」「その他」のいずれか1つに分類してください。分類結果のカテゴリ名だけを返してください。',
+                ],
+                [
+                    'role' => 'user',
+                    'content' => $question,
+                ],
+            ],
+        ]);
+
+        $category = $response->choices[0]->message->content;
+        if (! is_string($category) || ! in_array(trim($category), TarotReading::CATEGORIES, true)) {
+            throw new UnexpectedValueException('OpenAI returned an invalid reading category.');
+        }
+
+        return trim($category);
+    }
+
+    /**
+     * @param  Collection<int, TarotReading>  $history
+     */
+    private function premiumReadingPrompt(string $question, string $card, Collection $history): string
+    {
+        $historyContext = $history->isEmpty()
+            ? '該当カテゴリの過去のリーディング履歴はありません。'
+            : $history
+                ->map(fn (TarotReading $reading): string => "- {$reading->created_at->format('Y/m/d H:i')}：{$reading->summary}")
+                ->implode("\n");
+
+        return "過去の同カテゴリのリーディング要約と日時：\n{$historyContext}\n\n今回の質問：{$question}\nカード：{$card}";
+    }
+
+    private function readingSummary(string $question, string $card, string $interpretation): string
+    {
+        $response = OpenAI::chat()->create([
+            'model' => 'gpt-5.6-luna',
+            'messages' => [
+                [
+                    'role' => 'system',
+                    'content' => 'タロットリーディング結果を日本語で150文字以内に要約してください。JSONオブジェクトで summary の1項目だけを返してください。',
+                ],
+                [
+                    'role' => 'user',
+                    'content' => "質問：{$question}\nカード：{$card}\nリーディング結果：{$interpretation}",
+                ],
+            ],
+            'response_format' => ['type' => 'json_object'],
+        ]);
+
+        $content = $response->choices[0]->message->content;
+        if (! is_string($content)) {
+            throw new UnexpectedValueException('OpenAI returned no reading summary.');
+        }
+
+        $result = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
+        $summary = is_array($result) ? ($result['summary'] ?? null) : null;
+        if (
+            ! is_string($summary)
+            || trim($summary) === ''
+            || mb_strlen($summary) > TarotReading::SUMMARY_MAX_LENGTH
+        ) {
+            throw new UnexpectedValueException('OpenAI returned an invalid reading summary.');
+        }
+
+        return $summary;
+    }
+
+    /**
+     * @return array{category: string, summary: string}
+     */
+    private function readingMetadata(string $question, string $card, string $interpretation): array
+    {
+        $response = OpenAI::chat()->create([
+            'model' => 'gpt-5.6-luna',
+            'messages' => [
+                [
+                    'role' => 'system',
+                    'content' => 'あなたはタロットリーディング結果の分類・要約を行います。カテゴリは「仕事」「恋愛」「人間関係」「お金」「健康」「将来」「その他」の7つから最も関連のあるものを1つだけ選んでください。要約は日本語で150文字以内にしてください。JSONオブジェクトで category と summary の2項目のみを返してください。',
+                ],
+                [
+                    'role' => 'user',
+                    'content' => "質問：{$question}\nカード：{$card}\nリーディング結果：{$interpretation}",
+                ],
+            ],
+            'response_format' => ['type' => 'json_object'],
+        ]);
+
+        $content = $response->choices[0]->message->content;
+        if (! is_string($content)) {
+            throw new UnexpectedValueException('OpenAI returned no reading metadata.');
+        }
+
+        $metadata = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
+        $category = is_array($metadata) ? ($metadata['category'] ?? null) : null;
+        $summary = is_array($metadata) ? ($metadata['summary'] ?? null) : null;
+
+        if (
+            ! is_string($category)
+            || ! in_array($category, TarotReading::CATEGORIES, true)
+            || ! is_string($summary)
+            || trim($summary) === ''
+            || mb_strlen($summary) > TarotReading::SUMMARY_MAX_LENGTH
+        ) {
+            throw new UnexpectedValueException('OpenAI returned invalid reading metadata.');
+        }
+
+        return [
+            'category' => $category,
+            'summary' => $summary,
+        ];
     }
 
     private function guestDeviceToken(Request $request): string
