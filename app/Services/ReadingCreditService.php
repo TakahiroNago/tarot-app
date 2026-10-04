@@ -87,6 +87,23 @@ class ReadingCreditService
         $today = CarbonImmutable::today();
         $refreshedAt = $user->daily_credits_refreshed_at;
 
+        if ($user->daily_credits_plan !== $plan) {
+            $maximumBalance = match ($plan) {
+                User::PLAN_LITE => 150,
+                User::PLAN_PREMIUM => 300,
+                default => 3,
+            };
+            $user->daily_credits = min(
+                $maximumBalance,
+                max($user->daily_credits, $this->dailyCreditLimit($plan)),
+            );
+            $user->daily_credits_plan = $plan;
+            $user->daily_credits_refreshed_at = $today;
+            $user->save();
+
+            return;
+        }
+
         if ($refreshedAt === null) {
             $user->daily_credits = $this->dailyCreditLimit($plan);
             $user->daily_credits_refreshed_at = $today;

@@ -41,4 +41,17 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
 
+    'stripe' => [
+        'secret' => env('STRIPE_SECRET'),
+        'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+        'ca_bundle' => env('STRIPE_CA_BUNDLE', ini_get('curl.cainfo') ?: null),
+        'prices' => [
+            'credits_10' => env('STRIPE_PRICE_CREDITS_10'),
+            'credits_50' => env('STRIPE_PRICE_CREDITS_50'),
+            'credits_100' => env('STRIPE_PRICE_CREDITS_100'),
+            'lite' => env('STRIPE_PRICE_LITE'),
+            'premium' => env('STRIPE_PRICE_PREMIUM'),
+        ],
+    ],
+
 ];

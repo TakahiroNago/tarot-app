@@ -8,7 +8,9 @@ use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
+use App\Http\Controllers\BillingController;
 use App\Http\Controllers\ReadingHistoryController;
+use App\Http\Controllers\StripeWebhookController;
 use App\Http\Controllers\TarotController;
 use Illuminate\Support\Facades\Route;
 
@@ -22,7 +24,11 @@ Route::post('/tarot/draw', [TarotController::class, 'draw'])->name('tarot.draw')
 
 Route::view('/plans', 'plans')->name('plans');
 
+Route::post('/stripe/webhook', StripeWebhookController::class)->name('stripe.webhook');
+
 Route::middleware('active')->group(function () {
+    Route::post('/billing/checkout', [BillingController::class, 'checkout'])->middleware('auth')->name('billing.checkout');
+    Route::post('/billing/portal', [BillingController::class, 'portal'])->middleware('auth')->name('billing.portal');
     Route::get('/readings', [ReadingHistoryController::class, 'index'])->name('readings.index');
     Route::get('/readings/{reading}', [ReadingHistoryController::class, 'show'])->name('readings.show');
 });

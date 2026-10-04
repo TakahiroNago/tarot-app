@@ -28,14 +28,15 @@ class ReadingHistoryController extends Controller
             $historyCount = $historyQuery->count();
             $displayLimit = $user->plan === User::PLAN_FREE ? min(50, $historyCount) : $historyCount;
             $historyUpgradePrompt = $user->plan === User::PLAN_FREE && $historyCount > 50;
+            $perPage = 20;
             $page = LengthAwarePaginator::resolveCurrentPage();
             $databaseReadings = new LengthAwarePaginator(
                 $historyQuery
-                    ->offset(($page - 1) * 15)
-                    ->limit(min(15, max(0, $displayLimit - (($page - 1) * 15))))
+                    ->offset(($page - 1) * $perPage)
+                    ->limit(min($perPage, max(0, $displayLimit - (($page - 1) * $perPage))))
                     ->get(),
                 $displayLimit,
-                15,
+                $perPage,
                 $page,
                 ['path' => LengthAwarePaginator::resolveCurrentPath(), 'query' => $request->query()],
             );
