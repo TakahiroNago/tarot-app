@@ -2,6 +2,7 @@
 
 <?php
 
+use App\Http\Controllers\AccountSettingsController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\GoogleAuthController;
@@ -9,6 +10,7 @@ use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\BillingController;
+use App\Http\Controllers\ContactController;
 use App\Http\Controllers\ReadingHistoryController;
 use App\Http\Controllers\StripeWebhookController;
 use App\Http\Controllers\TarotController;
@@ -23,6 +25,15 @@ Route::get('/tarot', [TarotController::class, 'index'])->name('tarot');
 Route::post('/tarot/draw', [TarotController::class, 'draw'])->name('tarot.draw');
 
 Route::view('/plans', 'plans')->name('plans');
+
+Route::view('/terms', 'legal.terms')->name('legal.terms');
+Route::view('/privacy', 'legal.privacy')->name('legal.privacy');
+Route::view('/specified-commercial-transactions', 'legal.commercial-transactions')
+    ->name('legal.commercial-transactions');
+Route::view('/refund-credit-policy', 'legal.refund-credit-policy')
+    ->name('legal.refund-credit-policy');
+Route::get('/contact', [ContactController::class, 'create'])->name('contact.create');
+Route::post('/contact', [ContactController::class, 'store'])->middleware('throttle:5,1')->name('contact.store');
 
 Route::post('/stripe/webhook', StripeWebhookController::class)->name('stripe.webhook');
 
@@ -49,6 +60,12 @@ Route::middleware('guest')->group(function () {
 Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
     ->middleware(['auth', 'active'])
     ->name('logout');
+
+Route::middleware(['auth', 'active'])->prefix('account')->name('account.')->group(function () {
+    Route::get('/settings', [AccountSettingsController::class, 'edit'])->name('settings.edit');
+    Route::put('/settings', [AccountSettingsController::class, 'update'])->name('settings.update');
+    Route::delete('/settings', [AccountSettingsController::class, 'destroy'])->name('settings.destroy');
+});
 
 Route::prefix('admin')->name('admin.')->middleware(['auth', 'active', 'admin'])->group(function () {
     Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');

@@ -10,6 +10,7 @@ use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Stripe\Checkout\Session;
 use Stripe\Event;
+use Stripe\Exception\ApiErrorException;
 use Stripe\Stripe;
 use Stripe\StripeClient;
 
@@ -138,6 +139,63 @@ class StripeBillingService
         }
 
         return $session->url;
+    }
+
+    public function cancelForAccountDeletion(User $user): void
+    {
+        if (
+            $user->stripe_pending_subscription_checkout_id === null
+            && $user->stripe_subscription_id === null
+            && $user->stripe_customer_id === null
+        ) {
+            return;
+        }
+
+        if (! is_string(config('services.stripe.secret')) || config('services.stripe.secret') === '') {
+            throw ValidationException::withMessages([
+                'account' => '決済サービスに接続できないため、アカウントは削除されませんでした。サポートへお問い合わせください。',
+            ]);
+        }
+
+        try {
+            $stripe = $this->stripe();
+            $subscriptionIds = array_filter([$user->stripe_subscription_id], 'is_string');
+
+            if (is_string($user->stripe_pending_subscription_checkout_id)) {
+                $checkout = $stripe->checkout->sessions->retrieve($user->stripe_pending_subscription_checkout_id);
+
+                if ($checkout->status === 'open') {
+                    $stripe->checkout->sessions->expire($checkout->id);
+                } elseif ($checkout->status === 'complete') {
+                    $subscription = $checkout->subscription ?? null;
+                    $subscriptionId = is_string($subscription)
+                        ? $subscription
+                        : (is_string($subscription->id ?? null) ? $subscription->id : null);
+
+                    if ($subscriptionId !== null) {
+                        $subscriptionIds[] = $subscriptionId;
+                    }
+                }
+            }
+
+            foreach (array_unique($subscriptionIds) as $subscriptionId) {
+                $subscription = $stripe->subscriptions->retrieve($subscriptionId);
+
+                if (! in_array($subscription->status, ['canceled', 'incomplete_expired'], true)) {
+                    $stripe->subscriptions->cancel($subscriptionId);
+                }
+            }
+
+            if (is_string($user->stripe_customer_id)) {
+                $stripe->customers->delete($user->stripe_customer_id);
+            }
+        } catch (ApiErrorException $exception) {
+            report($exception);
+
+            throw ValidationException::withMessages([
+                'account' => '決済サービスの契約を停止できなかったため、アカウントは削除されませんでした。時間をおいて再度お試しください。',
+            ]);
+        }
     }
 
     public function handleWebhook(Event $event): void

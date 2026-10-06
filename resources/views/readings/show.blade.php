@@ -36,7 +36,7 @@
                 </div>
             </article>
         </main>
-        <footer class="site-footer">YOUR MOMENT, YOUR MEANING</footer>
+        @include('partials.site-footer')
     </div>
 </body>
 </html>

@@ -41,6 +41,10 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
 
+    'contact' => [
+        'email' => env('CONTACT_EMAIL', 'takahiro.nago.art@gmail.com'),
+    ],
+
     'stripe' => [
         'secret' => env('STRIPE_SECRET'),
         'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
