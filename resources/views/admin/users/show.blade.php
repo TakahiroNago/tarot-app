@@ -38,7 +38,7 @@
                 <a class="text-link" href="{{ route('admin.users.index') }}">ユーザー一覧へ戻る</a>
             </section>
         </main>
-        <footer class="site-footer">YOUR MOMENT, YOUR MEANING</footer>
+        @include('partials.site-footer')
     </div>
 </body>
 </html>

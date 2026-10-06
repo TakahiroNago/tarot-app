@@ -60,6 +60,7 @@
                             <span class="account-profile-email">{{ auth()->user()->email }}</span>
                         </div>
                     </div>
+                    <a class="account-popover-link" href="{{ route('account.settings.edit') }}">アカウント設定</a>
                     <a class="account-popover-link" href="{{ route('readings.index') }}">占い履歴</a>
                     @if (auth()->user()->isAdmin())
                         <a class="account-popover-link" href="{{ route('admin.users.index') }}">ユーザー管理</a>
