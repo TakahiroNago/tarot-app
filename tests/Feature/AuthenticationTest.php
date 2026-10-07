@@ -2,9 +2,13 @@
 
 use App\Models\User;
 use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\URL;
 use Laravel\Socialite\Contracts\Provider;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as GoogleUser;
@@ -12,6 +16,8 @@ use Laravel\Socialite\Two\User as GoogleUser;
 uses(RefreshDatabase::class);
 
 test('a visitor can register and is assigned the user role', function () {
+    Notification::fake();
+
     $this->post(route('register.store'), [
         'name' => 'New User',
         'email' => 'new-user@example.com',
@@ -19,14 +25,16 @@ test('a visitor can register and is assigned the user role', function () {
         'password_confirmation' => 'A-strong-password-2026',
         'role' => User::ROLE_ADMIN,
         'is_active' => false,
-    ])->assertRedirect(route('home'));
+    ])->assertRedirect(route('verification.notice'));
 
     $this->assertAuthenticated();
     $this->assertDatabaseHas('users', [
         'email' => 'new-user@example.com',
         'role' => User::ROLE_USER,
         'is_active' => true,
+        'email_verified_at' => null,
     ]);
+    Notification::assertSentTo(User::where('email', 'new-user@example.com')->sole(), VerifyEmail::class);
 });
 
 test('registration saves the current session readings to the new account', function () {
@@ -43,7 +51,7 @@ test('registration saves the current session readings to the new account', funct
         'email' => 'new-reader@example.com',
         'password' => 'A-strong-password-2026',
         'password_confirmation' => 'A-strong-password-2026',
-    ])->assertRedirect(route('home'))
+    ])->assertRedirect(route('verification.notice'))
         ->assertSessionMissing('tarot_readings');
 
     $user = User::where('email', 'new-reader@example.com')->sole();
@@ -143,6 +151,111 @@ test('a registered user can log in', function () {
     ])->assertRedirect(route('home'));
 
     $this->assertAuthenticatedAs($user);
+});
+
+test('a guest who starts login from the plans page returns to the plans page', function () {
+    $user = User::factory()->create([
+        'email' => 'plans-reader@example.com',
+        'password' => Hash::make('A-strong-password-2026'),
+    ]);
+
+    $this->get(route('plans'))
+        ->assertOk()
+        ->assertSee(route('login', ['redirect' => 'plans']));
+
+    $this->get(route('login', ['redirect' => 'plans']))
+        ->assertOk();
+
+    $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'A-strong-password-2026',
+    ])->assertRedirect(route('plans'));
+
+    $this->assertAuthenticatedAs($user);
+});
+
+test('an unverified user is sent to email verification after login', function () {
+    $user = User::factory()->unverified()->create([
+        'email' => 'unverified-reader@example.com',
+        'password' => Hash::make('A-strong-password-2026'),
+    ]);
+
+    $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'A-strong-password-2026',
+    ])->assertRedirect(route('verification.notice'));
+
+    $this->assertAuthenticatedAs($user);
+});
+
+test('an unverified user can request a verification email and cannot access reading history', function () {
+    Notification::fake();
+    $user = User::factory()->unverified()->create();
+
+    $this->actingAs($user)
+        ->get(route('verification.notice'))
+        ->assertOk()
+        ->assertSee('メールに記載された確認リンクを開いてください。');
+
+    $this->actingAs($user)
+        ->get(route('readings.index'))
+        ->assertRedirect(route('verification.notice'));
+
+    $this->actingAs($user)
+        ->post(route('verification.send'))
+        ->assertRedirect()
+        ->assertSessionHas('status', 'verification-link-sent');
+
+    Notification::assertSentTo($user, VerifyEmail::class);
+});
+
+test('a user can verify their email using the signed verification link', function () {
+    $user = User::factory()->unverified()->create();
+    $verificationUrl = URL::temporarySignedRoute(
+        'verification.verify',
+        now()->addMinutes(60),
+        ['id' => $user->id, 'hash' => sha1($user->email)],
+    );
+
+    $this->actingAs($user)
+        ->get($verificationUrl)
+        ->assertRedirect(route('home'))
+        ->assertSessionHas('status', 'email-verified');
+
+    expect($user->fresh()->hasVerifiedEmail())->toBeTrue();
+});
+
+test('a verification link for a different email address is rejected', function () {
+    $user = User::factory()->unverified()->create();
+    $verificationUrl = URL::temporarySignedRoute(
+        'verification.verify',
+        now()->addMinutes(60),
+        ['id' => $user->id, 'hash' => sha1('different@example.com')],
+    );
+
+    $this->actingAs($user)
+        ->get($verificationUrl)
+        ->assertForbidden();
+
+    expect($user->fresh()->hasVerifiedEmail())->toBeFalse();
+});
+
+test('the email verification confirmation is marked to auto-dismiss on the welcome and tarot pages', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->withSession(['status' => 'email-verified'])
+        ->get(route('home'))
+        ->assertOk()
+        ->assertSee('data-auto-dismiss', false)
+        ->assertSee('メールアドレスを確認しました。');
+
+    $this->actingAs($user)
+        ->withSession(['status' => 'email-verified'])
+        ->get(route('tarot'))
+        ->assertOk()
+        ->assertSee('data-auto-dismiss', false)
+        ->assertSee('メールアドレスを確認しました。');
 });
 
 test('a guest can start Google login', function () {
@@ -329,4 +442,41 @@ test('a user can reset their password from the email notification', function () 
     ])->assertRedirect(route('login'));
 
     expect(Hash::check('A-new-strong-password-2026', $user->fresh()->password))->toBeTrue();
+});
+
+test('password reset and email verification notifications are written in Japanese', function () {
+    App::setLocale('ja');
+    $user = User::factory()->create();
+    $passwordResetMail = (new ResetPassword('reset-token'))->toMail($user);
+    $verificationMail = (new VerifyEmail)->toMail($user);
+
+    expect($user->preferredLocale())->toBe('ja')
+        ->and($passwordResetMail->subject)->toBe(Lang::get('Reset your password'))
+        ->and($passwordResetMail->introLines)->toContain(
+            Lang::get('You are receiving this email because we received a password reset request for your account.'),
+        )
+        ->and($passwordResetMail->outroLines)->toContain(
+            Lang::get('This password reset link will expire in :count minutes.', ['count' => 60]),
+            Lang::get('If you did not request a password reset, no further action is required.'),
+        )
+        ->and($passwordResetMail->actionText)->toBe(Lang::get('Reset Password'))
+        ->and($verificationMail->subject)->toBe(Lang::get('Verify your email address'))
+        ->and($verificationMail->introLines)->toContain(
+            Lang::get('Please click the button below to verify your email address.'),
+        )
+        ->and($verificationMail->outroLines)->toContain(
+            Lang::get('If you did not create an account, no further action is required.'),
+        )
+        ->and($verificationMail->actionText)->toBe(Lang::get('Verify Email Address'))
+        ->and(config('app.name'))->toBe("\u{6708}\u{8A60} TAROT JOURNAL")
+        ->and((string) $passwordResetMail->render())->toContain(
+            Lang::get('Hello!'),
+            Lang::get('Regards,'),
+            config('app.name'),
+        )
+        ->and((string) $verificationMail->render())->toContain(
+            Lang::get('Hello!'),
+            Lang::get('Regards,'),
+            config('app.name'),
+        );
 });

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>新規登録 | 月詠</title>
+    <title>新規登録 | 月詠 TAROT JOURNAL</title>
     @vite(['resources/css/app.css'])
 </head>
 <body>
@@ -23,8 +23,8 @@
                     <input class="question-input" id="email" name="email" type="email" value="{{ old('email') }}" autocomplete="email" required maxlength="255">
                     @error('email')<p class="form-error">{{ $message }}</p>@enderror
 
-                    <label class="question-label" for="password">パスワード</label>
-                    <input class="question-input" id="password" name="password" type="password" autocomplete="new-password" required minlength="12">
+                    <label class="question-label" for="password">パスワード（12文字以上）</label>
+                    <input class="question-input" id="password" name="password" type="password" autocomplete="new-password" required minlength="12" aria-describedby="password-requirement">
                     @error('password')<p class="form-error">{{ $message }}</p>@enderror
 
                     <label class="question-label" for="password_confirmation">パスワード（確認）</label>

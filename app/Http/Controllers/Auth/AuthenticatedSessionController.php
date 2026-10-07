@@ -12,8 +12,12 @@ use Illuminate\View\View;
 
 class AuthenticatedSessionController extends Controller
 {
-    public function create(): View
+    public function create(Request $request): View
     {
+        if ($request->query('redirect') === 'plans') {
+            $request->session()->put('url.intended', route('plans'));
+        }
+
         return view('auth.login');
     }
 
@@ -33,6 +37,11 @@ class AuthenticatedSessionController extends Controller
         $request->session()->regenerate();
         $user = $request->user();
         abort_unless($user instanceof User, 403);
+
+        if (! $user->hasVerifiedEmail()) {
+            return redirect()->route('verification.notice');
+        }
+
         $sessionReadingPersister->persist($user, $request);
 
         return redirect()->intended(route('home'));

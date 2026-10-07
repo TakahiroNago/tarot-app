@@ -26,7 +26,7 @@
                     href="{{ route('plans') }}"
                     aria-label="利用可能なクレジット合計 {{ $creditSummary['total'] }}回。料金・プランを見る"
                 >
-                    残り <strong>{{ $creditSummary['total'] }}</strong> 回
+                    <strong>{{ $creditSummary['total'] }}</strong> 回
                 </a>
             @else
                 <a href="{{ route('plans') }}">料金・プラン</a>

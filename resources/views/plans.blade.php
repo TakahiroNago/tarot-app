@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>料金・プラン | 月詠</title>
+    <title>料金・プラン | 月詠 TAROT JOURNAL</title>
     @vite(['resources/css/app.css'])
 </head>
 <body>
@@ -13,7 +13,6 @@
             <section class="history-panel plans-panel">
                 <p class="eyebrow">MEMBERSHIP</p>
                 <h1>料金・プラン</h1>
-                <p class="page-description">Stripeの安全な決済画面から、クレジット購入や有料プランへの登録ができます。決済情報はStripeが管理します。</p>
 
                 @if ($errors->has('billing'))
                     <p class="form-notice credit-notice" role="alert">{{ $errors->first('billing') }}</p>
@@ -47,22 +46,29 @@
                 <div class="plan-grid">
                     <section class="plan-card">
                         <h2>クレジット購入</h2>
-                        <p class="plan-price">10回 <strong>100円</strong></p>
-                        <p class="plan-price">50回 <strong>400円</strong></p>
-                        <p class="plan-price">100回 <strong>500円</strong></p>
-                        @foreach (['credits_10' => '10回分を購入', 'credits_50' => '50回分を購入', 'credits_100' => '100回分を購入'] as $product => $label)
-                            @if (auth()->check() && config('services.stripe.secret') && config("services.stripe.prices.{$product}"))
-                                <form method="POST" action="{{ route('billing.checkout') }}">
-                                    @csrf
-                                    <input type="hidden" name="product" value="{{ $product }}">
-                                    <button class="text-link" type="submit">{{ $label }}</button>
-                                </form>
-                            @elseif (auth()->guest())
-                                <p><a class="text-link" href="{{ route('login') }}">ログインして{{ $label }}</a></p>
-                            @else
-                                <p>決済準備中</p>
-                            @endif
+                        @foreach ([
+                            'credits_10' => ['10回', '100円', '10回分を購入'],
+                            'credits_50' => ['50回', '400円', '50回分を購入'],
+                            'credits_100' => ['100回', '500円', '100回分を購入'],
+                        ] as $product => [$credits, $price, $label])
+                            <div class="plan-credit-option">
+                                <p class="plan-price">{{ $credits }} <strong>{{ $price }}</strong></p>
+                                @auth
+                                    @if (config('services.stripe.secret') && config("services.stripe.prices.{$product}"))
+                                        <form method="POST" action="{{ route('billing.checkout') }}">
+                                            @csrf
+                                            <input type="hidden" name="product" value="{{ $product }}">
+                                            <button class="primary-action plan-credit-button" type="submit">{{ $label }}</button>
+                                        </form>
+                                    @else
+                                        <span>決済準備中</span>
+                                    @endif
+                                @endauth
+                            </div>
                         @endforeach
+                        @guest
+                            <p><a class="text-link" href="{{ route('login', ['redirect' => 'plans']) }}">ログインして購入</a></p>
+                        @endguest
                     </section>
                     <section class="plan-card">
                         <h2>ライトプラン</h2>
@@ -107,6 +113,7 @@
                         <a href="{{ route('register') }}">無料会員登録</a>後にログインすると購入できます。
                     </p>
                 @endguest
+                <p class="page-description">Stripeの安全な決済画面から、クレジット購入や有料プランへの登録ができます。決済情報はStripeが管理します。</p>
                 <p class="page-description">プランの解約・変更は契約管理画面から手続きできます。解約後も、お支払い済み期間の終了までは有料機能をご利用いただけます。</p>
                 <a class="text-link" href="{{ route('tarot') }}">占いに戻る</a>
             </section>

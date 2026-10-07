@@ -5,7 +5,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>タロット占い</title>
+    <title>タロット占い | 月詠 TAROT JOURNAL</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body>
@@ -14,6 +14,9 @@
 
         <main class="page-content">
             <section class="form-panel">
+                @if (session('status') === 'email-verified')
+                    <p class="form-notice" data-auto-dismiss role="status">メールアドレスを確認しました。</p>
+                @endif
                 <p class="eyebrow">A MOMENT FOR YOU</p>
                 <h1>心にある問いを、<br>聞かせてください。</h1>
                 <p class="page-description">いま気になっていることを、自由に入力してください。</p>

@@ -17,7 +17,31 @@ test('the plans page shows the planned credit pack and subscription prices', fun
         ->assertSee('100回')
         ->assertSee('月額280円')
         ->assertSee('月額980円')
+        ->assertSee('ログインして購入')
+        ->assertDontSee('ログインして10回分を購入')
+        ->assertDontSee('ログインして50回分を購入')
+        ->assertDontSee('ログインして100回分を購入')
         ->assertSee('Stripe');
+});
+
+test('signed-in users see purchase buttons beside each credit pack price', function () {
+    config([
+        'services.stripe.secret' => 'sk_test',
+        'services.stripe.prices.credits_10' => 'price_credits_10',
+        'services.stripe.prices.credits_50' => 'price_credits_50',
+        'services.stripe.prices.credits_100' => 'price_credits_100',
+    ]);
+
+    $this->actingAs(User::factory()->create())
+        ->get(route('plans'))
+        ->assertOk()
+        ->assertSee('class="plan-credit-option"', false)
+        ->assertSee('10回 <strong>100円</strong>', false)
+        ->assertSee('class="primary-action plan-credit-button" type="submit">10回分を購入</button>', false)
+        ->assertSee('50回 <strong>400円</strong>', false)
+        ->assertSee('class="primary-action plan-credit-button" type="submit">50回分を購入</button>', false)
+        ->assertSee('100回 <strong>500円</strong>', false)
+        ->assertSee('class="primary-action plan-credit-button" type="submit">100回分を購入</button>', false);
 });
 
 test('guests can use three trial readings and are prompted to register afterwards', function () {
