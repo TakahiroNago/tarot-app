@@ -5,16 +5,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>タロット占い</title>
-    @vite(['resources/css/app.css'])
+    <title>タロット占い | 月詠 TAROT JOURNAL</title>
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body>
     <div class="page-frame">
         @include('partials.site-header')
-
         <main class="page-content">
             <section class="welcome-panel">
                 <div class="welcome-copy">
+                    @if (session('status') === 'email-verified')
+                        <p class="form-notice" data-auto-dismiss role="status">メールアドレスを確認しました。</p>
+                    @endif
                     <p class="eyebrow">今日のあなたへ</p>
                     <h1 class="welcome-title">心の声に、<br>カードが光をあてる。</h1>
                     <p class="welcome-description">迷いや期待を、ひとつの問いに。カードが映す小さなヒントを、あなたの毎日に届けます。</p>

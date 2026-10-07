@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>占い履歴 | 月詠</title>
+    <title>占い履歴 | 月詠 TAROT JOURNAL</title>
     @vite(['resources/css/app.css'])
 </head>
 <body>

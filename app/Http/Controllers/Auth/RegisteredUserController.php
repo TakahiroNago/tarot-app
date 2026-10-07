@@ -39,6 +39,6 @@ class RegisteredUserController extends Controller
         $request->session()->regenerate();
         $sessionReadingPersister->persist($user, $request);
 
-        return redirect()->intended(route('home'));
+        return redirect()->route('verification.notice');
     }
 }

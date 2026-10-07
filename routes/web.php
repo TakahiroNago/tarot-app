@@ -14,6 +14,8 @@ use App\Http\Controllers\ContactController;
 use App\Http\Controllers\ReadingHistoryController;
 use App\Http\Controllers\StripeWebhookController;
 use App\Http\Controllers\TarotController;
+use Illuminate\Foundation\Auth\EmailVerificationRequest;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -38,10 +40,36 @@ Route::post('/contact', [ContactController::class, 'store'])->middleware('thrott
 Route::post('/stripe/webhook', StripeWebhookController::class)->name('stripe.webhook');
 
 Route::middleware('active')->group(function () {
-    Route::post('/billing/checkout', [BillingController::class, 'checkout'])->middleware('auth')->name('billing.checkout');
-    Route::post('/billing/portal', [BillingController::class, 'portal'])->middleware('auth')->name('billing.portal');
-    Route::get('/readings', [ReadingHistoryController::class, 'index'])->name('readings.index');
-    Route::get('/readings/{reading}', [ReadingHistoryController::class, 'show'])->name('readings.show');
+    Route::post('/billing/checkout', [BillingController::class, 'checkout'])->middleware(['auth', 'verified'])->name('billing.checkout');
+    Route::post('/billing/portal', [BillingController::class, 'portal'])->middleware(['auth', 'verified'])->name('billing.portal');
+    Route::get('/readings', [ReadingHistoryController::class, 'index'])->middleware('verified')->name('readings.index');
+    Route::get('/readings/{reading}', [ReadingHistoryController::class, 'show'])->middleware('verified')->name('readings.show');
+});
+
+Route::middleware(['auth', 'active'])->group(function () {
+    Route::get('/email/verify', function (Request $request) {
+        if ($request->user()->hasVerifiedEmail()) {
+            return redirect()->intended(route('home'));
+        }
+
+        return view('auth.verify-email');
+    })->name('verification.notice');
+
+    Route::get('/email/verify/{id}/{hash}', function (EmailVerificationRequest $request) {
+        $request->fulfill();
+
+        return redirect()->route('home')->with('status', 'email-verified');
+    })->middleware(['signed', 'throttle:6,1'])->name('verification.verify');
+
+    Route::post('/email/verification-notification', function (Request $request) {
+        if ($request->user()->hasVerifiedEmail()) {
+            return redirect()->route('home');
+        }
+
+        $request->user()->sendEmailVerificationNotification();
+
+        return back()->with('status', 'verification-link-sent');
+    })->middleware('throttle:6,1')->name('verification.send');
 });
 
 Route::middleware('guest')->group(function () {
@@ -61,13 +89,13 @@ Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
     ->middleware(['auth', 'active'])
     ->name('logout');
 
-Route::middleware(['auth', 'active'])->prefix('account')->name('account.')->group(function () {
+Route::middleware(['auth', 'active', 'verified'])->prefix('account')->name('account.')->group(function () {
     Route::get('/settings', [AccountSettingsController::class, 'edit'])->name('settings.edit');
     Route::put('/settings', [AccountSettingsController::class, 'update'])->name('settings.update');
     Route::delete('/settings', [AccountSettingsController::class, 'destroy'])->name('settings.destroy');
 });
 
-Route::prefix('admin')->name('admin.')->middleware(['auth', 'active', 'admin'])->group(function () {
+Route::prefix('admin')->name('admin.')->middleware(['auth', 'active', 'verified', 'admin'])->group(function () {
     Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
     Route::get('/users/{user}', [AdminUserController::class, 'show'])->name('users.show');
     Route::get('/users/{user}/edit', [AdminUserController::class, 'edit'])->name('users.edit');

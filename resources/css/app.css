@@ -330,8 +330,8 @@ h2 {
 .welcome-title {
     max-width: 520px;
     margin-bottom: 20px;
-    font-size: clamp(36px, 4vw, 54px);
-    line-height: 1.42;
+    font-size: clamp(32px, 3.6vw, 48px);
+    line-height: 1.35;
 }
 
 .welcome-description,
@@ -520,6 +520,12 @@ h2 {
     color: var(--color-forest-dark);
     font-size: 14px;
     line-height: 1.6;
+}
+
+.form-notice.is-dismissing {
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: opacity 250ms ease, transform 250ms ease;
 }
 
 .contact-privacy-note {
@@ -867,6 +873,28 @@ h2 {
     margin-block: 6px;
 }
 
+.plan-credit-option {
+    display: grid;
+    grid-template-columns: 90px max-content;
+    align-items: center;
+    gap: 12px;
+    margin-block: 8px;
+}
+
+.plan-credit-option .plan-price {
+    margin: 0;
+    white-space: nowrap;
+}
+
+.plan-credit-button {
+    justify-content: center;
+    gap: 0;
+    min-height: 42px;
+    padding-inline: 10px;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
 .plan-price strong {
     color: var(--color-forest-dark);
     font-size: 18px;
@@ -1190,10 +1218,6 @@ h2 {
         gap: 12px;
     }
 
-    .brand-caption {
-        display: none;
-    }
-
     .account-navigation {
         flex-wrap: wrap;
         justify-content: flex-end;
@@ -1281,7 +1305,7 @@ h2 {
     }
 
     .welcome-title {
-        font-size: 38px;
+        font-size: clamp(26px, 8vw, 36px);
     }
 
     .art-stage {
@@ -1326,7 +1350,7 @@ h2 {
     }
 
     .welcome-title {
-        font-size: 34px;
+        font-size: clamp(24px, 8vw, 32px);
     }
 
     .form-panel {
