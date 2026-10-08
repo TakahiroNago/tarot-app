@@ -4,27 +4,38 @@ use App\Models\User;
 use App\Services\GuestTrialCreditService;
 use App\Services\ReadingCreditService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\RateLimiter;
 use OpenAI\Laravel\Facades\OpenAI;
 use OpenAI\Responses\Chat\CreateResponse;
 
 uses(RefreshDatabase::class);
 
-test('the plans page shows the planned credit pack and subscription prices', function () {
+test('the plans page explains free membership and does not offer credit purchases', function () {
     $response = $this->get(route('plans'));
 
     $response->assertOk()
-        ->assertSee('10回')
-        ->assertSee('100回')
-        ->assertSee('月額280円')
-        ->assertSee('月額980円')
-        ->assertSee('ログインして購入')
-        ->assertDontSee('ログインして10回分を購入')
-        ->assertDontSee('ログインして50回分を購入')
-        ->assertDontSee('ログインして100回分を購入')
-        ->assertSee('Stripe');
+        ->assertSee('無料会員は毎日3回までご利用いただけます。')
+        ->assertSee('直近3か月の最大50件まで')
+        ->assertSee('クレジットの購入はできません。')
+        ->assertDontSee('10回分を購入')
+        ->assertDontSee('50回分を購入')
+        ->assertDontSee('100回分を購入')
+        ->assertSee('1日10回（最大50回まで引継ぎ）')
+        ->assertSee('占い回数無制限（短時間での連続利用は1分あたり5回まで）')
+        ->assertSee('180円/')
+        ->assertSee('580円/')
+        ->assertSee('Stripeの安全な決済画面から有料プランへの登録ができます。');
 });
 
-test('signed-in users see purchase buttons beside each credit pack price', function () {
+test('the plans page advertises the updated lite and premium allowances', function () {
+    $this->get(route('plans'))
+        ->assertOk()
+        ->assertSee('1日10回（最大50回まで引継ぎ）')
+        ->assertSee('占い回数無制限（短時間での連続利用は1分あたり5回まで）');
+});
+
+test('signed-in users cannot purchase credits from the plans page', function () {
     config([
         'services.stripe.secret' => 'sk_test',
         'services.stripe.prices.credits_10' => 'price_credits_10',
@@ -35,13 +46,11 @@ test('signed-in users see purchase buttons beside each credit pack price', funct
     $this->actingAs(User::factory()->create())
         ->get(route('plans'))
         ->assertOk()
-        ->assertSee('class="plan-credit-option"', false)
-        ->assertSee('10回 <strong>100円</strong>', false)
-        ->assertSee('class="primary-action plan-credit-button" type="submit">10回分を購入</button>', false)
-        ->assertSee('50回 <strong>400円</strong>', false)
-        ->assertSee('class="primary-action plan-credit-button" type="submit">50回分を購入</button>', false)
-        ->assertSee('100回 <strong>500円</strong>', false)
-        ->assertSee('class="primary-action plan-credit-button" type="submit">100回分を購入</button>', false);
+        ->assertSee('クレジットの購入はできません。')
+        ->assertDontSee('plan-credit-button')
+        ->assertDontSee('10回分を購入')
+        ->assertDontSee('50回分を購入')
+        ->assertDontSee('100回分を購入');
 });
 
 test('guests can use three trial readings and are prompted to register afterwards', function () {
@@ -139,6 +148,7 @@ test('only premium members do not see the plans link on the tarot page', functio
     $this->actingAs($premiumMember)
         ->get(route('tarot'))
         ->assertOk()
+        ->assertSee('<strong>無制限</strong>', false)
         ->assertDontSee($plansLink, false);
 });
 
@@ -182,7 +192,7 @@ test('members with no credits see a full-width plans link and cannot draw a card
         ->assertOk()
         ->assertSee('href="'.route('plans').'"', false)
         ->assertSee('class="primary-action" type="submit" disabled', false)
-        ->assertSee('本日利用可能なクレジットを使い切りました。クレジット購入または有料プランをご検討ください。 クレジット・プランを見る');
+        ->assertSee('本日利用可能なクレジットを使い切りました。有料プランをご検討ください。 プランを見る');
 });
 
 test('the result page links the entire exhausted member-credit notice to plans', function () {
@@ -201,10 +211,10 @@ test('the result page links the entire exhausted member-credit notice to plans',
         ->post(route('tarot.draw'), ['question' => 'Last question?'])
         ->assertOk()
         ->assertSee('<a class="form-notice credit-notice credit-notice-link" href="'.route('plans').'">', false)
-        ->assertSee('本日利用可能なクレジットを使い切りました。クレジット購入または有料プランをご検討ください。 プランを見る');
+        ->assertSee('本日利用可能なクレジットを使い切りました。有料プランをご検討ください。 プランを見る');
 });
 
-test('paid plans accrue daily credits up to their cap while keeping purchased credits uncapped', function () {
+test('lite members receive ten daily credits up to a fifty-credit carryover cap', function () {
     $user = User::factory()->create();
     $user->forceFill([
         'plan' => User::PLAN_LITE,
@@ -214,21 +224,18 @@ test('paid plans accrue daily credits up to their cap while keeping purchased cr
         'purchased_credits' => 105,
     ])->save();
 
-    $this->actingAs($user)->get(route('tarot'))
-        ->assertOk()
-        ->assertSee('残り <strong>255</strong> 回', false)
-        ->assertDontSee('今日の残り')
-        ->assertDontSee('購入クレジット');
+    $this->actingAs($user)->get(route('tarot'))->assertOk();
 
-    expect($user->fresh()->daily_credits)->toBe(150)
+    expect(app(ReadingCreditService::class)->balance($user)['total'])->toBe(155)
+        ->and($user->fresh()->daily_credits)->toBe(50)
         ->and($user->fresh()->purchased_credits)->toBe(105);
 });
 
-test('upgrading a plan restores daily credits to the new plan allowance', function () {
+test('upgrading to lite grants ten daily credits and upgrading to premium enables unlimited readings', function () {
     $upgrades = [
-        [User::PLAN_FREE, User::PLAN_LITE, 5],
-        [User::PLAN_FREE, User::PLAN_PREMIUM, 10],
-        [User::PLAN_LITE, User::PLAN_PREMIUM, 10],
+        [User::PLAN_FREE, User::PLAN_LITE, 10],
+        [User::PLAN_FREE, User::PLAN_PREMIUM, 0],
+        [User::PLAN_LITE, User::PLAN_PREMIUM, 0],
     ];
     $creditService = app(ReadingCreditService::class);
 
@@ -242,7 +249,10 @@ test('upgrading a plan restores daily credits to the new plan allowance', functi
         ])->save();
         $user->forceFill(['plan' => $newPlan])->save();
 
-        expect($creditService->balance($user)['daily'])->toBe($expectedCredits)
+        $balance = $creditService->balance($user);
+        expect($balance['daily'])->toBe($expectedCredits)
+            ->and($balance['unlimited'])->toBe($newPlan === User::PLAN_PREMIUM)
+            ->and($balance['total'])->toBe($newPlan === User::PLAN_PREMIUM ? null : $expectedCredits)
             ->and($user->fresh()->daily_credits_plan)->toBe($newPlan)
             ->and($user->fresh()->daily_credits_refreshed_at->toDateString())->toBe(now()->toDateString());
     }
@@ -258,9 +268,123 @@ test('plan upgrades do not grant paid daily credits for days before the upgrade'
     ])->save();
     $user->forceFill(['plan' => User::PLAN_PREMIUM])->save();
 
-    expect(app(ReadingCreditService::class)->balance($user)['daily'])->toBe(10)
+    expect(app(ReadingCreditService::class)->balance($user)['daily'])->toBe(0)
+        ->and(app(ReadingCreditService::class)->balance($user)['unlimited'])->toBeTrue()
         ->and($user->fresh()->daily_credits_refreshed_at->toDateString())->toBe(now()->toDateString());
 });
+
+test('premium members can draw without spending daily or purchased credits', function () {
+    OpenAI::fake([
+        CreateResponse::fake(['choices' => [['message' => ['content' => '仕事']]]]),
+        CreateResponse::fake(['choices' => [['message' => ['content' => 'An unlimited reading.']]]]),
+        CreateResponse::fake(['choices' => [['message' => ['content' => '{"summary":"無制限の占い結果です。"}']]]]),
+    ]);
+    $user = User::factory()->create();
+    $user->forceFill([
+        'plan' => User::PLAN_PREMIUM,
+        'daily_credits' => 0,
+        'purchased_credits' => 7,
+    ])->save();
+
+    $this->actingAs($user)
+        ->post(route('tarot.draw'), ['question' => 'How will work go?'])
+        ->assertOk()
+        ->assertSee('占い回数は無制限です');
+
+    expect($user->fresh()->daily_credits)->toBe(0)
+        ->and($user->fresh()->purchased_credits)->toBe(7);
+});
+
+test('premium members are limited to five readings per minute', function () {
+    $responses = [];
+    foreach (range(1, 5) as $index) {
+        $responses[] = CreateResponse::fake(['choices' => [['message' => ['content' => 'その他']]]]);
+        $responses[] = CreateResponse::fake(['choices' => [['message' => ['content' => "Premium result {$index}."]]]]);
+        $responses[] = CreateResponse::fake(['choices' => [['message' => ['content' => '{"summary":"プレミアム結果です。"}']]]]);
+    }
+    OpenAI::fake($responses);
+
+    $user = User::factory()->create();
+    $user->forceFill(['plan' => User::PLAN_PREMIUM])->save();
+    $rateLimitKey = 'premium-reading:'.$user->getAuthIdentifier();
+    RateLimiter::clear($rateLimitKey);
+
+    $this->actingAs($user);
+    foreach (range(1, 5) as $index) {
+        $this->post(route('tarot.draw'), ['question' => "Question {$index}?"])->assertOk();
+    }
+
+    $this->post(route('tarot.draw'), ['question' => 'One more question?'])
+        ->assertRedirect(route('tarot'))
+        ->assertSessionHas('reading_rate_limited');
+    $this->get(route('tarot'))
+        ->assertOk()
+        ->assertSee('1分あたり5回までです。');
+
+    expect($user->fresh()->daily_credits)->toBe(0);
+    RateLimiter::clear($rateLimitKey);
+});
+
+test('premium members are limited to one thousand readings per calendar day', function () {
+    OpenAI::fake([
+        CreateResponse::fake(['choices' => [['message' => ['content' => '仕事']]]]),
+        CreateResponse::fake(['choices' => [['message' => ['content' => 'The thousandth reading.']]]]),
+        CreateResponse::fake(['choices' => [['message' => ['content' => '{"summary":"上限の占い結果です。"}']]]]),
+    ]);
+
+    $user = User::factory()->create();
+    $user->forceFill(['plan' => User::PLAN_PREMIUM])->save();
+    $dailyRateLimitKey = 'premium-daily-reading:'.$user->getAuthIdentifier().':'.now()->toDateString();
+    $minuteRateLimitKey = 'premium-reading:'.$user->getAuthIdentifier();
+    RateLimiter::clear($dailyRateLimitKey);
+    RateLimiter::clear($minuteRateLimitKey);
+    foreach (range(1, 999) as $unused) {
+        RateLimiter::hit($dailyRateLimitKey, 86400);
+    }
+
+    $this->actingAs($user)
+        ->post(route('tarot.draw'), ['question' => 'The thousandth question?'])
+        ->assertOk();
+
+    $this->post(route('tarot.draw'), ['question' => 'The next question?'])
+        ->assertRedirect(route('tarot'))
+        ->assertSessionHas('reading_rate_limited', '本日のプレミアムプランの利用上限に達しました。明日以降に再度お試しください。');
+
+    expect(RateLimiter::attempts($dailyRateLimitKey))->toBe(1000);
+    RateLimiter::clear($dailyRateLimitKey);
+    RateLimiter::clear($minuteRateLimitKey);
+});
+
+test('only one reading can run concurrently for each member or guest device', function (?string $plan) {
+    $deviceToken = str_repeat('d', 64);
+    if ($plan === null) {
+        $lockIdentity = 'guest:'.hash('sha256', $deviceToken);
+        $user = null;
+    } else {
+        $user = User::factory()->create(['plan' => $plan]);
+        $lockIdentity = 'user:'.$user->getAuthIdentifier();
+    }
+
+    $lock = Cache::lock('tarot-reading:'.$lockIdentity, 300);
+    expect($lock->get())->toBeTrue();
+
+    if ($user instanceof User) {
+        $this->actingAs($user);
+    } else {
+        $this->withCookie('guest_trial_device', $deviceToken);
+    }
+
+    $this->post(route('tarot.draw'), ['question' => 'Another reading?'])
+        ->assertRedirect(route('tarot'))
+        ->assertSessionHas('reading_rate_limited', '別の占いを実行中です。完了後にもう一度お試しください。');
+
+    $lock->release();
+})->with([
+    'free member' => [User::PLAN_FREE],
+    'lite member' => [User::PLAN_LITE],
+    'premium member' => [User::PLAN_PREMIUM],
+    'guest' => [null],
+]);
 
 test('free members see only recent readings within the fifty-reading cap and receive an upgrade prompt', function () {
     $user = User::factory()->create();

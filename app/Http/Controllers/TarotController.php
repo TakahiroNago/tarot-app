@@ -5,12 +5,16 @@ namespace App\Http\Controllers;
 use App\Models\TarotReading;
 use App\Models\User;
 use App\Services\GuestTrialCreditService;
+use App\Services\PublicReadingShareService;
 use App\Services\ReadingCreditService;
+use App\Support\TarotCardCatalog;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Cookie;
+use Illuminate\Support\Facades\RateLimiter;
 use OpenAI\Laravel\Facades\OpenAI;
 use Throwable;
 use UnexpectedValueException;
@@ -18,6 +22,10 @@ use UnexpectedValueException;
 class TarotController extends Controller
 {
     private const GUEST_DEVICE_COOKIE = 'guest_trial_device';
+
+    private const PREMIUM_DAILY_LIMIT = 1000;
+
+    private const DRAW_LOCK_TTL_SECONDS = 300;
 
     public function index(
         Request $request,
@@ -39,6 +47,7 @@ class TarotController extends Controller
         Request $request,
         ReadingCreditService $creditService,
         GuestTrialCreditService $guestTrialCreditService,
+        PublicReadingShareService $shareService,
     ): View|RedirectResponse {
         $validated = $request->validate([
             'question' => [
@@ -49,46 +58,153 @@ class TarotController extends Controller
         ]);
         $question = $validated['question'];
         $user = $request->user();
+        $guestDeviceToken = $user instanceof User ? null : $this->guestDeviceToken($request);
+        $lockIdentity = $user instanceof User
+            ? 'user:'.$user->getAuthIdentifier()
+            : 'guest:'.hash('sha256', $guestDeviceToken);
+        $lock = Cache::lock('tarot-reading:'.$lockIdentity, self::DRAW_LOCK_TTL_SECONDS);
+
+        if (! $lock->get()) {
+            return redirect()->route('tarot')->with(
+                'reading_rate_limited',
+                '別の占いを実行中です。完了後にもう一度お試しください。',
+            );
+        }
+
+        try {
+            return $this->drawWithLock(
+                $request,
+                $question,
+                $user instanceof User ? $user : null,
+                $guestDeviceToken,
+                $creditService,
+                $guestTrialCreditService,
+                $shareService,
+            );
+        } finally {
+            $lock->release();
+        }
+    }
+
+    public function daily(
+        Request $request,
+        ReadingCreditService $creditService,
+        PublicReadingShareService $shareService,
+    ): View|RedirectResponse {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(403);
+        }
+
+        $lock = Cache::lock(
+            'tarot-reading:user:'.$user->getAuthIdentifier(),
+            self::DRAW_LOCK_TTL_SECONDS,
+        );
+        if (! $lock->get()) {
+            return redirect()->route('home')->with(
+                'daily_reading_rate_limited',
+                '別の占いを実行中です。完了後にもう一度お試しください。',
+            );
+        }
+
+        try {
+            $readingDate = now()->toDateString();
+            $savedReading = $user->tarotReadings()
+                ->whereDate('daily_reading_date', $readingDate)
+                ->first();
+
+            if ($savedReading === null) {
+                $cards = TarotCardCatalog::all();
+                $selectedCard = $cards[array_rand($cards)];
+                $reading = $this->createDailyReading(
+                    '今日のメッセージをお願いします',
+                    $selectedCard['name'],
+                );
+                $savedReading = $user->tarotReadings()->create([
+                    ...$reading,
+                    'daily_reading_date' => $readingDate,
+                ]);
+            }
+
+            $card = TarotCardCatalog::find($savedReading->card);
+            if ($card === null) {
+                throw new UnexpectedValueException('Stored daily reading has an unknown tarot card.');
+            }
+
+            $reading = $savedReading->only([
+                'question',
+                'card',
+                'interpretation',
+                'category',
+                'summary',
+            ]);
+            $shareToken = $shareService->create($reading);
+            $creditSummary = $creditService->balance($user);
+
+            return view('tarot-result', [
+                ...$reading,
+                'shareUrl' => route('readings.share', ['token' => $shareToken]),
+                'creditsRemaining' => $creditSummary['total'],
+                'isGuest' => false,
+                'cardNumber' => $card['number'],
+                'cardSymbol' => $card['symbol'],
+                'cardEnglishName' => $card['english_name'],
+            ]);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function drawWithLock(
+        Request $request,
+        string $question,
+        ?User $user,
+        ?string $guestDeviceToken,
+        ReadingCreditService $creditService,
+        GuestTrialCreditService $guestTrialCreditService,
+        PublicReadingShareService $shareService,
+    ): View|RedirectResponse {
         $creditBucket = null;
-        $guestDeviceToken = null;
 
         if ($user instanceof User) {
+            if ($user->plan === User::PLAN_PREMIUM) {
+                $dailyRateLimitKey = 'premium-daily-reading:'.$user->getAuthIdentifier().':'.now()->toDateString();
+                if (RateLimiter::tooManyAttempts($dailyRateLimitKey, self::PREMIUM_DAILY_LIMIT)) {
+                    return redirect()->route('tarot')->with(
+                        'reading_rate_limited',
+                        '本日のプレミアムプランの利用上限に達しました。明日以降に再度お試しください。',
+                    );
+                }
+
+                $rateLimitKey = 'premium-reading:'.$user->getAuthIdentifier();
+                if (RateLimiter::tooManyAttempts($rateLimitKey, 5)) {
+                    $secondsUntilAvailable = RateLimiter::availableIn($rateLimitKey);
+
+                    return redirect()->route('tarot')->with(
+                        'reading_rate_limited',
+                        "プレミアムプランの占いは1分あたり5回までです。{$secondsUntilAvailable}秒後に再度お試しください。",
+                    );
+                }
+
+                RateLimiter::hit($dailyRateLimitKey, 86400);
+                RateLimiter::hit($rateLimitKey, 60);
+            }
+
             $creditBucket = $creditService->consume($user);
             if ($creditBucket === null) {
                 return redirect()->route('tarot')->with('credit_exhausted', '本日利用可能なクレジットを使い切りました。クレジット購入または有料プランをご検討ください。');
             }
         } else {
-            $guestDeviceToken = $this->guestDeviceToken($request);
+            if (! is_string($guestDeviceToken)) {
+                throw new \LogicException('Guest device token is required for guest readings.');
+            }
+
             if (! $guestTrialCreditService->consume($guestDeviceToken)) {
                 return redirect()->route('tarot')->with('credit_exhausted', '無料体験を使い切りました。会員登録すると毎日3回占えます。');
             }
         }
 
-        $cards = [
-            ['number' => '0', 'symbol' => '✧', 'name' => '愚者', 'english_name' => 'THE FOOL'],
-            ['number' => 'I', 'symbol' => '☿', 'name' => '魔術師', 'english_name' => 'THE MAGICIAN'],
-            ['number' => 'II', 'symbol' => '☾', 'name' => '女教皇', 'english_name' => 'THE HIGH PRIESTESS'],
-            ['number' => 'III', 'symbol' => '♀', 'name' => '女帝', 'english_name' => 'THE EMPRESS'],
-            ['number' => 'IV', 'symbol' => '♈︎', 'name' => '皇帝', 'english_name' => 'THE EMPEROR'],
-            ['number' => 'V', 'symbol' => '✥', 'name' => '教皇', 'english_name' => 'THE HIEROPHANT'],
-            ['number' => 'VI', 'symbol' => '♡', 'name' => '恋人たち', 'english_name' => 'THE LOVERS'],
-            ['number' => 'VII', 'symbol' => '⚔', 'name' => '戦車', 'english_name' => 'THE CHARIOT'],
-            ['number' => 'VIII', 'symbol' => '♌︎', 'name' => '力', 'english_name' => 'STRENGTH'],
-            ['number' => 'IX', 'symbol' => '✶', 'name' => '隠者', 'english_name' => 'THE HERMIT'],
-            ['number' => 'X', 'symbol' => '⟳', 'name' => '運命の輪', 'english_name' => 'WHEEL OF FORTUNE'],
-            ['number' => 'XI', 'symbol' => '⚖', 'name' => '正義', 'english_name' => 'JUSTICE'],
-            ['number' => 'XII', 'symbol' => '⤵', 'name' => '吊るされた男', 'english_name' => 'THE HANGED MAN'],
-            ['number' => 'XIII', 'symbol' => '♻︎', 'name' => '死神', 'english_name' => 'DEATH'],
-            ['number' => 'XIV', 'symbol' => '⚗', 'name' => '節制', 'english_name' => 'TEMPERANCE'],
-            ['number' => 'XV', 'symbol' => '♑︎', 'name' => '悪魔', 'english_name' => 'THE DEVIL'],
-            ['number' => 'XVI', 'symbol' => '⚡︎', 'name' => '塔', 'english_name' => 'THE TOWER'],
-            ['number' => 'XVII', 'symbol' => '✷', 'name' => '星', 'english_name' => 'THE STAR'],
-            ['number' => 'XVIII', 'symbol' => '☽', 'name' => '月', 'english_name' => 'THE MOON'],
-            ['number' => 'XIX', 'symbol' => '☼', 'name' => '太陽', 'english_name' => 'THE SUN'],
-            ['number' => 'XX', 'symbol' => '🎺︎', 'name' => '審判', 'english_name' => 'JUDGEMENT'],
-            ['number' => 'XXI', 'symbol' => '◎', 'name' => '世界', 'english_name' => 'THE WORLD'],
-        ];
-
+        $cards = TarotCardCatalog::all();
         $selectedCard = $cards[array_rand($cards)];
 
         try {
@@ -136,6 +252,7 @@ class TarotController extends Controller
                 'interpretation' => $interpretation,
                 ...$metadata,
             ];
+            $shareToken = $shareService->create($reading);
 
             if ($user instanceof User) {
                 $creditSummary = $creditService->balance($user);
@@ -159,12 +276,63 @@ class TarotController extends Controller
 
         return view('tarot-result', [
             ...$reading,
+            'shareUrl' => route('readings.share', ['token' => $shareToken]),
             'creditsRemaining' => $creditsRemaining,
             'isGuest' => ! $user instanceof User,
             'cardNumber' => $selectedCard['number'],
             'cardSymbol' => $selectedCard['symbol'],
             'cardEnglishName' => $selectedCard['english_name'],
         ]);
+    }
+
+    /**
+     * @return array{question: string, card: string, interpretation: string, category: string, summary: string}
+     */
+    private function createDailyReading(string $question, string $card): array
+    {
+        $response = OpenAI::chat()->create([
+            'model' => 'gpt-5.6-luna',
+            'messages' => [
+                [
+                    'role' => 'system',
+                    'content' => '[REDACTED]',
+                ],
+                [
+                    'role' => 'user',
+                    'content' => "質問：{$question}\nカード：{$card}",
+                ],
+            ],
+            'response_format' => ['type' => 'json_object'],
+        ]);
+
+        $content = $response->choices[0]->message->content;
+        if (! is_string($content)) {
+            throw new UnexpectedValueException('OpenAI returned no daily reading.');
+        }
+
+        $result = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
+        $interpretation = is_array($result) ? ($result['interpretation'] ?? null) : null;
+        $category = is_array($result) ? ($result['category'] ?? null) : null;
+        $summary = is_array($result) ? ($result['summary'] ?? null) : null;
+        if (
+            ! is_string($interpretation)
+            || trim($interpretation) === ''
+            || ! is_string($category)
+            || ! in_array($category, TarotReading::CATEGORIES, true)
+            || ! is_string($summary)
+            || trim($summary) === ''
+            || mb_strlen($summary) > TarotReading::SUMMARY_MAX_LENGTH
+        ) {
+            throw new UnexpectedValueException('OpenAI returned invalid daily reading data.');
+        }
+
+        return [
+            'question' => '今日のメッセージ',
+            'card' => $card,
+            'interpretation' => $interpretation,
+            'category' => $category,
+            'summary' => $summary,
+        ];
     }
 
     private function readingCategory(string $question): string

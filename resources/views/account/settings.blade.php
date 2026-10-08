@@ -23,6 +23,9 @@
                 @if ($errors->has('account'))
                     <p class="form-error" role="alert">{{ $errors->first('account') }}</p>
                 @endif
+                @if ($errors->has('billing'))
+                    <p class="form-error" role="alert">{{ $errors->first('billing') }}</p>
+                @endif
 
                 <section class="account-settings-section">
                     <h2>登録情報</h2>
@@ -42,6 +45,53 @@
 
                         <button class="primary-action" type="submit">登録情報を保存</button>
                     </form>
+                </section>
+
+                <section class="account-settings-section">
+                    <h2>契約・お支払い</h2>
+                    <p class="form-notice" role="status">
+                        現在のプラン：{{ $user->plan === \App\Models\User::PLAN_PREMIUM ? 'プレミアム' : ($user->plan === \App\Models\User::PLAN_LITE ? 'ライト' : '無料') }}
+                        @if ($user->stripe_cancel_at_period_end && $user->stripe_current_period_end)
+                            <br>{{ $user->stripe_current_period_end->format('Y年n月j日') }}に終了予定
+                        @endif
+                    </p>
+                    @if (request('billing') === 'returned')
+                        <p class="settings-note" role="status">Stripeの管理画面から戻りました。契約内容の変更はWebhookで反映されるため、反映まで時間がかかる場合があります。最新の状態を確認するには、このページを再読み込みしてください。</p>
+                    @endif
+                    @if ($user->stripe_customer_id !== null)
+                        <form method="POST" action="{{ route('billing.portal') }}">
+                            @csrf
+                            @if ($user->stripe_subscription_id !== null)
+                                <button class="primary-action" type="submit">契約・お支払いを管理</button>
+                            @else
+                                <button class="text-link" type="submit">お支払い情報を管理</button>
+                            @endif
+                        </form>
+                    @endif
+                    @if ($user->stripe_scheduled_plan === \App\Models\User::PLAN_LITE && $user->stripe_current_period_end)
+                        <p role="status">
+                            {{ $user->stripe_current_period_end->format('Y年n月j日') }}にライトプランへ切り替わる予定です。
+                        </p>
+                        <form method="POST" action="{{ route('billing.plan.cancel') }}">
+                            @csrf
+                            @method('DELETE')
+                            <button class="secondary-action" type="submit">予約を取り消す</button>
+                        </form>
+                    @elseif ($user->stripe_subscription_id !== null && $user->plan === \App\Models\User::PLAN_LITE && ! $user->stripe_cancel_at_period_end)
+                        <p class="settings-note">プレミアムへの変更は即時適用され、現在の期間の未使用分は日割り計算で今回の請求に充当されます。</p>
+                        <form method="POST" action="{{ route('billing.plan.change') }}">
+                            @csrf
+                            <input type="hidden" name="plan" value="premium">
+                            <button class="primary-action" type="submit">プレミアムへ変更</button>
+                        </form>
+                    @elseif ($user->stripe_subscription_id !== null && $user->plan === \App\Models\User::PLAN_PREMIUM && ! $user->stripe_cancel_at_period_end)
+                        <p class="settings-note">ライトへの変更は予約として登録され、現在のプレミアム期間終了後に適用されます。</p>
+                        <form method="POST" action="{{ route('billing.plan.change') }}">
+                            @csrf
+                            <input type="hidden" name="plan" value="lite">
+                            <button class="secondary-action" type="submit">ライトへ変更</button>
+                        </form>
+                    @endif
                 </section>
 
                 <section class="account-settings-section account-deletion-section">

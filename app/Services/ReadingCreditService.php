@@ -8,17 +8,19 @@ use Illuminate\Support\Facades\DB;
 
 class ReadingCreditService
 {
-    /** @return array{daily: int, purchased: int, total: int, plan: string} */
+    /** @return array{daily: int, purchased: int, total: int|null, plan: string, unlimited: bool} */
     public function balance(User $user): array
     {
         $this->refreshDailyCredits($user);
         $user->refresh();
+        $isUnlimited = $user->plan === User::PLAN_PREMIUM;
 
         return [
             'daily' => $user->daily_credits,
             'purchased' => $user->purchased_credits,
-            'total' => $user->daily_credits + $user->purchased_credits,
+            'total' => $isUnlimited ? null : $user->daily_credits + $user->purchased_credits,
             'plan' => $user->plan ?? User::PLAN_FREE,
+            'unlimited' => $isUnlimited,
         ];
     }
 
@@ -27,6 +29,10 @@ class ReadingCreditService
         return DB::transaction(function () use ($user): ?string {
             $lockedUser = User::query()->lockForUpdate()->findOrFail($user->id);
             $this->refreshLockedUser($lockedUser);
+
+            if ($lockedUser->plan === User::PLAN_PREMIUM) {
+                return 'unlimited';
+            }
 
             if ($lockedUser->daily_credits > 0) {
                 $lockedUser->decrement('daily_credits');
@@ -46,16 +52,20 @@ class ReadingCreditService
 
     public function refund(User $user, string $bucket): void
     {
-        if (! in_array($bucket, ['daily', 'purchased'], true)) {
+        if (! in_array($bucket, ['daily', 'purchased', 'unlimited'], true)) {
             throw new \InvalidArgumentException('Unknown reading credit bucket.');
+        }
+
+        if ($bucket === 'unlimited') {
+            return;
         }
 
         DB::transaction(function () use ($user, $bucket): void {
             $lockedUser = User::query()->lockForUpdate()->findOrFail($user->id);
             if ($bucket === 'daily') {
                 $limit = match ($lockedUser->plan) {
-                    User::PLAN_LITE => 150,
-                    User::PLAN_PREMIUM => 300,
+                    User::PLAN_LITE => 50,
+                    User::PLAN_PREMIUM => 0,
                     default => 3,
                 };
                 $lockedUser->daily_credits = min($limit, $lockedUser->daily_credits + 1);
@@ -89,8 +99,8 @@ class ReadingCreditService
 
         if ($user->daily_credits_plan !== $plan) {
             $maximumBalance = match ($plan) {
-                User::PLAN_LITE => 150,
-                User::PLAN_PREMIUM => 300,
+                User::PLAN_LITE => 50,
+                User::PLAN_PREMIUM => 0,
                 default => 3,
             };
             $user->daily_credits = min(
@@ -117,8 +127,8 @@ class ReadingCreditService
             $dailyLimit = $this->dailyCreditLimit($plan);
 
             $user->daily_credits = match ($plan) {
-                User::PLAN_LITE => min(150, $user->daily_credits + (5 * $elapsedDays)),
-                User::PLAN_PREMIUM => min(300, $user->daily_credits + (10 * $elapsedDays)),
+                User::PLAN_LITE => min(50, $user->daily_credits + (10 * $elapsedDays)),
+                User::PLAN_PREMIUM => 0,
                 default => $dailyLimit,
             };
             $user->daily_credits_refreshed_at = $today;
@@ -136,8 +146,8 @@ class ReadingCreditService
     private function dailyCreditLimit(?string $plan): int
     {
         return match ($plan ?? User::PLAN_FREE) {
-            User::PLAN_LITE => 5,
-            User::PLAN_PREMIUM => 10,
+            User::PLAN_LITE => 10,
+            User::PLAN_PREMIUM => 0,
             default => 3,
         };
     }

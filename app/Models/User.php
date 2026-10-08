@@ -49,6 +49,7 @@ class User extends Authenticatable implements HasLocalePreference, MustVerifyEma
             'stripe_current_period_end' => 'datetime',
             'stripe_subscription_event_created_at' => 'datetime',
             'stripe_cancel_at_period_end' => 'boolean',
+            'stripe_subscription_schedule_id' => 'string',
             'password' => 'hashed',
         ];
     }

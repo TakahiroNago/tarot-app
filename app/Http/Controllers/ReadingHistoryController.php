@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Support\TarotCardCatalog;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -88,7 +89,14 @@ class ReadingHistoryController extends Controller
             $readingData = $savedReading->only(['question', 'card', 'interpretation', 'created_at']);
         }
 
-        return view('readings.show', ['reading' => $readingData]);
+        $card = TarotCardCatalog::find($readingData['card']);
+
+        return view('readings.show', [
+            'reading' => $readingData,
+            'cardNumber' => $card['number'] ?? '',
+            'cardSymbol' => $card['symbol'] ?? '✧',
+            'cardEnglishName' => $card['english_name'] ?? $readingData['card'],
+        ]);
     }
 
     /** @return Collection<int, array{id: string, question: string, card: string, interpretation: string}> */
@@ -109,6 +117,8 @@ class ReadingHistoryController extends Controller
     private function isReading(mixed $reading): bool
     {
         return is_array($reading)
-            && isset($reading['question'], $reading['card'], $reading['interpretation']);
+            && is_string($reading['question'] ?? null)
+            && is_string($reading['card'] ?? null)
+            && is_string($reading['interpretation'] ?? null);
     }
 }
