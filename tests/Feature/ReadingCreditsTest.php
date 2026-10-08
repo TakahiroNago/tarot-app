@@ -478,3 +478,32 @@ test('premium members can open older history without a display cap', function ()
         ->assertOk()
         ->assertSee('A preserved reading.');
 });
+
+test('category filtering does not reveal readings outside the free history cap', function () {
+    $user = User::factory()->create();
+    foreach (range(1, 51) as $daysAgo) {
+        $reading = $user->tarotReadings()->create([
+            'question' => "Recent question {$daysAgo}",
+            'card' => 'The Star',
+            'interpretation' => 'A reading.',
+            'category' => $daysAgo === 51 ? '仕事' : '恋愛',
+            'summary' => 'テスト要約です。',
+        ]);
+        $createdAt = now()->subDays($daysAgo);
+        $reading->forceFill(['created_at' => $createdAt, 'updated_at' => $createdAt])->save();
+    }
+
+    $categoryResponse = $this->actingAs($user)
+        ->get(route('readings.index'))
+        ->assertOk();
+    expect($categoryResponse->viewData('categories')->all())->toBe(['恋愛']);
+
+    $response = $this->get(route('readings.index', ['category' => '仕事']));
+
+    $response->assertOk()
+        ->assertSee('「仕事」カテゴリの履歴はありません。')
+        ->assertDontSee('Recent question 51');
+
+    expect($response->viewData('historyUpgradePrompt'))->toBeTrue()
+        ->and($response->viewData('databaseReadings')->total())->toBe(0);
+});

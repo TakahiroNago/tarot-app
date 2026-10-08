@@ -12,7 +12,17 @@
         <main class="page-content history-content">
             <section class="history-panel">
                 <p class="eyebrow">READING JOURNAL</p>
-                <h1>占い履歴</h1>
+                <div class="history-heading">
+                    <h1>占い履歴</h1>
+                    <form class="history-filter" method="GET" action="{{ route('readings.index') }}">
+                        <select id="history-category" name="category" aria-label="表示するカテゴリ" data-history-category-filter>
+                            <option value="">すべて</option>
+                            @foreach ($categories as $category)
+                                <option value="{{ $category }}" @selected($selectedCategory === $category)>{{ $category }}</option>
+                            @endforeach
+                        </select>
+                    </form>
+                </div>
                 @if ($historyUpgradePrompt)
                     <p class="form-notice credit-notice">
                         無料会員の履歴表示は直近3か月の50件までです。有料プランで、より多くの履歴を確認できます。
@@ -53,8 +63,13 @@
                 @endif
 
                 @if ($sessionReadings->isEmpty() && ! $databaseReadings?->isNotEmpty())
-                    <p class="history-empty">まだリーディング履歴がありません。</p>
-                    <a class="primary-action" href="{{ route('tarot') }}">占いを始める <span class="action-arrow" aria-hidden="true">→</span></a>
+                    @if ($selectedCategory !== null)
+                        <p class="history-empty">「{{ $selectedCategory }}」カテゴリの履歴はありません。</p>
+                        <a class="history-filter-clear" href="{{ route('readings.index') }}">すべての履歴を表示</a>
+                    @else
+                        <p class="history-empty">まだリーディング履歴がありません。</p>
+                        <a class="primary-action" href="{{ route('tarot') }}">占いを始める <span class="action-arrow" aria-hidden="true">→</span></a>
+                    @endif
                 @endif
             </section>
         </main>
