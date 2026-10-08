@@ -27,7 +27,7 @@
                 @auth
                     @if (! $creditSummary['unlimited'] && $creditSummary['total'] === 0)
                         <a class="form-notice credit-notice credit-notice-link" href="{{ route('plans') }}" role="alert">
-                            本日利用可能なクレジットを使い切りました。有料プランをご検討ください。 プランを見る
+                            本日利用可能なクレジットを使い切りました。→有料プランを見る
                         </a>
                     @elseif (session('credit_exhausted'))
                         <a class="form-notice credit-notice credit-notice-link" href="{{ route('plans') }}" role="alert">
@@ -37,7 +37,7 @@
                 @else
                     @if ($guestCredits === 0)
                         <a class="form-notice credit-notice credit-notice-link" href="{{ route('register') }}" role="alert">
-                            無料体験を使い切りました。会員登録すると毎日3回占えます。 会員登録はこちら
+                            無料体験を使い切りました。無料会員登録すると毎日3回占えます。→ 会員登録はこちら
                         </a>
                     @else
                         <p class="credit-summary">無料体験の残り {{ $guestCredits }}回（全3回）</p>
