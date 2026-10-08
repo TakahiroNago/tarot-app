@@ -17,14 +17,17 @@
                 @if (session('status') === 'email-verified')
                     <p class="form-notice" data-auto-dismiss role="status">メールアドレスを確認しました。</p>
                 @endif
+                @if (session('reading_rate_limited'))
+                    <p class="form-notice credit-notice" role="alert">{{ session('reading_rate_limited') }}</p>
+                @endif
                 <p class="eyebrow">A MOMENT FOR YOU</p>
                 <h1>心にある問いを、<br>聞かせてください。</h1>
                 <p class="page-description">いま気になっていることを、自由に入力してください。</p>
 
                 @auth
-                    @if ($creditSummary['total'] === 0)
+                    @if (! $creditSummary['unlimited'] && $creditSummary['total'] === 0)
                         <a class="form-notice credit-notice credit-notice-link" href="{{ route('plans') }}" role="alert">
-                            本日利用可能なクレジットを使い切りました。クレジット購入または有料プランをご検討ください。 クレジット・プランを見る
+                            本日利用可能なクレジットを使い切りました。有料プランをご検討ください。 プランを見る
                         </a>
                     @elseif (session('credit_exhausted'))
                         <a class="form-notice credit-notice credit-notice-link" href="{{ route('plans') }}" role="alert">
@@ -62,7 +65,7 @@
                     @error('question')
                         <p class="form-error" role="alert">{{ $message }}</p>
                     @enderror
-                    <button class="primary-action" type="submit" @disabled(auth()->check() ? $creditSummary['total'] === 0 : $guestCredits === 0)>
+                    <button class="primary-action" type="submit" @disabled(auth()->check() ? (! $creditSummary['unlimited'] && $creditSummary['total'] === 0) : $guestCredits === 0)>
                         <span class="loading-spinner" aria-hidden="true"></span>
                         <span class="submit-label">カードを引く</span>
                         <span class="action-arrow" aria-hidden="true">→</span>

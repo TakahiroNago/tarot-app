@@ -12,6 +12,7 @@ use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\ReadingHistoryController;
+use App\Http\Controllers\SharedReadingController;
 use App\Http\Controllers\StripeWebhookController;
 use App\Http\Controllers\TarotController;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
@@ -25,6 +26,11 @@ Route::get('/', function () {
 Route::get('/tarot', [TarotController::class, 'index'])->name('tarot');
 
 Route::post('/tarot/draw', [TarotController::class, 'draw'])->name('tarot.draw');
+Route::post('/tarot/daily', [TarotController::class, 'daily'])->middleware('auth')->name('tarot.daily');
+
+Route::get('/shared-readings/{token}', SharedReadingController::class)
+    ->where('token', '[a-f0-9]{64}')
+    ->name('readings.share');
 
 Route::view('/plans', 'plans')->name('plans');
 
@@ -42,6 +48,8 @@ Route::post('/stripe/webhook', StripeWebhookController::class)->name('stripe.web
 Route::middleware('active')->group(function () {
     Route::post('/billing/checkout', [BillingController::class, 'checkout'])->middleware(['auth', 'verified'])->name('billing.checkout');
     Route::post('/billing/portal', [BillingController::class, 'portal'])->middleware(['auth', 'verified'])->name('billing.portal');
+    Route::post('/billing/plan', [BillingController::class, 'changePlan'])->middleware(['auth', 'verified'])->name('billing.plan.change');
+    Route::delete('/billing/plan', [BillingController::class, 'cancelPlanChange'])->middleware(['auth', 'verified'])->name('billing.plan.cancel');
     Route::get('/readings', [ReadingHistoryController::class, 'index'])->middleware('verified')->name('readings.index');
     Route::get('/readings/{reading}', [ReadingHistoryController::class, 'show'])->middleware('verified')->name('readings.show');
 });

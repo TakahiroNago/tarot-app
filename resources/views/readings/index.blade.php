@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>占い履歴 | 月詠 TAROT JOURNAL</title>
-    @vite(['resources/css/app.css'])
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body>
     <div class="page-frame">
@@ -43,7 +43,7 @@
                                 <a class="reading-row" href="{{ route('readings.show', $reading->id) }}">
                                     <span class="reading-question">{{ $reading->question }}</span>
                                     <span class="reading-card">{{ $reading->card }}</span>
-                                    <time class="reading-date" datetime="{{ $reading->created_at->toISOString() }}">{{ $reading->created_at->format('Y/m/d H:i') }}</time>
+                                    <time class="reading-date" datetime="{{ $reading->created_at->toISOString() }}" data-local-time>{{ $reading->created_at->format('Y/m/d H:i') }}</time>
                                     <span class="reading-open">詳細 <span aria-hidden="true">→</span></span>
                                 </a>
                             @endforeach

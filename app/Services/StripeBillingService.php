@@ -23,8 +23,8 @@ class StripeBillingService
             'credits_10' => ['price_id' => config('services.stripe.prices.credits_10'), 'amount' => 100, 'credits' => 10],
             'credits_50' => ['price_id' => config('services.stripe.prices.credits_50'), 'amount' => 400, 'credits' => 50],
             'credits_100' => ['price_id' => config('services.stripe.prices.credits_100'), 'amount' => 500, 'credits' => 100],
-            'lite' => ['price_id' => config('services.stripe.prices.lite'), 'amount' => 280, 'plan' => User::PLAN_LITE],
-            'premium' => ['price_id' => config('services.stripe.prices.premium'), 'amount' => 980, 'plan' => User::PLAN_PREMIUM],
+            'lite' => ['price_id' => config('services.stripe.prices.lite'), 'amount' => 180, 'plan' => User::PLAN_LITE],
+            'premium' => ['price_id' => config('services.stripe.prices.premium'), 'amount' => 580, 'plan' => User::PLAN_PREMIUM],
         ];
     }
 
@@ -131,7 +131,7 @@ class StripeBillingService
 
         $session = $this->stripe()->billingPortal->sessions->create([
             'customer' => $user->stripe_customer_id,
-            'return_url' => route('plans'),
+            'return_url' => route('account.settings.edit', ['billing' => 'returned']),
         ]);
 
         if (! is_string($session->url) || $session->url === '') {
@@ -139,6 +139,290 @@ class StripeBillingService
         }
 
         return $session->url;
+    }
+
+    public function changePlan(User $user, string $targetPlan): string
+    {
+        if (! in_array($targetPlan, [User::PLAN_LITE, User::PLAN_PREMIUM], true)) {
+            throw ValidationException::withMessages([
+                'billing' => '選択したプランは変更できません。',
+            ]);
+        }
+
+        return DB::transaction(function () use ($user, $targetPlan): string {
+            $account = User::query()->lockForUpdate()->findOrFail($user->id);
+
+            if (
+                ! is_string($account->stripe_customer_id)
+                || $account->stripe_customer_id === ''
+                || ! is_string($account->stripe_subscription_id)
+                || $account->stripe_subscription_id === ''
+            ) {
+                throw ValidationException::withMessages([
+                    'billing' => '変更できる有料プランの契約が見つかりません。',
+                ]);
+            }
+
+            if ($account->stripe_scheduled_plan !== null || $account->stripe_cancel_at_period_end) {
+                throw ValidationException::withMessages([
+                    'billing' => '予約済みの変更または解約があります。先に現在の契約状態をご確認ください。',
+                ]);
+            }
+
+            if (
+                ($account->plan === User::PLAN_LITE && $targetPlan !== User::PLAN_PREMIUM)
+                || ($account->plan === User::PLAN_PREMIUM && $targetPlan !== User::PLAN_LITE)
+            ) {
+                throw ValidationException::withMessages([
+                    'billing' => '現在のプランから選択したプランへは変更できません。',
+                ]);
+            }
+
+            $stripe = $this->stripe();
+            $subscription = $stripe->subscriptions->retrieve($account->stripe_subscription_id);
+            if (
+                $subscription->customer !== $account->stripe_customer_id
+                || ! in_array($subscription->status, ['active', 'trialing'], true)
+            ) {
+                throw ValidationException::withMessages([
+                    'billing' => 'Stripe上の契約状態を確認できません。時間をおいて再度お試しください。',
+                ]);
+            }
+
+            if (
+                (isset($subscription->cancel_at_period_end) && $subscription->cancel_at_period_end)
+                || isset($subscription->schedule)
+            ) {
+                throw ValidationException::withMessages([
+                    'billing' => 'Stripe上に別の解約またはプラン変更の予約があります。契約状態をご確認ください。',
+                ]);
+            }
+
+            if (isset($subscription->pending_update)) {
+                throw ValidationException::withMessages([
+                    'billing' => '前回のプラン変更の決済を確認中です。決済完了後に再度お試しください。',
+                ]);
+            }
+
+            $items = $subscription->items->data ?? [];
+            if (count($items) !== 1) {
+                throw ValidationException::withMessages([
+                    'billing' => 'この契約はオンラインで変更できません。サポートへお問い合わせください。',
+                ]);
+            }
+
+            $subscriptionItem = $items[0];
+            $currentPriceId = $subscriptionItem->price->id ?? null;
+            if ($this->planForPrice($currentPriceId) !== $account->plan) {
+                throw ValidationException::withMessages([
+                    'billing' => 'アプリとStripeの契約情報が一致しません。時間をおいて再度お試しください。',
+                ]);
+            }
+
+            $targetPriceId = $this->products()[$targetPlan]['price_id'];
+            if (! is_string($targetPriceId) || $targetPriceId === '') {
+                throw ValidationException::withMessages([
+                    'billing' => '変更先プランの決済設定が完了していません。',
+                ]);
+            }
+
+            if ($targetPlan === User::PLAN_PREMIUM) {
+                try {
+                    $updatedSubscription = $stripe->subscriptions->update($subscription->id, [
+                        'items' => [[
+                            'id' => $subscriptionItem->id,
+                            'price' => $targetPriceId,
+                        ]],
+                        'proration_behavior' => 'always_invoice',
+                        'payment_behavior' => 'pending_if_incomplete',
+                    ]);
+                } catch (ApiErrorException $exception) {
+                    report($exception);
+
+                    throw ValidationException::withMessages([
+                        'billing' => 'プラン変更の決済を完了できませんでした。お支払い方法をご確認のうえ、再度お試しください。',
+                    ]);
+                }
+
+                return isset($updatedSubscription->pending_update) ? 'upgrade_pending' : 'upgraded';
+            }
+
+            $periodEnd = $subscription->current_period_end
+                ?? $subscriptionItem->current_period_end
+                ?? null;
+            if (! is_numeric($periodEnd) || (int) $periodEnd <= now()->timestamp) {
+                throw ValidationException::withMessages([
+                    'billing' => '契約期間の終了日を確認できません。時間をおいて再度お試しください。',
+                ]);
+            }
+
+            $schedule = null;
+            try {
+                $schedule = $stripe->subscriptionSchedules->create([
+                    'from_subscription' => $subscription->id,
+                ]);
+                if (! is_string($schedule->id ?? null) || $schedule->id === '') {
+                    throw new RuntimeException('Stripe did not return a subscription schedule ID.');
+                }
+
+                $currentPhase = $schedule->phases[0] ?? null;
+                if ($currentPhase === null) {
+                    throw new RuntimeException('Stripe did not return the current subscription schedule phase.');
+                }
+
+                $currentPhaseParams = $this->schedulePhaseParameters($currentPhase);
+                $currentPhaseParams['start_date'] = $currentPhase->start_date
+                    ?? $subscription->current_period_start
+                    ?? $subscriptionItem->current_period_start
+                    ?? null;
+                $currentPhaseParams['end_date'] = (int) $periodEnd;
+                $currentPhaseParams['items'] = $this->schedulePhaseItems($currentPhase);
+                $currentPhaseParams['proration_behavior'] = 'none';
+                if (! is_numeric($currentPhaseParams['start_date'])) {
+                    throw new RuntimeException('Stripe did not return the current subscription phase start date.');
+                }
+
+                $nextPhaseParams = $this->schedulePhaseParameters($currentPhase);
+                $nextPhaseParams['start_date'] = (int) $periodEnd;
+                $nextPhaseParams['iterations'] = 1;
+                $nextPhaseParams['items'] = [[
+                    'price' => $targetPriceId,
+                    'quantity' => $subscriptionItem->quantity ?? 1,
+                    ...$this->scheduleItemTaxRates($currentPhase),
+                ]];
+                $nextPhaseParams['proration_behavior'] = 'none';
+
+                $stripe->subscriptionSchedules->update($schedule->id, [
+                    'end_behavior' => 'release',
+                    'phases' => [$currentPhaseParams, $nextPhaseParams],
+                ]);
+            } catch (ApiErrorException $exception) {
+                report($exception);
+                $this->releaseIncompleteSchedule($stripe, $schedule);
+
+                throw ValidationException::withMessages([
+                    'billing' => 'プラン変更を予約できませんでした。時間をおいて再度お試しください。',
+                ]);
+            } catch (RuntimeException $exception) {
+                $this->releaseIncompleteSchedule($stripe, $schedule);
+
+                throw $exception;
+            }
+
+            $account->stripe_scheduled_plan = $targetPlan;
+            $account->stripe_subscription_schedule_id = $schedule->id;
+            $account->stripe_current_period_end = date('Y-m-d H:i:s', (int) $periodEnd);
+            $account->save();
+
+            return 'downgrade_scheduled';
+        });
+    }
+
+    public function cancelScheduledPlanChange(User $user): void
+    {
+        $account = User::query()->findOrFail($user->id);
+        if (
+            ! is_string($account->stripe_subscription_schedule_id)
+            || $account->stripe_subscription_schedule_id === ''
+            || $account->stripe_scheduled_plan === null
+        ) {
+            throw ValidationException::withMessages([
+                'billing' => '取り消せるプラン変更の予約がありません。',
+            ]);
+        }
+
+        try {
+            $this->stripe()->subscriptionSchedules->release($account->stripe_subscription_schedule_id);
+        } catch (ApiErrorException $exception) {
+            report($exception);
+
+            throw ValidationException::withMessages([
+                'billing' => 'プラン変更の予約を取り消せませんでした。時間をおいて再度お試しください。',
+            ]);
+        }
+
+        $account->stripe_scheduled_plan = null;
+        $account->stripe_subscription_schedule_id = null;
+        $account->save();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function schedulePhaseParameters(object $phase): array
+    {
+        $phaseData = $phase->toArray();
+        $parameterKeys = [
+            'application_fee_percent',
+            'automatic_tax',
+            'billing_cycle_anchor',
+            'collection_method',
+            'default_payment_method',
+            'default_tax_rates',
+            'description',
+            'discounts',
+            'invoice_settings',
+            'metadata',
+            'on_behalf_of',
+            'transfer_data',
+        ];
+
+        return array_filter(
+            array_intersect_key($phaseData, array_flip($parameterKeys)),
+            static fn (mixed $value): bool => $value !== null,
+        );
+    }
+
+    /**
+     * @return array<int, array{price: string, quantity?: int, tax_rates?: array<int, string>}>
+     */
+    private function schedulePhaseItems(object $phase): array
+    {
+        $items = [];
+        foreach ($phase->items as $item) {
+            $price = $item->price ?? null;
+            $priceId = is_string($price) ? $price : ($price->id ?? null);
+            if (! is_string($priceId) || $priceId === '') {
+                throw new RuntimeException('Stripe subscription phase is missing a price ID.');
+            }
+
+            $items[] = [
+                'price' => $priceId,
+                ...((is_int($item->quantity ?? null)) ? ['quantity' => $item->quantity] : []),
+                ...$this->scheduleItemTaxRates($item),
+            ];
+        }
+
+        return $items;
+    }
+
+    /**
+     * @return array{tax_rates?: array<int, string>}
+     */
+    private function scheduleItemTaxRates(object $item): array
+    {
+        $taxRates = [];
+        foreach ($item->tax_rates ?? [] as $taxRate) {
+            $taxRateId = is_string($taxRate) ? $taxRate : ($taxRate->id ?? null);
+            if (is_string($taxRateId) && $taxRateId !== '') {
+                $taxRates[] = $taxRateId;
+            }
+        }
+
+        return $taxRates === [] ? [] : ['tax_rates' => $taxRates];
+    }
+
+    private function releaseIncompleteSchedule(StripeClient $stripe, ?object $schedule): void
+    {
+        if ($schedule === null || ! is_string($schedule->id ?? null) || $schedule->id === '') {
+            return;
+        }
+
+        try {
+            $stripe->subscriptionSchedules->release($schedule->id);
+        } catch (ApiErrorException $exception) {
+            report($exception);
+        }
     }
 
     public function cancelForAccountDeletion(User $user): void
@@ -213,6 +497,9 @@ class StripeBillingService
                 'customer.subscription.deleted',
                 'customer.subscription.paused',
                 'customer.subscription.resumed' => $this->handleSubscription($event->data->object, $event->type, $event->created),
+                'subscription_schedule.canceled',
+                'subscription_schedule.released',
+                'subscription_schedule.completed' => $this->handleSubscriptionSchedule($event->data->object),
                 default => null,
             };
 
@@ -362,11 +649,38 @@ class StripeBillingService
         $user->stripe_subscription_event_created_at = date('Y-m-d H:i:s', $eventCreatedAt);
         $user->stripe_cancel_at_period_end = (bool) ($subscription->cancel_at_period_end ?? false);
         $user->plan = $isEntitled ? $plan : User::PLAN_FREE;
+        if (
+            $eventType === 'customer.subscription.deleted'
+            || ($user->stripe_scheduled_plan !== null && $user->stripe_scheduled_plan === $plan)
+        ) {
+            $user->stripe_scheduled_plan = null;
+            $user->stripe_subscription_schedule_id = null;
+        }
         if ($eventType === 'customer.subscription.deleted') {
             $user->stripe_subscription_status = null;
             $user->stripe_current_period_end = null;
             $user->stripe_cancel_at_period_end = false;
         }
+        $user->save();
+    }
+
+    private function handleSubscriptionSchedule(object $schedule): void
+    {
+        $scheduleId = is_string($schedule->id ?? null) ? $schedule->id : null;
+        if ($scheduleId === null) {
+            throw new RuntimeException('Stripe subscription schedule event is missing an ID.');
+        }
+
+        $user = User::query()
+            ->where('stripe_subscription_schedule_id', $scheduleId)
+            ->lockForUpdate()
+            ->first();
+        if ($user === null) {
+            return;
+        }
+
+        $user->stripe_scheduled_plan = null;
+        $user->stripe_subscription_schedule_id = null;
         $user->save();
     }
 

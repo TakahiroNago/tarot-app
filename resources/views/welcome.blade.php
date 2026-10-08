@@ -17,6 +17,9 @@
                     @if (session('status') === 'email-verified')
                         <p class="form-notice" data-auto-dismiss role="status">メールアドレスを確認しました。</p>
                     @endif
+                    @if (session('daily_reading_rate_limited'))
+                        <p class="form-notice" role="status">{{ session('daily_reading_rate_limited') }}</p>
+                    @endif
                     <p class="eyebrow">今日のあなたへ</p>
                     <h1 class="welcome-title">心の声に、<br>カードが光をあてる。</h1>
                     <p class="welcome-description">迷いや期待を、ひとつの問いに。カードが映す小さなヒントを、あなたの毎日に届けます。</p>
@@ -24,6 +27,15 @@
                         <span>占いを始める</span>
                         <span class="action-arrow" aria-hidden="true">→</span>
                     </a>
+                    @auth
+                        <form class="daily-reading-form" method="POST" action="{{ route('tarot.daily') }}">
+                            @csrf
+                            <button class="primary-action" type="submit">
+                                <span>今日の1枚</span>
+                                <span class="action-arrow" aria-hidden="true">→</span>
+                            </button>
+                        </form>
+                    @endauth
                 </div>
                 <div class="art-stage" aria-hidden="true">
                     <div class="tarot-card-art">

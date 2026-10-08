@@ -24,9 +24,9 @@
                 <a
                     class="credit-balance-link"
                     href="{{ route('plans') }}"
-                    aria-label="利用可能なクレジット合計 {{ $creditSummary['total'] }}回。料金・プランを見る"
+                    aria-label="利用可能な占い回数 {{ $creditSummary['unlimited'] ? '無制限' : $creditSummary['total'].'回' }}。料金・プランを見る"
                 >
-                    <strong>{{ $creditSummary['total'] }}</strong> 回
+                    <strong>{{ $creditSummary['unlimited'] ? '無制限' : $creditSummary['total'] }}</strong>{{ $creditSummary['unlimited'] ? '' : ' 回' }}
                 </a>
             @else
                 <a href="{{ route('plans') }}">料金・プラン</a>
@@ -43,25 +43,25 @@
                     aria-haspopup="true"
                 >
                     <svg aria-hidden="true" viewBox="0 0 48 48">
-                        <circle cx="24" cy="24" r="23" fill="#315c49"/>
-                        <circle cx="24" cy="18" r="8" fill="#fbfcf7"/>
-                        <path d="M9 41c1.8-8 7.4-12 15-12s13.2 4 15 12" fill="#fbfcf7"/>
+                        <circle cx="24" cy="24" r="23" fill="#78496f"/>
+                        <circle cx="24" cy="18" r="8" fill="#fdfafe"/>
+                        <path d="M9 41c1.8-8 7.4-12 15-12s13.2 4 15 12" fill="#fdfafe"/>
                     </svg>
                 </a>
                 <section class="account-popover" aria-label="アカウントメニュー">
                     <div class="account-profile">
                         <svg class="account-avatar" aria-hidden="true" viewBox="0 0 48 48">
-                            <circle cx="24" cy="24" r="23" fill="#315c49"/>
-                            <circle cx="24" cy="18" r="8" fill="#fbfcf7"/>
-                            <path d="M9 41c1.8-8 7.4-12 15-12s13.2 4 15 12" fill="#fbfcf7"/>
+                            <circle cx="24" cy="24" r="23" fill="#78496f"/>
+                            <circle cx="24" cy="18" r="8" fill="#fdfafe"/>
+                            <path d="M9 41c1.8-8 7.4-12 15-12s13.2 4 15 12" fill="#fdfafe"/>
                         </svg>
                         <div class="account-profile-details">
                             <span class="account-profile-name">{{ auth()->user()->name }}</span>
                             <span class="account-profile-email">{{ auth()->user()->email }}</span>
                         </div>
                     </div>
-                    <a class="account-popover-link" href="{{ route('account.settings.edit') }}">アカウント設定</a>
                     <a class="account-popover-link" href="{{ route('readings.index') }}">占い履歴</a>
+                    <a class="account-popover-link" href="{{ route('account.settings.edit') }}">アカウント設定</a>
                     @if (auth()->user()->isAdmin())
                         <a class="account-popover-link" href="{{ route('admin.users.index') }}">ユーザー管理</a>
                     @endif

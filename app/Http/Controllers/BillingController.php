@@ -6,6 +6,8 @@ use App\Models\User;
 use App\Services\StripeBillingService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use RuntimeException;
+use Stripe\Exception\ApiErrorException;
 
 class BillingController extends Controller
 {
@@ -18,6 +20,10 @@ class BillingController extends Controller
         abort_unless($user instanceof User, 403);
 
         $product = $billingService->products()[$validated['product']];
+        if (isset($product['credits'])) {
+            return back()->withErrors(['billing' => 'クレジットは購入できません。有料プランをご利用ください。']);
+        }
+
         if (! is_string($product['price_id']) || $product['price_id'] === '' || ! config('services.stripe.secret')) {
             return back()->withErrors(['billing' => '決済の準備が完了していません。時間をおいて再度お試しください。']);
         }
@@ -47,5 +53,49 @@ class BillingController extends Controller
         }
 
         return redirect()->away($billingService->portalUrl($user));
+    }
+
+    public function changePlan(Request $request, StripeBillingService $billingService): RedirectResponse
+    {
+        $validated = $request->validate([
+            'plan' => ['required', 'string', 'in:lite,premium'],
+        ]);
+        $user = $request->user();
+        abort_unless($user instanceof User, 403);
+
+        if (! is_string(config('services.stripe.secret')) || config('services.stripe.secret') === '') {
+            return back()->withErrors(['billing' => '決済の準備が完了していません。時間をおいて再度お試しください。']);
+        }
+
+        try {
+            $result = $billingService->changePlan($user, $validated['plan']);
+        } catch (ApiErrorException $exception) {
+            report($exception);
+
+            return back()->withErrors(['billing' => 'Stripe上の契約を確認できませんでした。時間をおいて再度お試しください。']);
+        }
+
+        $message = match ($result) {
+            'upgraded' => 'プレミアムプランへ切り替えました。日割り分は今回の請求に反映されています。',
+            'upgrade_pending' => 'プレミアムへの変更を受け付けました。決済完了後にプランへ反映されます。',
+            'downgrade_scheduled' => 'ライトプランへの変更を予約しました。現在の契約期間終了後に切り替わります。',
+            default => throw new RuntimeException('Unknown subscription plan change result.'),
+        };
+
+        return to_route('account.settings.edit')->with('status', $message);
+    }
+
+    public function cancelPlanChange(Request $request, StripeBillingService $billingService): RedirectResponse
+    {
+        $user = $request->user();
+        abort_unless($user instanceof User, 403);
+
+        if (! is_string(config('services.stripe.secret')) || config('services.stripe.secret') === '') {
+            return back()->withErrors(['billing' => '決済の準備が完了していません。時間をおいて再度お試しください。']);
+        }
+
+        $billingService->cancelScheduledPlanChange($user);
+
+        return to_route('account.settings.edit')->with('status', '予約していたプラン変更を取り消しました。');
     }
 }

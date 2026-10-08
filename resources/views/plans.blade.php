@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>料金・プラン | 月詠 TAROT JOURNAL</title>
-    @vite(['resources/css/app.css'])
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body>
     <div class="page-frame">
@@ -24,57 +24,41 @@
                 @endif
 
                 @auth
-                    @if (auth()->user()->stripe_subscription_id !== null)
-                        <p class="form-notice credit-notice" role="status">
-                            現在のプラン：{{ auth()->user()->plan === \App\Models\User::PLAN_PREMIUM ? 'プレミアム' : (auth()->user()->plan === \App\Models\User::PLAN_LITE ? 'ライト' : '無料') }}
-                            @if (auth()->user()->stripe_cancel_at_period_end && auth()->user()->stripe_current_period_end)
-                                （{{ auth()->user()->stripe_current_period_end->format('Y年n月j日') }}に終了予定）
-                            @endif
-                        </p>
-                        <form method="POST" action="{{ route('billing.portal') }}">
-                            @csrf
-                            <button class="primary-action" type="submit">契約・お支払いを管理</button>
-                        </form>
-                    @elseif (auth()->user()->stripe_customer_id !== null)
-                        <form method="POST" action="{{ route('billing.portal') }}">
-                            @csrf
-                            <button class="text-link" type="submit">お支払い情報を管理</button>
-                        </form>
-                    @endif
+                    <p class="form-notice credit-notice" role="status">
+                        現在のプラン：{{ auth()->user()->plan === \App\Models\User::PLAN_PREMIUM ? 'プレミアムプラン' : (auth()->user()->plan === \App\Models\User::PLAN_LITE ? 'ライトプラン' : '無料会員') }}
+                        @if (auth()->user()->stripe_subscription_id !== null && auth()->user()->stripe_cancel_at_period_end && auth()->user()->stripe_current_period_end)
+                            （{{ auth()->user()->stripe_current_period_end->format('Y年n月j日') }}に終了予定）
+                        @endif
+                    </p>
                 @endauth
 
                 <div class="plan-grid">
                     <section class="plan-card">
-                        <h2>クレジット購入</h2>
-                        @foreach ([
-                            'credits_10' => ['10回', '100円', '10回分を購入'],
-                            'credits_50' => ['50回', '400円', '50回分を購入'],
-                            'credits_100' => ['100回', '500円', '100回分を購入'],
-                        ] as $product => [$credits, $price, $label])
-                            <div class="plan-credit-option">
-                                <p class="plan-price">{{ $credits }} <strong>{{ $price }}</strong></p>
-                                @auth
-                                    @if (config('services.stripe.secret') && config("services.stripe.prices.{$product}"))
-                                        <form method="POST" action="{{ route('billing.checkout') }}">
-                                            @csrf
-                                            <input type="hidden" name="product" value="{{ $product }}">
-                                            <button class="primary-action plan-credit-button" type="submit">{{ $label }}</button>
-                                        </form>
-                                    @else
-                                        <span>決済準備中</span>
-                                    @endif
-                                @endauth
-                            </div>
-                        @endforeach
-                        @guest
-                            <p><a class="text-link" href="{{ route('login', ['redirect' => 'plans']) }}">ログインして購入</a></p>
-                        @endguest
+                        <h2>プレミアムプラン</h2>
+                        <p>・占い回数無制限</p>
+                        <p>・すべてのリーディング履歴</p>
+                        <p>・「今日の1枚」</p>
+                        <p>・過去のリーディング結果をもとにした、さらに深いリーディング</p>
+                        <p class="plan-price"><strong>580円/<span class="plan-price-period">月</span></strong></p>
+                        @if (auth()->check() && auth()->user()->stripe_subscription_id === null && auth()->user()->plan === \App\Models\User::PLAN_FREE && config('services.stripe.secret') && config('services.stripe.prices.premium'))
+                            <form method="POST" action="{{ route('billing.checkout') }}">
+                                @csrf
+                                <input type="hidden" name="product" value="premium">
+                                <button class="primary-action" type="submit">プレミアムに申し込む</button>
+                            </form>
+                        @elseif (auth()->guest())
+                            <p><a class="text-link" href="{{ route('login') }}">ログインしてプレミアムに申し込む</a></p>
+                        @elseif (! auth()->check() || ! config('services.stripe.secret') || ! config('services.stripe.prices.premium'))
+                            <p>決済準備中</p>
+                        @endif
+                        <p>※ 短時間でのボットなどによる過重アクセスは一時的に制限される場合があります。</p>
                     </section>
                     <section class="plan-card">
                         <h2>ライトプラン</h2>
-                        <p class="plan-price"><strong>月額280円</strong></p>
-                        <p>・1日5回（最大150回まで引継ぎ）</p>
+                        <p>・1日10回（最大50回まで引継ぎ）</p>
                         <p>・過去3か月のリーディング履歴</p>
+                        <p>・「今日の1枚」（利用回数減なし）</p>
+                        <p class="plan-price"><strong>180円/<span class="plan-price-period">月</span></strong></p>
                         @if (auth()->check() && auth()->user()->stripe_subscription_id === null && auth()->user()->plan === \App\Models\User::PLAN_FREE && config('services.stripe.secret') && config('services.stripe.prices.lite'))
                             <form method="POST" action="{{ route('billing.checkout') }}">
                                 @csrf
@@ -88,33 +72,14 @@
                         @endif
                     </section>
                     <section class="plan-card">
-                        <h2>プレミアムプラン</h2>
-                        <p class="plan-price"><strong>月額980円</strong></p>
-                        <p>・1日10回（最大300回まで引継ぎ）</p>
-                        <p>・すべてのリーディング履歴</p>
-                        <p>・過去のリーディング結果をもとにした、さらに深いリーディング結果</p>
-                        @if (auth()->check() && auth()->user()->stripe_subscription_id === null && auth()->user()->plan === \App\Models\User::PLAN_FREE && config('services.stripe.secret') && config('services.stripe.prices.premium'))
-                            <form method="POST" action="{{ route('billing.checkout') }}">
-                                @csrf
-                                <input type="hidden" name="product" value="premium">
-                                <button class="primary-action" type="submit">プレミアムに申し込む</button>
-                            </form>
-                        @elseif (auth()->guest())
-                            <p><a class="text-link" href="{{ route('login') }}">ログインしてプレミアムに申し込む</a></p>
-                        @elseif (! auth()->check() || ! config('services.stripe.secret') || ! config('services.stripe.prices.premium'))
-                            <p>決済準備中</p>
-                        @endif
+                        <h2>無料会員</h2>
+                        <p>・1日3回（回数引継ぎなし）</p>
+                        <p>・50件までのリーディング履歴</p>
+                        <p>・「今日の1枚」（利用回数減なし）</p>
                     </section>
                 </div>
 
-                @guest
-                    <p class="form-notice credit-notice">
-                        無料会員は毎日3回、直近3か月分の履歴を最大50件まで利用できます。
-                        <a href="{{ route('register') }}">無料会員登録</a>後にログインすると購入できます。
-                    </p>
-                @endguest
-                <p class="page-description">Stripeの安全な決済画面から、クレジット購入や有料プランへの登録ができます。決済情報はStripeが管理します。</p>
-                <p class="page-description">プランの解約・変更は契約管理画面から手続きできます。解約後も、お支払い済み期間の終了までは有料機能をご利用いただけます。</p>
+                <p class="page-description">Stripeの安全な決済画面から有料プランへの登録ができます。決済情報はStripeが管理します。プランの解約・変更は<a href="{{ route('account.settings.edit') }}"><strong>アカウント設定</strong></a>から手続きできます。解約後も、お支払い済み期間の終了までは有料機能をご利用いただけます。</p>
                 <a class="text-link" href="{{ route('tarot') }}">占いに戻る</a>
             </section>
         </main>
