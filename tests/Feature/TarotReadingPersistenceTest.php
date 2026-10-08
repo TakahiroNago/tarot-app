@@ -379,3 +379,55 @@ test('guests can view session readings but cannot open database reading ids', fu
 
     $this->get(route('readings.show', $reading->id))->assertRedirect(route('login'));
 });
+
+test('reading history can be filtered by category for database and session readings', function () {
+    $user = User::factory()->create();
+    $user->tarotReadings()->create([
+        'question' => 'Work database question',
+        'card' => 'The Star',
+        'interpretation' => 'A work answer.',
+        'category' => '仕事',
+        'summary' => '仕事に関する要約です。',
+    ]);
+    $user->tarotReadings()->create([
+        'question' => 'Love database question',
+        'card' => 'The Lovers',
+        'interpretation' => 'A love answer.',
+        'category' => '恋愛',
+        'summary' => '恋愛に関する要約です。',
+    ]);
+
+    $response = $this->actingAs($user)
+        ->withSession([
+            'tarot_readings' => [
+                [
+                    'question' => 'Work session question',
+                    'card' => 'The Sun',
+                    'interpretation' => 'A work session answer.',
+                    'category' => '仕事',
+                    'summary' => '仕事に関するセッション要約です。',
+                ],
+                [
+                    'question' => 'Love session question',
+                    'card' => 'The Moon',
+                    'interpretation' => 'A love session answer.',
+                    'category' => '恋愛',
+                    'summary' => '恋愛に関するセッション要約です。',
+                ],
+            ],
+        ])
+        ->get(route('readings.index', ['category' => '恋愛']));
+
+    $response->assertOk()
+        ->assertSee('Love database question')
+        ->assertSee('Love session question')
+        ->assertDontSee('Work database question')
+        ->assertDontSee('Work session question')
+        ->assertSee('絞り込みを解除');
+
+    expect($response->viewData('selectedCategory'))->toBe('恋愛')
+        ->and($response->viewData('databaseReadings')->total())->toBe(1)
+        ->and($response->viewData('categories')->all())->toBe(['仕事', '恋愛'])
+        ->and($response->viewData('sessionReadings')->pluck('question')->all())
+        ->toBe(['Love session question']);
+});

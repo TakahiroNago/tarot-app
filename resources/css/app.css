@@ -372,7 +372,7 @@ h2 {
 }
 
 .daily-reading-form .primary-action {
-    margin-top: 12px;
+    margin-top: 24px;
     cursor: pointer;
     font: inherit;
 }
@@ -829,6 +829,18 @@ h2 {
     font-size: 36px;
 }
 
+.history-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px 24px;
+    margin-bottom: 24px;
+}
+
+.history-heading h1 {
+    margin-bottom: 0;
+}
+
 .reading-detail h1 {
     font-size: clamp(18px, 3.6vw, 34px);
     white-space: nowrap;
@@ -844,6 +856,37 @@ h2 {
     font-family: var(--font-sans);
     font-size: 13px;
     font-weight: 600;
+}
+
+.history-filter {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+}
+
+.history-filter label {
+    color: var(--color-forest-dark);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.history-filter select {
+    width: 120px;
+    min-height: 42px;
+    min-width: 0;
+    padding: 8px;
+    border: 1px solid var(--color-line);
+    border-radius: 3px;
+    background: #fff;
+    color: var(--color-ink);
+    font: inherit;
+}
+
+.history-filter-clear {
+    color: var(--color-forest);
+    font-size: 13px;
+    text-underline-offset: 3px;
 }
 
 .reading-list {
@@ -1372,6 +1415,17 @@ h2 {
         padding: 28px 20px;
     }
 
+    .history-heading {
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .history-heading h1 {
+        flex: 0 0 auto;
+        font-size: clamp(24px, 7vw, 30px);
+        white-space: nowrap;
+    }
+
     .reading-detail {
         grid-template-columns: 1fr;
         gap: 0;
@@ -1426,20 +1480,41 @@ h2 {
     }
 
     .reading-row {
-        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-columns: minmax(0, 1fr) auto auto;
         gap: 8px 12px;
+    }
+
+    .reading-question {
+        grid-column: 1 / span 2;
+        grid-row: 1;
+        font-size: 14px;
+    }
+
+    .history-filter {
+        align-items: stretch;
+    }
+
+    .history-filter label {
+        width: auto;
+    }
+
+    .history-filter select {
+        flex: 0 0 120px;
     }
 
     .reading-card {
         grid-column: 1;
+        grid-row: 2;
     }
 
     .reading-date {
-        grid-column: 1;
+        grid-column: 2;
+        grid-row: 2;
+        margin-right: 8px;
     }
 
     .reading-open {
-        grid-column: 2;
+        grid-column: 3;
         grid-row: 1 / span 2;
     }
 

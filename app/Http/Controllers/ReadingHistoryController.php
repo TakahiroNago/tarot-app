@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\TarotReading;
 use App\Models\User;
 use App\Support\TarotCardCatalog;
 use Illuminate\Contracts\View\View;
@@ -9,14 +10,19 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 
 class ReadingHistoryController extends Controller
 {
     public function index(Request $request): View
     {
+        $selectedCategory = $request->validate([
+            'category' => ['nullable', 'string', Rule::in(TarotReading::CATEGORIES)],
+        ])['category'] ?? null;
         $user = $request->user();
         $databaseReadings = null;
         $historyUpgradePrompt = false;
+        $databaseCategories = collect();
 
         if ($user instanceof User) {
             $historyQuery = $user->tarotReadings()
@@ -29,6 +35,35 @@ class ReadingHistoryController extends Controller
             $historyCount = $historyQuery->count();
             $displayLimit = $user->plan === User::PLAN_FREE ? min(50, $historyCount) : $historyCount;
             $historyUpgradePrompt = $user->plan === User::PLAN_FREE && $historyCount > 50;
+            $visibleReadingIds = null;
+            if ($user->plan === User::PLAN_FREE) {
+                $visibleReadingIds = (clone $historyQuery)
+                    ->select('id')
+                    ->limit($displayLimit)
+                    ->pluck('id')
+                    ->all();
+            }
+
+            $categoryQuery = clone $historyQuery;
+            if ($visibleReadingIds !== null) {
+                $categoryQuery->whereIn('id', $visibleReadingIds);
+            }
+            $databaseCategories = $categoryQuery
+                ->reorder()
+                ->whereNotNull('category')
+                ->distinct()
+                ->pluck('category');
+
+            if ($selectedCategory !== null) {
+                $filteredHistoryQuery = clone $historyQuery;
+                if ($visibleReadingIds !== null) {
+                    $filteredHistoryQuery->whereIn('id', $visibleReadingIds);
+                }
+
+                $historyQuery = $filteredHistoryQuery->where('category', $selectedCategory);
+                $displayLimit = $historyQuery->count();
+            }
+
             $perPage = 20;
             $page = LengthAwarePaginator::resolveCurrentPage();
             $databaseReadings = new LengthAwarePaginator(
@@ -43,9 +78,24 @@ class ReadingHistoryController extends Controller
             );
         }
 
-        $sessionReadings = $this->sessionReadings($request);
+        $sessionReadings = $this->sessionReadings($request, $selectedCategory);
 
-        return view('readings.index', compact('databaseReadings', 'sessionReadings', 'historyUpgradePrompt'));
+        $sessionCategories = collect($request->session()->get('tarot_readings', []))
+            ->filter(fn (mixed $reading): bool => $this->isReading($reading)
+                && in_array($reading['category'] ?? null, TarotReading::CATEGORIES, true))
+            ->pluck('category');
+        $categories = collect(TarotReading::CATEGORIES)
+            ->filter(fn (string $category): bool => $databaseCategories->contains($category)
+                || $sessionCategories->contains($category))
+            ->values();
+
+        return view('readings.index', compact(
+            'categories',
+            'databaseReadings',
+            'historyUpgradePrompt',
+            'selectedCategory',
+            'sessionReadings',
+        ));
     }
 
     public function show(Request $request, string $reading): View|RedirectResponse
@@ -100,10 +150,11 @@ class ReadingHistoryController extends Controller
     }
 
     /** @return Collection<int, array{id: string, question: string, card: string, interpretation: string}> */
-    private function sessionReadings(Request $request): Collection
+    private function sessionReadings(Request $request, ?string $selectedCategory): Collection
     {
         return collect($request->session()->get('tarot_readings', []))
-            ->filter(fn (mixed $reading): bool => $this->isReading($reading))
+            ->filter(fn (mixed $reading): bool => $this->isReading($reading)
+                && ($selectedCategory === null || ($reading['category'] ?? null) === $selectedCategory))
             ->map(fn (array $reading, int|string $index): array => [
                 'id' => 'session-'.$index,
                 'question' => $reading['question'],

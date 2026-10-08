@@ -1,7 +1,12 @@
 const questionForm = document.querySelector('.question-form');
+const historyCategoryFilter = document.querySelector('[data-history-category-filter]');
 const plansPanel = document.querySelector('.plans-panel');
 const accountMenu = document.querySelector('.account-menu');
 const accountPopover = accountMenu?.querySelector('.account-popover');
+
+historyCategoryFilter?.addEventListener('change', () => {
+	historyCategoryFilter.form?.requestSubmit();
+});
 
 document.querySelectorAll('[data-local-time]').forEach((timeElement) => {
 	const date = new Date(timeElement.dateTime);
