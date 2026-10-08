@@ -47,7 +47,7 @@
                                 <button class="primary-action" type="submit">プレミアムに申し込む</button>
                             </form>
                         @elseif (auth()->guest())
-                            <p><a class="text-link" href="{{ route('login') }}">ログインしてプレミアムに申し込む</a></p>
+                            <p><a class="text-link" href="{{ route('login') }}">→ ログインしてプレミアムに申し込む</a></p>
                         @elseif (! auth()->check() || ! config('services.stripe.secret') || ! config('services.stripe.prices.premium'))
                             <p>決済準備中</p>
                         @endif
@@ -66,7 +66,7 @@
                                 <button class="primary-action" type="submit">ライトに申し込む</button>
                             </form>
                         @elseif (auth()->guest())
-                            <p><a class="text-link" href="{{ route('login') }}">ログインしてライトに申し込む</a></p>
+                            <p><a class="text-link" href="{{ route('login') }}">→ ログインしてライトに申し込む</a></p>
                         @elseif (! auth()->check() || ! config('services.stripe.secret') || ! config('services.stripe.prices.lite'))
                             <p>決済準備中</p>
                         @endif
@@ -76,6 +76,9 @@
                         <p>・1日3回（回数引継ぎなし）</p>
                         <p>・50件までのリーディング履歴</p>
                         <p>・「今日の1枚」（利用回数減なし）</p>
+                        @if (auth()->guest())
+                            <p><a class="text-link" href="{{ route('register') }}">→ 新規登録</a></p>
+                        @endif
                     </section>
                 </div>
 

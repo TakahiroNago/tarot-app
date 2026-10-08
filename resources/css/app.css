@@ -1448,7 +1448,7 @@ h2 {
 
     .result-panel > .result-card-caption {
         display: block;
-        margin: 0 28px 18px;
+        margin: 0 28px;
         border-top: 0;
     }
 
@@ -1570,7 +1570,11 @@ h2 {
     }
 
     .result-copy {
-        padding: 36px 28px 42px;
+        padding: 8px 28px 42px;
+    }
+
+    .result-copy > .result-section:first-of-type {
+        padding-top: 10px;
     }
 }
 
