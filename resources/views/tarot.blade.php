@@ -21,7 +21,7 @@
                     <p class="form-notice credit-notice" role="alert">{{ session('reading_rate_limited') }}</p>
                 @endif
                 <p class="eyebrow">A MOMENT FOR YOU</p>
-                <h1>心にある問いを、<br>聞かせてください。</h1>
+                <h1>心にある問いを<br>聞かせてください</h1>
                 <p class="page-description">いま気になっていることを、自由に入力してください。</p>
 
                 @auth

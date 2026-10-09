@@ -1,24 +1,10 @@
 <header class="site-header">
-    @php
-        $hasSessionReadings = collect(session('tarot_readings', []))->contains(
-            fn ($reading) => is_array($reading)
-                && isset($reading['question'], $reading['card'], $reading['interpretation'])
-                && is_string($reading['question'])
-                && is_string($reading['card'])
-                && is_string($reading['interpretation']),
-        );
-    @endphp
     <a class="brand" href="{{ route('home') }}">
         <span class="brand-mark" aria-hidden="true">✦</span>
         <span class="brand-name">月詠</span>
         <span class="brand-caption">TAROT JOURNAL</span>
     </a>
     <nav class="account-navigation" aria-label="アカウント">
-        @guest
-            @if ($hasSessionReadings)
-                <a href="{{ route('readings.index') }}">占い履歴</a>
-            @endif
-        @endguest
         @auth
             @if (isset($creditSummary))
                 <a
@@ -31,23 +17,19 @@
             @else
                 <a href="{{ route('plans') }}">料金・プラン</a>
             @endif
-        @else
-            <a href="{{ route('plans') }}">料金・プラン</a>
         @endauth
         @auth
             <div class="account-menu{{ request()->routeIs('plans') && request()->query('account_menu') === 'open' ? ' is-open' : '' }}">
-                <a
+                <button
+                    type="button"
                     class="account-menu-trigger"
-                    href="{{ route('plans', ['account_menu' => 'open']) }}"
-                    aria-label="アカウントメニューを開いて料金・プランを表示"
+                    aria-label="アカウントメニューを開く"
                     aria-haspopup="true"
                 >
-                    <svg aria-hidden="true" viewBox="0 0 48 48">
-                        <circle cx="24" cy="24" r="23" fill="#78496f"/>
-                        <circle cx="24" cy="18" r="8" fill="#fdfafe"/>
-                        <path d="M9 41c1.8-8 7.4-12 15-12s13.2 4 15 12" fill="#fdfafe"/>
+                    <svg class="account-menu-icon" aria-hidden="true" viewBox="0 0 16 16">
+                        <path fill="currentColor" d="M3 9.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0m5 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0m5 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0"/>
                     </svg>
-                </a>
+                </button>
                 <section class="account-popover" aria-label="アカウントメニュー">
                     <div class="account-profile">
                         <svg class="account-avatar" aria-hidden="true" viewBox="0 0 48 48">
@@ -69,7 +51,6 @@
                         @csrf
                         <button class="account-popover-link" type="submit">ログアウト</button>
                     </form>
-                    <a class="account-popover-close" href="{{ route('plans') }}">閉じる</a>
                 </section>
             </div>
         @else

@@ -21,7 +21,7 @@
                         <p class="form-notice" role="status">{{ session('daily_reading_rate_limited') }}</p>
                     @endif
                     <p class="eyebrow">今日のあなたへ</p>
-                    <h1 class="welcome-title">心の声に、<br>カードが光をあてる。</h1>
+                    <h1 class="welcome-title">心の声に<br>カードが光をあてる</h1>
                     <p class="welcome-description">迷いや期待を、ひとつの問いに。カードが映す小さなヒントを、あなたの毎日に届けます。</p>
                     <a class="primary-action" href="{{ route('tarot') }}">
                         <span>占いを始める</span>

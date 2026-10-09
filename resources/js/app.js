@@ -3,6 +3,7 @@ const historyCategoryFilter = document.querySelector('[data-history-category-fil
 const plansPanel = document.querySelector('.plans-panel');
 const accountMenu = document.querySelector('.account-menu');
 const accountPopover = accountMenu?.querySelector('.account-popover');
+const accountMenuTrigger = accountMenu?.querySelector('.account-menu-trigger');
 
 historyCategoryFilter?.addEventListener('change', () => {
 	historyCategoryFilter.form?.requestSubmit();
@@ -27,7 +28,7 @@ if (plansPanel && accountMenu && accountPopover && accountMenu.classList.contain
 	};
 
 	document.addEventListener('click', (event) => {
-		if (!accountPopover.contains(event.target)) {
+		if (!accountPopover.contains(event.target) && !accountMenuTrigger?.contains(event.target)) {
 			dismissAccountPopover();
 		}
 	});

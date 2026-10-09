@@ -19,7 +19,14 @@
     --color-forest-dark: #244536;
     --color-coral: #c86e57;
     --color-gold: #c69b53;
+    --color-gold-light: #e7c98e;
     --font-display: 'Palatino Linotype', 'Yu Mincho', 'Hiragino Mincho ProN', serif;
+    --font-display-ja: 'Palatino Linotype', 'Yu Mincho', 'Hiragino Mincho ProN', 'Noto Serif JP', 'BIZ UDPMincho', serif;
+    --font-sans-ja: 'Instrument Sans', 'Noto Sans JP', 'Yu Gothic UI', 'Hiragino Kaku Gothic ProN', Meiryo,
+        ui-sans-serif, system-ui, sans-serif;
+    --radius-control: 6px;
+    --radius-panel: 12px;
+    --shadow-panel: 0 24px 70px rgb(35 56 42 / 8%);
 }
 
 * {
@@ -44,6 +51,13 @@ a {
     color: inherit;
 }
 
+.site-header :focus-visible,
+.site-footer :focus-visible,
+.welcome-panel :focus-visible {
+    outline: 3px solid var(--color-gold);
+    outline-offset: 3px;
+}
+
 .page-frame {
     display: flex;
     min-height: 100vh;
@@ -62,11 +76,14 @@ a {
     min-height: 94px;
     align-items: center;
     justify-content: space-between;
+    gap: 24px;
     border-bottom: 1px solid rgb(49 92 73 / 15%);
+    font-family: var(--font-sans-ja);
 }
 
 .brand {
     display: inline-flex;
+    min-width: 0;
     align-items: center;
     gap: 12px;
     text-decoration: none;
@@ -84,9 +101,10 @@ a {
 }
 
 .brand-name {
-    font-family: var(--font-display);
+    font-family: var(--font-display-ja);
     font-size: 18px;
     letter-spacing: 0;
+    white-space: nowrap;
 }
 
 .brand-caption,
@@ -99,6 +117,7 @@ a {
 
 .brand-caption {
     margin-left: 2px;
+    white-space: nowrap;
 }
 
 .account-navigation,
@@ -116,6 +135,13 @@ a {
     font-size: 13px;
 }
 
+.account-navigation > a {
+    display: inline-flex;
+    min-height: 42px;
+    align-items: center;
+    justify-content: center;
+}
+
 .account-navigation a,
 .account-navigation button,
 .table-link {
@@ -130,9 +156,12 @@ a {
 }
 
 .account-register {
-    padding: 9px 12px;
+    min-height: 42px;
+    padding: 0 14px;
     border: 1px solid var(--color-forest) !important;
-    border-radius: 3px;
+    border-radius: var(--radius-control);
+    background: rgb(49 92 73 / 5%) !important;
+    font-weight: 600;
     text-decoration: none !important;
 }
 
@@ -143,7 +172,7 @@ a {
     gap: 5px;
     padding: 0 12px;
     border: 1px solid var(--color-forest);
-    border-radius: 4px;
+    border-radius: var(--radius-control);
     color: var(--color-forest-dark);
     text-decoration: none;
     white-space: nowrap;
@@ -163,8 +192,8 @@ a {
 
 .account-menu-trigger {
     display: grid;
-    width: 44px;
-    height: 44px;
+    width: 48px;
+    height: 48px;
     place-items: center;
     border-radius: 50%;
     outline-offset: 3px;
@@ -177,6 +206,11 @@ a {
     height: 40px;
 }
 
+.account-menu-trigger .account-menu-icon {
+    width: 22px;
+    height: 22px;
+}
+
 .account-popover {
     position: absolute;
     z-index: 10;
@@ -184,9 +218,9 @@ a {
     right: 0;
     display: none;
     width: min(320px, calc(100vw - 36px));
-    padding: 18px;
+    padding: 18px 18px 10px;
     border: 1px solid var(--color-line);
-    border-radius: 6px;
+    border-radius: var(--radius-panel);
     background: var(--color-panel);
     box-shadow: 0 16px 40px rgb(35 56 42 / 16%);
     color: var(--color-ink);
@@ -246,7 +280,8 @@ a {
 .account-navigation .account-popover-link {
     display: block;
     width: 100%;
-    padding: 12px 2px;
+    min-height: 44px;
+    padding: 11px 2px;
     border: 0;
     border-bottom: 1px solid var(--color-line);
     background: none;
@@ -258,6 +293,10 @@ a {
 
 .account-popover form {
     display: block;
+}
+
+.account-popover form .account-popover-link {
+    border-bottom: 0;
 }
 
 .account-navigation .account-popover-link:hover {
@@ -277,7 +316,7 @@ a {
     display: flex;
     flex: 1;
     align-items: center;
-    padding-block: 56px;
+    padding-block: 56px 24px;
 }
 
 .welcome-panel,
@@ -292,14 +331,20 @@ a {
 
 .welcome-panel {
     display: grid;
-    min-height: 540px;
-    grid-template-columns: 1fr 0.9fr;
+    min-height: 560px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.95fr);
     align-items: center;
     overflow: hidden;
+    border-radius: var(--radius-panel);
+    background: rgb(251 252 247 / 92%);
+    box-shadow: var(--shadow-panel);
+    font-family: var(--font-sans-ja);
+    font-size: 15px;
+    line-height: 1.75;
 }
 
 .welcome-copy {
-    padding: 72px 0 72px 72px;
+    padding: clamp(42px, 6.5vw, 76px) 0 clamp(42px, 6.5vw, 76px) clamp(36px, 6.5vw, 76px);
 }
 
 .eyebrow {
@@ -334,8 +379,10 @@ h2 {
 .welcome-title {
     max-width: 520px;
     margin-bottom: 20px;
-    font-size: clamp(32px, 3.6vw, 48px);
-    line-height: 1.35;
+    font-size: clamp(32px, 3.8vw, 50px);
+    font-family: var(--font-display-ja);
+    line-height: 1.45;
+    letter-spacing: 0.04em;
 }
 
 .welcome-description,
@@ -346,7 +393,7 @@ h2 {
 }
 
 .welcome-description {
-    max-width: 380px;
+    max-width: 32em;
     margin-bottom: 34px;
 }
 
@@ -371,26 +418,39 @@ h2 {
     background: var(--color-forest-dark);
 }
 
+.welcome-copy > .primary-action,
+.welcome-copy .daily-reading-form .primary-action {
+    min-height: 52px;
+    border-radius: var(--radius-control);
+    transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.welcome-copy .primary-action:hover {
+    box-shadow: 0 8px 20px rgb(36 69 54 / 18%);
+}
+
 .daily-reading-form .primary-action {
-    margin-top: 24px;
+    margin-top: 12px;
     cursor: pointer;
     font: inherit;
 }
 
 .action-arrow {
-    color: #e7c98e;
+    color: var(--color-gold-light);
     font-size: 20px;
 }
 
 .art-stage {
     position: relative;
     display: grid;
-    min-height: 420px;
+    min-height: 460px;
     place-items: center;
     overflow: hidden;
     background:
-        radial-gradient(ellipse at center, rgb(201 219 198 / 86%), transparent 65%),
-        linear-gradient(145deg, rgb(235 239 225 / 45%), rgb(226 234 220 / 85%));
+        /* radial-gradient(ellipse at 50% 48%, rgb(198 155 83 / 22%), transparent 36%),
+        radial-gradient(ellipse at 50% 50%, rgb(75 113 88 / 75%), transparent 70%), */
+        radial-gradient(ellipse at center, rgb(201 219 198 / 86%), transparent 67%),
+        linear-gradient(145deg, #17382c, #244536 58%, #19372d);
 }
 
 .art-stage::before,
@@ -398,13 +458,18 @@ h2 {
     position: absolute;
     width: 310px;
     aspect-ratio: 1;
-    border: 1px solid rgb(49 92 73 / 16%);
+    border: 1px solid rgb(231 201 142 / 20%);
     border-radius: 50%;
     content: '';
 }
 
+.art-stage::before {
+    width: min(72%, 330px);
+}
+
 .art-stage::after {
-    width: 390px;
+    width: min(88%, 420px);
+    border-color: rgb(231 201 142 / 12%);
 }
 
 .tarot-card-art {
@@ -423,6 +488,15 @@ h2 {
     background: #315c49;
     box-shadow: 0 20px 40px rgb(32 41 35 / 24%), inset 0 0 0 6px #315c49, inset 0 0 0 7px rgb(226 197 133 / 62%);
     color: #f5e6bd;
+}
+
+.art-stage .tarot-card-art {
+    width: clamp(190px, 22vw, 238px);
+    padding: 22px 18px;
+    border-color: #e0c47e;
+    border-radius: var(--radius-control);
+    background: linear-gradient(150deg, #315c49, #244536);
+    box-shadow: 0 24px 52px rgb(9 24 18 / 38%), inset 0 0 0 6px #315c49, inset 0 0 0 7px rgb(226 197 133 / 66%);
 }
 
 .tarot-card-art::before {
@@ -454,6 +528,10 @@ h2 {
     font-family: var(--font-display);
     font-size: 56px;
     box-shadow: 0 0 0 10px rgb(226 197 133 / 8%), 0 0 0 20px rgb(226 197 133 / 5%);
+}
+
+.art-stage .card-sun {
+    box-shadow: 0 0 0 10px rgb(226 197 133 / 8%), 0 0 0 20px rgb(226 197 133 / 5%), 0 0 32px rgb(226 197 133 / 16%);
 }
 
 .card-label {
@@ -1112,7 +1190,8 @@ h2 {
     align-items: center;
     justify-content: space-between;
     gap: 18px;
-    padding-block: 22px 28px;
+    padding-block: 24px 32px;
+    font-family: var(--font-sans-ja);
 }
 
 .site-footer-links {
@@ -1126,6 +1205,12 @@ h2 {
 .site-footer-links a {
     color: var(--color-forest);
     text-underline-offset: 3px;
+}
+
+.site-footer-links a:hover,
+.text-link:hover,
+.account-navigation a:hover {
+    color: var(--color-coral);
 }
 
 .legal-updated {
@@ -1407,7 +1492,7 @@ h2 {
     }
 
     .site-header {
-        min-height: 76px;
+        min-height: 72px;
         gap: 12px;
     }
 
@@ -1416,6 +1501,10 @@ h2 {
         justify-content: flex-end;
         gap: 8px;
         font-size: 12px;
+    }
+
+    .account-navigation > a {
+        min-height: 40px;
     }
 
     .account-menu-trigger {
@@ -1552,7 +1641,7 @@ h2 {
     }
 
     .page-content {
-        padding-block: 28px;
+        padding-block: 28px 16px;
     }
 
     .welcome-panel,
@@ -1561,19 +1650,24 @@ h2 {
     }
 
     .welcome-copy {
-        padding: 42px 30px 34px;
+        padding: 40px clamp(24px, 7vw, 44px) 34px;
     }
 
     .welcome-title {
-        font-size: clamp(26px, 8vw, 36px);
+        max-width: 16em;
+        font-size: clamp(28px, 7vw, 38px);
     }
 
     .art-stage {
-        min-height: 320px;
+        min-height: clamp(300px, 78vw, 360px);
     }
 
     .tarot-card-art {
         width: 174px;
+    }
+
+    .art-stage .tarot-card-art {
+        width: clamp(170px, 48vw, 198px);
     }
 
     .form-panel {
@@ -1613,10 +1707,72 @@ h2 {
     }
 
     .welcome-title {
-        font-size: clamp(24px, 8vw, 32px);
+        font-size: clamp(26px, 8vw, 32px);
     }
 
     .form-panel {
         padding-inline: 22px;
+    }
+}
+
+@media (max-width: 520px) {
+    .site-header {
+        align-items: center;
+        flex-wrap: nowrap;
+        padding-block: 14px;
+    }
+
+    .brand {
+        min-height: 42px;
+        gap: 6px;
+    }
+
+    .account-navigation {
+        width: auto;
+        flex-wrap: nowrap;
+        justify-content: flex-end;
+        gap: 4px;
+        font-size: 11px;
+    }
+
+    .account-navigation > a {
+        white-space: nowrap;
+    }
+
+    .account-register {
+        padding-inline: 8px;
+    }
+
+    .site-footer {
+        gap: 12px;
+    }
+
+    .site-footer-links {
+        gap: 10px 16px;
+        font-size: 12px;
+        line-height: 1.7;
+    }
+}
+
+@media (max-width: 360px) {
+    .site-header {
+        gap: 4px;
+    }
+
+    .brand {
+        gap: 4px;
+    }
+
+    .brand-mark {
+        width: 30px;
+    }
+
+    .account-navigation {
+        gap: 2px;
+        font-size: 10px;
+    }
+
+    .account-register {
+        padding-inline: 6px;
     }
 }

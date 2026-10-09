@@ -109,6 +109,7 @@
                         <button class="danger-action" type="submit">アカウントを削除する</button>
                     </form>
                 </section>
+                <a class="text-link" href="{{ route('tarot') }}">→ 占いに戻る</a>
             </section>
         </main>
         @include('partials.site-footer')
