@@ -71,6 +71,7 @@ test('the welcome page shows navigation for guests and signed-in admins', functi
         ->assertSee(route('login'))
         ->assertSee(route('register'))
         ->assertDontSee(route('readings.index'))
+        ->assertDontSee(route('plans'))
         ->assertDontSee(route('admin.users.index'));
 
     $this->withSession([
@@ -81,15 +82,19 @@ test('the welcome page shows navigation for guests and signed-in admins', functi
         ]],
     ])->get(route('home'))
         ->assertOk()
-        ->assertSee(route('readings.index'))
-        ->assertSee('占い履歴');
+        ->assertDontSee(route('readings.index'))
+        ->assertDontSee(route('plans'))
+        ->assertDontSee('占い履歴')
+        ->assertDontSee('料金・プラン');
 
     $admin = User::factory()->admin()->create();
     $this->actingAs($admin)
         ->get(route('home'))
         ->assertOk()
         ->assertSee(route('admin.users.index'))
-        ->assertSee(route('plans', ['account_menu' => 'open']))
+        ->assertSee('class="account-menu-trigger"', false)
+        ->assertSee('type="button"', false)
+        ->assertDontSee(route('plans', ['account_menu' => 'open']))
         ->assertSee($admin->name)
         ->assertSee($admin->email)
         ->assertSee(route('readings.index'))

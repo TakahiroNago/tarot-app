@@ -32,7 +32,7 @@
 
                     <button class="primary-action" type="submit">登録する <span class="action-arrow" aria-hidden="true">→</span></button>
                 </form>
-                <a class="text-link" href="{{ route('login') }}">すでにアカウントをお持ちの方</a>
+                <a class="text-link" href="{{ route('login') }}">→ アカウントをお持ちの方</a>
             </section>
         </main>
         @include('partials.site-footer')

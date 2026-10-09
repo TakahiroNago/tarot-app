@@ -57,7 +57,7 @@
                         <h2>ライトプラン</h2>
                         <p>・1日10回（最大50回まで引継ぎ）</p>
                         <p>・過去3か月のリーディング履歴</p>
-                        <p>・「今日の1枚」（利用回数減なし）</p>
+                        <p>・「今日の1枚」</p>
                         <p class="plan-price"><strong>180円/<span class="plan-price-period">月</span></strong></p>
                         @if (auth()->check() && auth()->user()->stripe_subscription_id === null && auth()->user()->plan === \App\Models\User::PLAN_FREE && config('services.stripe.secret') && config('services.stripe.prices.lite'))
                             <form method="POST" action="{{ route('billing.checkout') }}">
@@ -75,7 +75,7 @@
                         <h2>無料会員</h2>
                         <p>・1日3回（回数引継ぎなし）</p>
                         <p>・50件までのリーディング履歴</p>
-                        <p>・「今日の1枚」（利用回数減なし）</p>
+                        <p>・「今日の1枚」</p>
                         @if (auth()->guest())
                             <p><a class="primary-action" href="{{ route('register') }}">→ 新規登録</a></p>
                         @endif
@@ -87,7 +87,7 @@
                         プランの解約・変更は<a href="{{ route('account.settings.edit') }}"><strong>アカウント設定</strong></a>から手続きできます。解約後も、お支払い済み期間の終了までは有料機能をご利用いただけます。
                     </p>
                 @endauth
-                <a class="text-link" href="{{ route('tarot') }}">占いに戻る</a>
+                <a class="text-link" href="{{ route('tarot') }}">→ 占いに戻る</a>
             </section>
         </main>
         @include('partials.site-footer')
