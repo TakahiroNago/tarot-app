@@ -64,7 +64,7 @@
                             @if ($user->stripe_subscription_id !== null)
                                 <button class="primary-action" type="submit">契約・お支払いを管理</button>
                             @else
-                                <button class="text-link" type="submit">お支払い情報を管理</button>
+                                <button class="text-link" type="submit">お支払い情報を管理（Stripe）</button>
                             @endif
                         </form>
                     @endif

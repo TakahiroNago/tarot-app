@@ -47,7 +47,7 @@
                                 <button class="primary-action" type="submit">プレミアムに申し込む</button>
                             </form>
                         @elseif (auth()->guest())
-                            <p><a class="text-link" href="{{ route('login') }}">→ ログインしてプレミアムに申し込む</a></p>
+                            <p><a class="primary-action" href="{{ route('login') }}">→ ログインして<br>プレミアムに申し込む</a></p>
                         @elseif (! auth()->check() || ! config('services.stripe.secret') || ! config('services.stripe.prices.premium'))
                             <p>決済準備中</p>
                         @endif
@@ -66,7 +66,7 @@
                                 <button class="primary-action" type="submit">ライトに申し込む</button>
                             </form>
                         @elseif (auth()->guest())
-                            <p><a class="text-link" href="{{ route('login') }}">→ ログインしてライトに申し込む</a></p>
+                            <p><a class="primary-action" href="{{ route('login') }}">→ ログインして<br>ライトに申し込む</a></p>
                         @elseif (! auth()->check() || ! config('services.stripe.secret') || ! config('services.stripe.prices.lite'))
                             <p>決済準備中</p>
                         @endif
@@ -77,12 +77,16 @@
                         <p>・50件までのリーディング履歴</p>
                         <p>・「今日の1枚」（利用回数減なし）</p>
                         @if (auth()->guest())
-                            <p><a class="text-link" href="{{ route('register') }}">→ 新規登録</a></p>
+                            <p><a class="primary-action" href="{{ route('register') }}">→ 新規登録</a></p>
                         @endif
                     </section>
                 </div>
 
-                <p class="page-description">Stripeの安全な決済画面から有料プランへの登録ができます。決済情報はStripeが管理します。プランの解約・変更は<a href="{{ route('account.settings.edit') }}"><strong>アカウント設定</strong></a>から手続きできます。解約後も、お支払い済み期間の終了までは有料機能をご利用いただけます。</p>
+                @auth
+                    <p class="page-description">
+                        プランの解約・変更は<a href="{{ route('account.settings.edit') }}"><strong>アカウント設定</strong></a>から手続きできます。解約後も、お支払い済み期間の終了までは有料機能をご利用いただけます。
+                    </p>
+                @endauth
                 <a class="text-link" href="{{ route('tarot') }}">占いに戻る</a>
             </section>
         </main>

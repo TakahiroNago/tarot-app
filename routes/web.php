@@ -50,8 +50,8 @@ Route::middleware('active')->group(function () {
     Route::post('/billing/portal', [BillingController::class, 'portal'])->middleware(['auth', 'verified'])->name('billing.portal');
     Route::post('/billing/plan', [BillingController::class, 'changePlan'])->middleware(['auth', 'verified'])->name('billing.plan.change');
     Route::delete('/billing/plan', [BillingController::class, 'cancelPlanChange'])->middleware(['auth', 'verified'])->name('billing.plan.cancel');
-    Route::get('/readings', [ReadingHistoryController::class, 'index'])->middleware('verified')->name('readings.index');
-    Route::get('/readings/{reading}', [ReadingHistoryController::class, 'show'])->middleware('verified')->name('readings.show');
+    Route::get('/readings', [ReadingHistoryController::class, 'index'])->name('readings.index');
+    Route::get('/readings/{reading}', [ReadingHistoryController::class, 'show'])->name('readings.show');
 });
 
 Route::middleware(['auth', 'active'])->group(function () {
