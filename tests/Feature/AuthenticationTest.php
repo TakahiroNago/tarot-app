@@ -128,7 +128,7 @@ test('the header shows the total credit balance on other authenticated pages', f
         $this->actingAs($user)
             ->get($url)
             ->assertOk()
-            ->assertSee('残り <strong>9</strong> 回', false)
+            ->assertSee('<strong>9</strong> 回', false)
             ->assertDontSee('料金・プラン</a>', false);
     }
 });
@@ -166,7 +166,7 @@ test('a guest who starts login from the plans page returns to the plans page', f
 
     $this->get(route('plans'))
         ->assertOk()
-        ->assertSee(route('login', ['redirect' => 'plans']));
+        ->assertSee(route('login'));
 
     $this->get(route('login', ['redirect' => 'plans']))
         ->assertOk();

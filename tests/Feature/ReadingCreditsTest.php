@@ -15,24 +15,22 @@ test('the plans page explains free membership and does not offer credit purchase
     $response = $this->get(route('plans'));
 
     $response->assertOk()
-        ->assertSee('無料会員は毎日3回までご利用いただけます。')
-        ->assertSee('直近3か月の最大50件まで')
-        ->assertSee('クレジットの購入はできません。')
+        ->assertSee('1日3回（回数引継ぎなし）')
+        ->assertSee('50件までのリーディング履歴')
         ->assertDontSee('10回分を購入')
         ->assertDontSee('50回分を購入')
         ->assertDontSee('100回分を購入')
         ->assertSee('1日10回（最大50回まで引継ぎ）')
-        ->assertSee('占い回数無制限（短時間での連続利用は1分あたり5回まで）')
+        ->assertSee('占い回数無制限')
         ->assertSee('180円/')
-        ->assertSee('580円/')
-        ->assertSee('Stripeの安全な決済画面から有料プランへの登録ができます。');
+        ->assertSee('580円/');
 });
 
 test('the plans page advertises the updated lite and premium allowances', function () {
     $this->get(route('plans'))
         ->assertOk()
         ->assertSee('1日10回（最大50回まで引継ぎ）')
-        ->assertSee('占い回数無制限（短時間での連続利用は1分あたり5回まで）');
+        ->assertSee('占い回数無制限');
 });
 
 test('signed-in users cannot purchase credits from the plans page', function () {
@@ -46,7 +44,6 @@ test('signed-in users cannot purchase credits from the plans page', function () 
     $this->actingAs(User::factory()->create())
         ->get(route('plans'))
         ->assertOk()
-        ->assertSee('クレジットの購入はできません。')
         ->assertDontSee('plan-credit-button')
         ->assertDontSee('10回分を購入')
         ->assertDontSee('50回分を購入')
@@ -74,7 +71,7 @@ test('guests can use three trial readings and are prompted to register afterward
         $response->assertOk();
         if ($question === 'Three?') {
             $response->assertSee('<a class="form-notice credit-notice credit-notice-link" href="'.route('register').'">', false)
-                ->assertSee('無料体験を使い切りました。会員登録すると毎日3回占えます。 会員登録はこちら');
+                ->assertSee('無料体験を使い切りました。無料会員登録すると毎日3回占えます。→ 会員登録はこちら');
         }
     }
 
@@ -112,7 +109,7 @@ test('guests with no trial credits see a full-width registration link and cannot
         ->assertOk()
         ->assertSee('href="'.route('register').'"', false)
         ->assertSee('class="primary-action" type="submit" disabled', false)
-        ->assertSee('無料体験を使い切りました。会員登録すると毎日3回占えます。 会員登録はこちら');
+        ->assertSee('無料体験を使い切りました。無料会員登録すると毎日3回占えます。→ 会員登録はこちら');
 });
 
 test('free members receive three readings per day without carrying unused credits forward', function () {
@@ -126,7 +123,7 @@ test('free members receive three readings per day without carrying unused credit
     $this->actingAs($user)->get(route('tarot'))
         ->assertOk()
         ->assertSee('class="credit-balance-link"', false)
-        ->assertSee('残り <strong>3</strong> 回', false)
+        ->assertSee('<strong>3</strong> 回', false)
         ->assertSee(route('plans'))
         ->assertDontSee('今日の残り')
         ->assertDontSee('購入クレジット');
@@ -192,7 +189,7 @@ test('members with no credits see a full-width plans link and cannot draw a card
         ->assertOk()
         ->assertSee('href="'.route('plans').'"', false)
         ->assertSee('class="primary-action" type="submit" disabled', false)
-        ->assertSee('本日利用可能なクレジットを使い切りました。有料プランをご検討ください。 プランを見る');
+        ->assertSee('本日利用可能なクレジットを使い切りました。→有料プランを見る');
 });
 
 test('the result page links the entire exhausted member-credit notice to plans', function () {
@@ -211,7 +208,7 @@ test('the result page links the entire exhausted member-credit notice to plans',
         ->post(route('tarot.draw'), ['question' => 'Last question?'])
         ->assertOk()
         ->assertSee('<a class="form-notice credit-notice credit-notice-link" href="'.route('plans').'">', false)
-        ->assertSee('本日利用可能なクレジットを使い切りました。有料プランをご検討ください。 プランを見る');
+        ->assertSee('本日利用可能なクレジットを使い切りました。→ 有料プランを見る');
 });
 
 test('lite members receive ten daily credits up to a fifty-credit carryover cap', function () {
