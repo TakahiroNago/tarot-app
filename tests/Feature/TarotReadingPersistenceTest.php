@@ -423,7 +423,7 @@ test('reading history can be filtered by category for database and session readi
         ->assertSee('Love session question')
         ->assertDontSee('Work database question')
         ->assertDontSee('Work session question')
-        ->assertSee('絞り込みを解除');
+        ->assertSee('value="恋愛" selected', false);
 
     expect($response->viewData('selectedCategory'))->toBe('恋愛')
         ->and($response->viewData('databaseReadings')->total())->toBe(1)
