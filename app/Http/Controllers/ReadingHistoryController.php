@@ -14,12 +14,16 @@ use Illuminate\Validation\Rule;
 
 class ReadingHistoryController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request): View|RedirectResponse
     {
         $selectedCategory = $request->validate([
             'category' => ['nullable', 'string', Rule::in(TarotReading::CATEGORIES)],
         ])['category'] ?? null;
         $user = $request->user();
+        if ($user instanceof User && ! $user->hasVerifiedEmail()) {
+            return redirect()->route('verification.notice');
+        }
+
         $databaseReadings = null;
         $historyUpgradePrompt = false;
         $databaseCategories = collect();
@@ -114,6 +118,10 @@ class ReadingHistoryController extends Controller
 
             if (! $user instanceof User) {
                 return redirect()->route('login');
+            }
+
+            if (! $user->hasVerifiedEmail()) {
+                return redirect()->route('verification.notice');
             }
 
             $readings = $user->tarotReadings();

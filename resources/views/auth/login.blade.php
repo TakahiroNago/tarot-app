@@ -37,8 +37,8 @@
                     </svg>
                     Googleでログイン
                 </a>
-                <a class="text-link" href="{{ route('password.request') }}">パスワードをお忘れですか？</a>
-                <a class="text-link" href="{{ route('register') }}">新規登録</a>
+                <p><a class="text-link" href="{{ route('password.request') }}">→ パスワードをお忘れですか？</a></p>
+                <p><a class="text-link" href="{{ route('register') }}">→ 新規登録</a></p>
             </section>
         </main>
         @include('partials.site-footer')

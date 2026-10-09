@@ -1015,14 +1015,37 @@ h2 {
     font-size: 17px;
 }
 
+.plan-card:first-child h2 {
+    color: #8a682f;
+    font-weight: 800;
+}
+
 .plan-card p {
     color: var(--color-muted);
     font-size: 13px;
     line-height: 1.8;
 }
 
+.plan-card:first-child > p:nth-of-type(-n + 4) {
+    color: #8a682f;
+}
+
 .plan-card .plan-price {
     margin-block: 6px;
+}
+
+.plan-card:first-child .plan-price strong {
+    color: #8a682f;
+}
+
+.plan-card:first-child .primary-action {
+    border-color: #8a682f;
+    background: #8a682f;
+}
+
+.plan-card:first-child .primary-action:hover {
+    border-color: #735522;
+    background: #735522;
 }
 
 .plan-credit-option {
