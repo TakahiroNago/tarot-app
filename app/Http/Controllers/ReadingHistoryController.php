@@ -110,7 +110,7 @@ class ReadingHistoryController extends Controller
 
             $readingData = [
                 'question' => $sessionReading['question'],
-                'card' => $sessionReading['card'],
+                'card' => $sessionReading['card'] ?? null,
                 'interpretation' => $sessionReading['interpretation'],
             ];
         } else {
@@ -147,7 +147,9 @@ class ReadingHistoryController extends Controller
             $readingData = $savedReading->only(['question', 'card', 'interpretation', 'created_at']);
         }
 
-        $card = TarotCardCatalog::find($readingData['card']);
+        $card = is_string($readingData['card'] ?? null)
+            ? TarotCardCatalog::find($readingData['card'])
+            : null;
 
         return view('readings.show', [
             'reading' => $readingData,
@@ -157,7 +159,7 @@ class ReadingHistoryController extends Controller
         ]);
     }
 
-    /** @return Collection<int, array{id: string, question: string, card: string, interpretation: string}> */
+    /** @return Collection<int, array{id: string, question: string, card: string|null, interpretation: string}> */
     private function sessionReadings(Request $request, ?string $selectedCategory): Collection
     {
         return collect($request->session()->get('tarot_readings', []))
@@ -166,7 +168,7 @@ class ReadingHistoryController extends Controller
             ->map(fn (array $reading, int|string $index): array => [
                 'id' => 'session-'.$index,
                 'question' => $reading['question'],
-                'card' => $reading['card'],
+                'card' => $reading['card'] ?? null,
                 'interpretation' => $reading['interpretation'],
             ])
             ->reverse()
@@ -177,7 +179,11 @@ class ReadingHistoryController extends Controller
     {
         return is_array($reading)
             && is_string($reading['question'] ?? null)
-            && is_string($reading['card'] ?? null)
+            && (
+                ! array_key_exists('card', $reading)
+                || $reading['card'] === null
+                || is_string($reading['card'])
+            )
             && is_string($reading['interpretation'] ?? null);
     }
 }

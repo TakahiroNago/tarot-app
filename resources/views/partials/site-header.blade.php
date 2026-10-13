@@ -2,7 +2,7 @@
     <a class="brand" href="{{ route('home') }}">
         <span class="brand-mark" aria-hidden="true">✦</span>
         <span class="brand-name">月詠</span>
-        <span class="brand-caption">TAROT JOURNAL</span>
+        <span class="brand-caption">ZEN REFLECTIONS</span>
     </a>
     <nav class="account-navigation" aria-label="アカウント">
         @auth
@@ -10,7 +10,7 @@
                 <a
                     class="credit-balance-link"
                     href="{{ route('plans') }}"
-                    aria-label="利用可能な占い回数 {{ $creditSummary['unlimited'] ? '無制限' : $creditSummary['total'].'回' }}。料金・プランを見る"
+                    aria-label="利用可能な相談回数 {{ $creditSummary['unlimited'] ? '無制限' : $creditSummary['total'].'回' }}。料金・プランを見る"
                 >
                     <strong>{{ $creditSummary['unlimited'] ? '無制限' : $creditSummary['total'] }}</strong>{{ $creditSummary['unlimited'] ? '' : ' 回' }}
                 </a>
@@ -42,7 +42,7 @@
                             <span class="account-profile-email">{{ auth()->user()->email }}</span>
                         </div>
                     </div>
-                    <a class="account-popover-link" href="{{ route('readings.index') }}">占い履歴</a>
+                    <a class="account-popover-link" href="{{ route('readings.index') }}">相談の記録</a>
                     <a class="account-popover-link" href="{{ route('account.settings.edit') }}">アカウント設定</a>
                     @if (auth()->user()->isAdmin())
                         <a class="account-popover-link" href="{{ route('admin.users.index') }}">ユーザー管理</a>

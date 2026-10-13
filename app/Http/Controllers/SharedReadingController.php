@@ -13,7 +13,7 @@ class SharedReadingController extends Controller
         $reading = $shareService->find($token);
         abort_if($reading === null, 404);
 
-        $card = TarotCardCatalog::find($reading['card']);
+        $card = is_string($reading['card']) ? TarotCardCatalog::find($reading['card']) : null;
 
         return view('readings.shared', [
             'reading' => $reading,

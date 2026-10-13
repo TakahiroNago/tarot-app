@@ -6,7 +6,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>アカウント設定 | 月詠 TAROT JOURNAL</title>
+    <title>アカウント設定 | 月詠 禅のことば</title>
     @vite(['resources/css/app.css'])
 </head>
 <body>
@@ -96,7 +96,7 @@
 
                 <section class="account-settings-section account-deletion-section">
                     <h2>アカウント削除</h2>
-                    <p>アカウントを削除すると、占い履歴や保有クレジットを含む登録情報が削除され、元に戻すことはできません。有料プランをご利用中の場合は、関連する契約も解約されます。</p>
+                    <p>アカウントを削除すると、相談の記録や保有クレジットを含む登録情報が削除され、元に戻すことはできません。有料プランをご利用中の場合は、関連する契約も解約されます。</p>
                     @if ($user->google_id !== null)
                         <p class="settings-note">削除には現在のパスワードが必要です。Googleログインのみをご利用の場合は、一度ログアウトし、ログイン画面の「パスワードをお忘れですか？」からパスワードを設定して、再度ログインしてください。</p>
                     @endif
@@ -109,7 +109,7 @@
                         <button class="danger-action" type="submit">アカウントを削除する</button>
                     </form>
                 </section>
-                <a class="text-link" href="{{ route('tarot') }}">→ 占いに戻る</a>
+                <a class="text-link" href="{{ route('tarot') }}">→ 相談に戻る</a>
             </section>
         </main>
         @include('partials.site-footer')

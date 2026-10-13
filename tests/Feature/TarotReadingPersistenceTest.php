@@ -11,7 +11,7 @@ use OpenAI\Responses\Chat\CreateResponse;
 uses(RefreshDatabase::class);
 
 test('authenticated readings are stored with their category and summary', function () {
-    OpenAI::fake([
+    $openAiFake = OpenAI::fake([
         CreateResponse::fake([
             'choices' => [[
                 'message' => [
@@ -36,6 +36,8 @@ test('authenticated readings are stored with their category and summary', functi
         ->assertViewHas('interpretation', 'A useful interpretation.')
         ->assertViewHas('category', '仕事')
         ->assertViewHas('summary', '仕事に関する前向きな助言です。')
+        ->assertSee('禅師からのことば')
+        ->assertDontSee('tarot-card-art')
         ->assertViewHas('shareUrl');
 
     $shareUrl = $response->viewData('shareUrl');
@@ -47,6 +49,7 @@ test('authenticated readings are stored with their category and summary', functi
         ->assertOk()
         ->assertSee('A useful interpretation.')
         ->assertSee('What should I focus on?')
+        ->assertDontSee('tarot-card-art')
         ->assertDontSee($user->email)
         ->assertDontSee('account-profile-email');
 
@@ -56,10 +59,15 @@ test('authenticated readings are stored with their category and summary', functi
     $reading = $user->tarotReadings()->sole();
 
     expect($reading->question)->toBe('What should I focus on?')
-        ->and($reading->card)->toBeString()
+        ->and($reading->card)->toBeNull()
         ->and($reading->interpretation)->toBe('A useful interpretation.')
         ->and($reading->category)->toBe('仕事')
         ->and($reading->summary)->toBe('仕事に関する前向きな助言です。');
+    $openAiFake->assertSent(Chat::class, function (string $method, array $parameters): bool {
+        return $method === 'create'
+            && str_contains($parameters['messages'][0]['content'], '仏教禅師')
+            && $parameters['messages'][1]['content'] === '相談：What should I focus on?';
+    });
 
     expect(Schema::getColumnListing('tarot_readings'))
         ->toEqualCanonicalizing(['id', 'user_id', 'question', 'card', 'interpretation', 'category', 'summary', 'daily_reading_date', 'created_at', 'updated_at']);
@@ -121,7 +129,7 @@ test('premium readings use the three latest summaries from the question category
 
     $openAiFake->assertSent(Chat::class, function (string $method, array $parameters): bool {
         return $method === 'create'
-            && $parameters['messages'][0]['content'] === '質問文を「仕事」「恋愛」「お金」「家族」「人間関係」「健康」「将来」「自分自身」「その他」のいずれか1つに分類してください。分類結果のカテゴリ名だけを返してください。'
+            && $parameters['messages'][0]['content'] === '相談文を「仕事」「恋愛」「お金」「家族」「人間関係」「健康」「将来」「自分自身」「その他」のいずれか1つに分類してください。分類結果のカテゴリ名だけを返してください。'
             && $parameters['messages'][1]['content'] === 'How can I grow in my career?';
     });
     $openAiFake->assertSent(Chat::class, function (string $method, array $parameters): bool {
@@ -166,12 +174,12 @@ test('authenticated users can draw one daily reading per day without spending a 
 
     $this->get(route('home'))
         ->assertOk()
-        ->assertDontSee('今日の1枚');
+        ->assertDontSee('今日のメッセージ');
 
     $this->actingAs($user)
         ->get(route('home'))
         ->assertOk()
-        ->assertSee('今日の1枚')
+        ->assertSee('今日のメッセージ')
         ->assertSee(route('tarot.daily'), false);
 
     $this->post(route('tarot.daily'))
@@ -195,12 +203,13 @@ test('authenticated users can draw one daily reading per day without spending a 
         return $method === 'create'
             && str_starts_with(
                 $parameters['messages'][1]['content'],
-                "質問：今日のメッセージをお願いします\nカード：",
+                '相談：今日のあなたに向けた禅のメッセージをお願いします',
             );
     });
     $this->assertDatabaseHas('tarot_readings', [
         'user_id' => $user->id,
         'question' => '今日のメッセージ',
+        'card' => null,
         'interpretation' => '今日のメッセージです。',
     ]);
     expect($user->tarotReadings()
@@ -219,6 +228,7 @@ test('authenticated users can draw one daily reading per day without spending a 
     $this->assertDatabaseHas('tarot_readings', [
         'user_id' => $user->id,
         'question' => '今日のメッセージ',
+        'card' => null,
         'interpretation' => '明日のメッセージです。',
     ]);
     expect($user->tarotReadings()
@@ -254,12 +264,20 @@ test('guest readings stay in the same session and are not written to the databas
         ->assertOk()
         ->assertSee('First question?')
         ->assertSee('First interpretation.')
+        ->assertDontSee('tarot-card-art')
         ->assertDontSee('account-profile-email');
+
+    $this->get(route('readings.show', 'session-0'))
+        ->assertOk()
+        ->assertSee('禅師からのことば')
+        ->assertSee('First interpretation.')
+        ->assertDontSee('tarot-card-art');
 
     $readings = session('tarot_readings');
 
     expect($readings)->toHaveCount(2)
         ->and($readings[0])->toHaveKeys(['question', 'card', 'interpretation', 'category', 'summary'])
+        ->and($readings[0]['card'])->toBeNull()
         ->and($readings[0]['question'])->toBe('First question?')
         ->and($readings[0]['category'])->toBe('恋愛')
         ->and($readings[0]['summary'])->toBe('恋愛に関する助言です。')

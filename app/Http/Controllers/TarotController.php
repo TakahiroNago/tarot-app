@@ -7,7 +7,6 @@ use App\Models\User;
 use App\Services\GuestTrialCreditService;
 use App\Services\PublicReadingShareService;
 use App\Services\ReadingCreditService;
-use App\Support\TarotCardCatalog;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
@@ -67,7 +66,7 @@ class TarotController extends Controller
         if (! $lock->get()) {
             return redirect()->route('tarot')->with(
                 'reading_rate_limited',
-                '別の占いを実行中です。完了後にもう一度お試しください。',
+                '別の相談に回答中です。完了後にもう一度お試しください。',
             );
         }
 
@@ -103,7 +102,7 @@ class TarotController extends Controller
         if (! $lock->get()) {
             return redirect()->route('home')->with(
                 'daily_reading_rate_limited',
-                '別の占いを実行中です。完了後にもう一度お試しください。',
+                '別の相談に回答中です。完了後にもう一度お試しください。',
             );
         }
 
@@ -114,21 +113,11 @@ class TarotController extends Controller
                 ->first();
 
             if ($savedReading === null) {
-                $cards = TarotCardCatalog::all();
-                $selectedCard = $cards[array_rand($cards)];
-                $reading = $this->createDailyReading(
-                    '今日のメッセージをお願いします',
-                    $selectedCard['name'],
-                );
+                $reading = $this->createDailyReading('今日のあなたに向けた禅のメッセージをお願いします');
                 $savedReading = $user->tarotReadings()->create([
                     ...$reading,
                     'daily_reading_date' => $readingDate,
                 ]);
-            }
-
-            $card = TarotCardCatalog::find($savedReading->card);
-            if ($card === null) {
-                throw new UnexpectedValueException('Stored daily reading has an unknown tarot card.');
             }
 
             $reading = $savedReading->only([
@@ -146,9 +135,6 @@ class TarotController extends Controller
                 'shareUrl' => route('readings.share', ['token' => $shareToken]),
                 'creditsRemaining' => $creditSummary['total'],
                 'isGuest' => false,
-                'cardNumber' => $card['number'],
-                'cardSymbol' => $card['symbol'],
-                'cardEnglishName' => $card['english_name'],
             ]);
         } finally {
             $lock->release();
@@ -182,7 +168,7 @@ class TarotController extends Controller
 
                     return redirect()->route('tarot')->with(
                         'reading_rate_limited',
-                        "プレミアムプランの占いは1分あたり5回までです。{$secondsUntilAvailable}秒後に再度お試しください。",
+                        "プレミアムプランの相談は1分あたり5回までです。{$secondsUntilAvailable}秒後に再度お試しください。",
                     );
                 }
 
@@ -200,12 +186,9 @@ class TarotController extends Controller
             }
 
             if (! $guestTrialCreditService->consume($guestDeviceToken)) {
-                return redirect()->route('tarot')->with('credit_exhausted', '無料体験を使い切りました。会員登録すると毎日3回占えます。');
+                return redirect()->route('tarot')->with('credit_exhausted', '無料体験を使い切りました。会員登録すると毎日3回相談できます。');
             }
         }
-
-        $cards = TarotCardCatalog::all();
-        $selectedCard = $cards[array_rand($cards)];
 
         try {
             $isPremiumMember = $user instanceof User && $user->plan === User::PLAN_PREMIUM;
@@ -233,22 +216,26 @@ class TarotController extends Controller
                     [
                         'role' => 'user',
                         'content' => $isPremiumMember
-                            ? $this->premiumReadingPrompt($question, $selectedCard['name'], $history)
-                            : "質問：{$question}\nカード：{$selectedCard['name']}",
+                            ? $this->premiumReadingPrompt($question, $history)
+                            : "相談：{$question}",
                     ],
                 ],
             ]);
 
             $interpretation = $response->choices[0]->message->content;
+            if (! is_string($interpretation) || trim($interpretation) === '') {
+                throw new UnexpectedValueException('OpenAI returned no consultation response.');
+            }
+
             $metadata = $isPremiumMember
                 ? [
                     'category' => $category,
-                    'summary' => $this->readingSummary($question, $selectedCard['name'], $interpretation),
+                    'summary' => $this->readingSummary($question, $interpretation),
                 ]
-                : $this->readingMetadata($question, $selectedCard['name'], $interpretation);
+                : $this->readingMetadata($question, $interpretation);
             $reading = [
                 'question' => $question,
-                'card' => $selectedCard['name'],
+                'card' => null,
                 'interpretation' => $interpretation,
                 ...$metadata,
             ];
@@ -279,16 +266,13 @@ class TarotController extends Controller
             'shareUrl' => route('readings.share', ['token' => $shareToken]),
             'creditsRemaining' => $creditsRemaining,
             'isGuest' => ! $user instanceof User,
-            'cardNumber' => $selectedCard['number'],
-            'cardSymbol' => $selectedCard['symbol'],
-            'cardEnglishName' => $selectedCard['english_name'],
         ]);
     }
 
     /**
-     * @return array{question: string, card: string, interpretation: string, category: string, summary: string}
+     * @return array{question: string, interpretation: string, category: string, summary: string}
      */
-    private function createDailyReading(string $question, string $card): array
+    private function createDailyReading(string $question): array
     {
         $response = OpenAI::chat()->create([
             'model' => 'gpt-5.6-luna',
@@ -299,7 +283,7 @@ class TarotController extends Controller
                 ],
                 [
                     'role' => 'user',
-                    'content' => "質問：{$question}\nカード：{$card}",
+                    'content' => "相談：{$question}",
                 ],
             ],
             'response_format' => ['type' => 'json_object'],
@@ -328,7 +312,6 @@ class TarotController extends Controller
 
         return [
             'question' => '今日のメッセージ',
-            'card' => $card,
             'interpretation' => $interpretation,
             'category' => $category,
             'summary' => $summary,
@@ -362,18 +345,21 @@ class TarotController extends Controller
     /**
      * @param  Collection<int, TarotReading>  $history
      */
-    private function premiumReadingPrompt(string $question, string $card, Collection $history): string
+    private function premiumReadingPrompt(string $question, Collection $history): string
     {
         $historyContext = $history->isEmpty()
-            ? '該当カテゴリの過去のリーディング履歴はありません。'
+            ? '該当カテゴリの過去の相談記録はありません。'
             : $history
                 ->map(fn (TarotReading $reading): string => "- {$reading->created_at->format('Y/m/d H:i')}：{$reading->summary}")
                 ->implode("\n");
 
-        return "過去の同カテゴリのリーディング要約と日時：\n{$historyContext}\n\n今回の質問：{$question}\nカード：{$card}";
+        return "過去の同カテゴリの相談要約と日時：\n{$historyContext}\n\n今回の相談：{$question}";
     }
 
-    private function readingSummary(string $question, string $card, string $interpretation): string
+    private function zenTeacherInstructions(): string
+    { return '[REDACTED]'; }
+
+    private function readingSummary(string $question, string $interpretation): string
     {
         $response = OpenAI::chat()->create([
             'model' => 'gpt-5.6-luna',
@@ -384,7 +370,7 @@ class TarotController extends Controller
                 ],
                 [
                     'role' => 'user',
-                    'content' => "質問：{$question}\nカード：{$card}\nリーディング結果：{$interpretation}",
+                    'content' => "相談：{$question}\n回答：{$interpretation}",
                 ],
             ],
             'response_format' => ['type' => 'json_object'],
@@ -411,7 +397,7 @@ class TarotController extends Controller
     /**
      * @return array{category: string, summary: string}
      */
-    private function readingMetadata(string $question, string $card, string $interpretation): array
+    private function readingMetadata(string $question, string $interpretation): array
     {
         $response = OpenAI::chat()->create([
             'model' => 'gpt-5.6-luna',
@@ -422,7 +408,7 @@ class TarotController extends Controller
                 ],
                 [
                     'role' => 'user',
-                    'content' => "質問：{$question}\nカード：{$card}\nリーディング結果：{$interpretation}",
+                    'content' => "相談：{$question}\n回答：{$interpretation}",
                 ],
             ],
             'response_format' => ['type' => 'json_object'],

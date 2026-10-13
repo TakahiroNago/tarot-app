@@ -8,6 +8,18 @@
         'Segoe UI Symbol', 'Noto Color Emoji';
 }
 
+.zen-quote {
+    position: relative;
+    z-index: 1;
+    margin: 0;
+    color: #f5e6bd;
+    font-family: var(--font-display-ja);
+    font-size: clamp(24px, 3vw, 36px);
+    line-height: 1.9;
+    letter-spacing: 0.12em;
+    text-align: center;
+}
+
 :root {
     color-scheme: light;
     --color-ink: #202923;
@@ -743,8 +755,13 @@ h2 {
 
 .result-panel {
     display: grid;
-    grid-template-columns: 0.8fr 1.2fr;
+    grid-template-columns: minmax(0, 1fr);
     overflow: hidden;
+}
+
+.result-panel-no-card .result-copy {
+    max-width: 760px;
+    margin-inline: auto;
 }
 
 .result-visual {
@@ -1165,6 +1182,10 @@ h2 {
     max-width: 760px;
 }
 
+.reading-detail-no-card {
+    grid-template-columns: minmax(0, 1fr);
+}
+
 .reading-detail-copy {
     min-width: 0;
 }
@@ -1548,11 +1569,7 @@ h2 {
         margin-bottom: 12px;
     }
 
-    .reading-detail-eyebrow,
-    .reading-detail-title,
     .reading-detail-card-section,
-    .result-eyebrow,
-    .result-title,
     .result-card-section,
     .reading-result-label-desktop {
         display: none;

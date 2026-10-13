@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>占い履歴 | 月詠 TAROT JOURNAL</title>
+    <title>相談の記録 | 月詠 禅のことば</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body>
@@ -13,7 +13,7 @@
             <section class="history-panel">
                 <p class="eyebrow">READING JOURNAL</p>
                 <div class="history-heading">
-                    <h1>占い履歴</h1>
+                    <h1>相談の記録</h1>
                     <form class="history-filter" method="GET" action="{{ route('readings.index') }}">
                         <select id="history-category" name="category" aria-label="表示するカテゴリ" data-history-category-filter>
                             <option value="">すべて</option>
@@ -37,7 +37,7 @@
                             @foreach ($sessionReadings as $reading)
                                 <div class="reading-row reading-row-session">
                                     <a class="reading-question" href="{{ route('readings.show', $reading['id']) }}">{{ $reading['question'] }}</a>
-                                    <span class="reading-card">{{ $reading['card'] }}</span>
+                                    <span class="reading-card">{{ $reading['card'] ?? '禅師のことば' }}</span>
                                     <a class="reading-open" href="{{ route('readings.show', $reading['id']) }}">詳細 <span aria-hidden="true">→</span></a>
                                 </div>
                             @endforeach
@@ -47,12 +47,12 @@
 
                 @if ($databaseReadings?->isNotEmpty())
                     <section class="history-group">
-                        <h2>タロット履歴</h2>
+                        <h2>これまでの相談</h2>
                         <div class="reading-list">
                             @foreach ($databaseReadings as $reading)
                                 <a class="reading-row" href="{{ route('readings.show', $reading->id) }}">
                                     <span class="reading-question">{{ $reading->question }}</span>
-                                    <span class="reading-card">{{ $reading->card }}</span>
+                                    <span class="reading-card">{{ $reading->card ?? '禅師のことば' }}</span>
                                     <time class="reading-date" datetime="{{ $reading->created_at->toISOString() }}" data-local-time>{{ $reading->created_at->format('Y/m/d H:i') }}</time>
                                     <span class="reading-open">詳細 <span aria-hidden="true">→</span></span>
                                 </a>
@@ -67,8 +67,8 @@
                         <p class="history-empty">「{{ $selectedCategory }}」カテゴリの履歴はありません。</p>
                         <a class="history-filter-clear" href="{{ route('readings.index') }}">すべての履歴を表示</a>
                     @else
-                        <p class="history-empty">まだリーディング履歴がありません。</p>
-                        <a class="primary-action" href="{{ route('tarot') }}">占いを始める <span class="action-arrow" aria-hidden="true">→</span></a>
+                        <p class="history-empty">まだ相談の記録がありません。</p>
+                        <a class="primary-action" href="{{ route('tarot') }}">禅師に相談する <span class="action-arrow" aria-hidden="true">→</span></a>
                     @endif
                 @endif
             </section>
