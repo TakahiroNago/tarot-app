@@ -5,7 +5,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>タロット占い | 月詠 TAROT JOURNAL</title>
+    <title>禅師に相談 | 月詠 禅のことば</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body>
@@ -21,28 +21,24 @@
                         <p class="form-notice" role="status">{{ session('daily_reading_rate_limited') }}</p>
                     @endif
                     <p class="eyebrow">今日のあなたへ</p>
-                    <h1 class="welcome-title">心の声に<br>カードが光をあてる</h1>
-                    <p class="welcome-description">迷いや期待を、ひとつの問いに。カードが映す小さなヒントを、あなたの毎日に届けます。</p>
+                    <h1 class="welcome-title">迷いの中に<br>小さな一歩を</h1>
+                    <p class="welcome-description">悩みを聞かせてください。AIが禅の視点を参考に、慈悲と智慧をもって心を見つめることばをお届けします。</p>
                     <a class="primary-action" href="{{ route('tarot') }}">
-                        <span>占いを始める</span>
+                        <span>禅師に相談する</span>
                         <span class="action-arrow" aria-hidden="true">→</span>
                     </a>
                     @auth
                         <form class="daily-reading-form" method="POST" action="{{ route('tarot.daily') }}">
                             @csrf
                             <button class="primary-action" type="submit">
-                                <span>今日の1枚</span>
+                                <span>今日のメッセージ</span>
                                 <span class="action-arrow" aria-hidden="true">→</span>
                             </button>
                         </form>
                     @endauth
                 </div>
                 <div class="art-stage" aria-hidden="true">
-                    <div class="tarot-card-art">
-                        <span class="card-number">XVII</span>
-                        <span class="card-sun">✷</span>
-                        <span class="card-label">THE STAR</span>
-                    </div>
+                    <p class="zen-quote">静けさの中に、<br>答えの芽がある。</p>
                 </div>
             </section>
         </main>

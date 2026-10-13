@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>タロット結果 | 月詠 TAROT JOURNAL</title>
+    <title>禅師からのことば | 月詠 禅のことば</title>
     @vite(['resources/css/app.css'])
 </head>
 <body>
@@ -11,42 +11,23 @@
         @include('partials.site-header')
 
         <main class="page-content">
-            <section class="result-panel">
-                <div class="result-visual">
-                    <div class="tarot-card-art" aria-hidden="true">
-                        <span class="card-number">{{ $cardNumber }}</span>
-                        <span class="card-sun">{{ $cardSymbol }}</span>
-                        <span class="card-label">{{ $cardEnglishName }}</span>
-                    </div>
-                </div>
-                <section class="result-section result-card-caption">
-                    <h2 class="section-label">引いたカード</h2>
-                    <p class="drawn-card-name">{{ $card }}</p>
-                </section>
+            <section class="result-panel result-panel-no-card">
                 <div class="result-copy">
-                    <p class="eyebrow result-eyebrow">YOUR READING</p>
-                    <h1 class="result-heading result-title">カードからのメッセージ</h1>
+                    <p class="eyebrow result-eyebrow">WORDS FOR YOU</p>
+                    <h1 class="result-heading result-title">禅師からのことば</h1>
 
                     <section class="result-section">
-                        <h2 class="section-label">あなたの質問</h2>
+                        <h2 class="section-label">あなたのお悩み</h2>
                         <p class="question-quote">{{ $question }}</p>
                     </section>
 
-                    <section class="result-section result-card-section">
-                        <h2 class="section-label">引いたカード</h2>
-                        <p class="drawn-card-name">{{ $card }}</p>
-                    </section>
-
                     <section class="result-section">
-                        <h2 class="section-label">
-                            <span class="reading-result-label-desktop">リーディング結果</span>
-                            <span class="reading-result-label-mobile">カードからのメッセージ</span>
-                        </h2>
+                        <h2 class="section-label">お答え</h2>
                         <p class="reading-copy">{{ $interpretation }}</p>
                     </section>
 
                     <section class="reading-share" aria-labelledby="reading-share-heading">
-                        <h2 class="section-label" id="reading-share-heading">リーディング結果をシェア</h2>
+                        <h2 class="section-label" id="reading-share-heading">ことばをシェア</h2>
                         <p class="reading-share-note">公開用URLにはメールアドレスやユーザーIDは含まれません。URLを知っている人は結果を閲覧できます（有効期限30日）。</p>
 
                         <div class="reading-share-links" aria-label="シェア先">
@@ -78,11 +59,11 @@
                     </section>
 
                     @if ($creditsRemaining === null)
-                        <p class="credit-summary">占い回数は無制限です</p>
+                        <p class="credit-summary">相談回数は無制限です</p>
                     @elseif ($creditsRemaining === 0)
                         @if ($isGuest)
                             <a class="form-notice credit-notice credit-notice-link" href="{{ route('register') }}">
-                                無料体験を使い切りました。無料会員登録すると毎日3回占えます。→ 会員登録はこちら
+                                無料体験を使い切りました。無料会員登録すると毎日3回相談できます。→ 会員登録はこちら
                             </a>
                         @else
                             <a class="form-notice credit-notice credit-notice-link" href="{{ route('plans') }}">
@@ -90,10 +71,10 @@
                             </a>
                         @endif
                     @else
-                        <p class="credit-summary">占い残り {{ $creditsRemaining }}回</p>
+                        <p class="credit-summary">相談残り {{ $creditsRemaining }}回</p>
                     @endif
 
-                    <a class="text-link" href="{{ route('tarot') }}">もう一度占う</a>
+                    <a class="text-link" href="{{ route('tarot') }}">もう一度相談する</a>
                 </div>
             </section>
         </main>

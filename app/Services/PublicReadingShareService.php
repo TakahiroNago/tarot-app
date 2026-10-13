@@ -10,7 +10,7 @@ class PublicReadingShareService
     private const EXPIRATION_DAYS = 30;
 
     /**
-     * @param  array{question: string, card: string, interpretation: string}  $reading
+     * @param  array{question: string, card?: string|null, interpretation: string}  $reading
      */
     public function create(array $reading): string
     {
@@ -18,7 +18,7 @@ class PublicReadingShareService
 
         Cache::put($this->cacheKey($token), [
             'question' => $reading['question'],
-            'card' => $reading['card'],
+            'card' => $reading['card'] ?? null,
             'interpretation' => $reading['interpretation'],
         ], now()->addDays(self::EXPIRATION_DAYS));
 
@@ -26,7 +26,7 @@ class PublicReadingShareService
     }
 
     /**
-     * @return array{question: string, card: string, interpretation: string}|null
+     * @return array{question: string, card: string|null, interpretation: string}|null
      */
     public function find(string $token): ?array
     {
@@ -38,7 +38,7 @@ class PublicReadingShareService
         if (
             ! is_array($reading)
             || ! is_string($reading['question'] ?? null)
-            || ! is_string($reading['card'] ?? null)
+            || (! is_string($reading['card'] ?? null) && ($reading['card'] ?? null) !== null)
             || ! is_string($reading['interpretation'] ?? null)
         ) {
             throw new UnexpectedValueException('Cached public tarot reading has an invalid format.');
@@ -46,7 +46,7 @@ class PublicReadingShareService
 
         return [
             'question' => $reading['question'],
-            'card' => $reading['card'],
+            'card' => $reading['card'] ?? null,
             'interpretation' => $reading['interpretation'],
         ];
     }

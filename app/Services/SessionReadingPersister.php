@@ -22,7 +22,7 @@ class SessionReadingPersister
             if (
                 ! is_array($reading)
                 || ! is_string($reading['question'] ?? null)
-                || ! is_string($reading['card'] ?? null)
+                || (! is_string($reading['card'] ?? null) && ($reading['card'] ?? null) !== null)
                 || ! is_string($reading['interpretation'] ?? null)
             ) {
                 throw new UnexpectedValueException('Session tarot reading has an invalid format.');
@@ -49,9 +49,11 @@ class SessionReadingPersister
 
             $persistedReading = [
                 'question' => $reading['question'],
-                'card' => $reading['card'],
                 'interpretation' => $reading['interpretation'],
             ];
+            if (is_string($reading['card'] ?? null)) {
+                $persistedReading['card'] = $reading['card'];
+            }
             if ($hasCategory) {
                 $persistedReading['category'] = $reading['category'];
                 $persistedReading['summary'] = $reading['summary'];

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>@yield('title') | 月詠 TAROT JOURNAL</title>
+    <title>@yield('title') | 月詠 禅のことば</title>
     @vite(['resources/css/app.css'])
 </head>
 <body>
@@ -13,7 +13,7 @@
             <article class="history-panel legal-panel">
                 <p class="eyebrow">@yield('eyebrow')</p>
                 <h1>@yield('title')</h1>
-                <p class="legal-updated">更新日：2026年10月4日</p>
+                <p class="legal-updated">更新日：2026年10月13日</p>
                 @yield('legal-content')
             </article>
         </main>

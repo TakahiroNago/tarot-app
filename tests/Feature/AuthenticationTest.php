@@ -45,6 +45,12 @@ test('registration saves the current session readings to the new account', funct
             'interpretation' => 'A reading before registration.',
             'category' => '将来',
             'summary' => '登録前のリーディングの要約です。',
+        ], [
+            'question' => 'Before registration without a card?',
+            'card' => null,
+            'interpretation' => 'A card-free consultation response.',
+            'category' => '自分自身',
+            'summary' => '自分自身について考えるための回答です。',
         ]],
     ])->post(route('register.store'), [
         'name' => 'New User',
@@ -62,6 +68,14 @@ test('registration saves the current session readings to the new account', funct
         'interpretation' => 'A reading before registration.',
         'category' => '将来',
         'summary' => '登録前のリーディングの要約です。',
+    ]);
+    $this->assertDatabaseHas('tarot_readings', [
+        'user_id' => $user->id,
+        'question' => 'Before registration without a card?',
+        'card' => null,
+        'interpretation' => 'A card-free consultation response.',
+        'category' => '自分自身',
+        'summary' => '自分自身について考えるための回答です。',
     ]);
 });
 
@@ -84,7 +98,7 @@ test('the welcome page shows navigation for guests and signed-in admins', functi
         ->assertOk()
         ->assertDontSee(route('readings.index'))
         ->assertDontSee(route('plans'))
-        ->assertDontSee('占い履歴')
+        ->assertDontSee('相談の記録')
         ->assertDontSee('料金・プラン');
 
     $admin = User::factory()->admin()->create();
@@ -111,7 +125,7 @@ test('the account icon opens the plan page with the account popover visible', fu
         ->assertSee('class="account-menu is-open"', false)
         ->assertSee($user->name)
         ->assertSee($user->email)
-        ->assertSee('占い履歴')
+        ->assertSee('相談の記録')
         ->assertSee('ログアウト')
         ->assertSee('料金・プラン');
 });

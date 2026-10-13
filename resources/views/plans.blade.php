@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>料金・プラン | 月詠 TAROT JOURNAL</title>
+    <title>料金・プラン | 月詠 禅のことば</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body>
@@ -35,10 +35,10 @@
                 <div class="plan-grid">
                     <section class="plan-card">
                         <h2>プレミアムプラン</h2>
-                        <p>・占い回数無制限</p>
-                        <p>・すべてのリーディング履歴</p>
-                        <p>・「今日の1枚」</p>
-                        <p>・過去のリーディング結果をもとにした、さらに深いリーディング</p>
+                        <p>・相談回数無制限</p>
+                        <p>・すべての相談の記録</p>
+                        <p>・「今日のメッセージ」</p>
+                        <p>・過去の相談を踏まえた、継続的な応答</p>
                         <p class="plan-price"><strong>580円/<span class="plan-price-period">月</span></strong></p>
                         @if (auth()->check() && auth()->user()->stripe_subscription_id === null && auth()->user()->plan === \App\Models\User::PLAN_FREE && config('services.stripe.secret') && config('services.stripe.prices.premium'))
                             <form method="POST" action="{{ route('billing.checkout') }}">
@@ -56,8 +56,8 @@
                     <section class="plan-card">
                         <h2>ライトプラン</h2>
                         <p>・1日10回（最大50回まで引継ぎ）</p>
-                        <p>・過去3か月のリーディング履歴</p>
-                        <p>・「今日の1枚」</p>
+                        <p>・過去3か月の相談の記録</p>
+                        <p>・「今日のメッセージ」</p>
                         <p class="plan-price"><strong>180円/<span class="plan-price-period">月</span></strong></p>
                         @if (auth()->check() && auth()->user()->stripe_subscription_id === null && auth()->user()->plan === \App\Models\User::PLAN_FREE && config('services.stripe.secret') && config('services.stripe.prices.lite'))
                             <form method="POST" action="{{ route('billing.checkout') }}">
@@ -74,8 +74,8 @@
                     <section class="plan-card">
                         <h2>無料会員</h2>
                         <p>・1日3回（回数引継ぎなし）</p>
-                        <p>・50件までのリーディング履歴</p>
-                        <p>・「今日の1枚」</p>
+                        <p>・50件までの相談の記録</p>
+                        <p>・「今日のメッセージ」</p>
                         @if (auth()->guest())
                             <p><a class="primary-action" href="{{ route('register') }}">→ 新規登録</a></p>
                         @endif
@@ -87,7 +87,7 @@
                         プランの解約・変更は<a href="{{ route('account.settings.edit') }}"><strong>アカウント設定</strong></a>から手続きできます。解約後も、お支払い済み期間の終了までは有料機能をご利用いただけます。
                     </p>
                 @endauth
-                <a class="text-link" href="{{ route('tarot') }}">→ 占いに戻る</a>
+                <a class="text-link" href="{{ route('tarot') }}">→ 相談に戻る</a>
             </section>
         </main>
         @include('partials.site-footer')

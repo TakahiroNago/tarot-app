@@ -16,12 +16,12 @@ test('the plans page explains free membership and does not offer credit purchase
 
     $response->assertOk()
         ->assertSee('1日3回（回数引継ぎなし）')
-        ->assertSee('50件までのリーディング履歴')
+        ->assertSee('50件までの相談の記録')
         ->assertDontSee('10回分を購入')
         ->assertDontSee('50回分を購入')
         ->assertDontSee('100回分を購入')
         ->assertSee('1日10回（最大50回まで引継ぎ）')
-        ->assertSee('占い回数無制限')
+        ->assertSee('相談回数無制限')
         ->assertSee('180円/')
         ->assertSee('580円/');
 });
@@ -30,7 +30,7 @@ test('the plans page advertises the updated lite and premium allowances', functi
     $this->get(route('plans'))
         ->assertOk()
         ->assertSee('1日10回（最大50回まで引継ぎ）')
-        ->assertSee('占い回数無制限');
+        ->assertSee('相談回数無制限');
 });
 
 test('signed-in users cannot purchase credits from the plans page', function () {
@@ -71,7 +71,7 @@ test('guests can use three trial readings and are prompted to register afterward
         $response->assertOk();
         if ($question === 'Three?') {
             $response->assertSee('<a class="form-notice credit-notice credit-notice-link" href="'.route('register').'">', false)
-                ->assertSee('無料体験を使い切りました。無料会員登録すると毎日3回占えます。→ 会員登録はこちら');
+                ->assertSee('無料体験を使い切りました。無料会員登録すると毎日3回相談できます。→ 会員登録はこちら');
         }
     }
 
@@ -109,7 +109,7 @@ test('guests with no trial credits see a full-width registration link and cannot
         ->assertOk()
         ->assertSee('href="'.route('register').'"', false)
         ->assertSee('class="primary-action" type="submit" disabled', false)
-        ->assertSee('無料体験を使い切りました。無料会員登録すると毎日3回占えます。→ 会員登録はこちら');
+        ->assertSee('無料体験を使い切りました。無料会員登録すると毎日3回相談できます。→ 会員登録はこちら');
 });
 
 test('free members receive three readings per day without carrying unused credits forward', function () {
@@ -170,7 +170,7 @@ test('purchased credits remain separate and can be spent after daily credits run
     $this->actingAs($user)
         ->post(route('tarot.draw'), ['question' => 'A question?'])
         ->assertOk()
-        ->assertSee('占い残り 100回');
+        ->assertSee('相談残り 100回');
 
     expect($user->fresh()->daily_credits)->toBe(0)
         ->and($user->fresh()->purchased_credits)->toBe(100);
@@ -286,7 +286,7 @@ test('premium members can draw without spending daily or purchased credits', fun
     $this->actingAs($user)
         ->post(route('tarot.draw'), ['question' => 'How will work go?'])
         ->assertOk()
-        ->assertSee('占い回数は無制限です');
+        ->assertSee('相談回数は無制限です');
 
     expect($user->fresh()->daily_credits)->toBe(0)
         ->and($user->fresh()->purchased_credits)->toBe(7);
@@ -373,7 +373,7 @@ test('only one reading can run concurrently for each member or guest device', fu
 
     $this->post(route('tarot.draw'), ['question' => 'Another reading?'])
         ->assertRedirect(route('tarot'))
-        ->assertSessionHas('reading_rate_limited', '別の占いを実行中です。完了後にもう一度お試しください。');
+        ->assertSessionHas('reading_rate_limited', '別の相談に回答中です。完了後にもう一度お試しください。');
 
     $lock->release();
 })->with([
