@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Services\SessionReadingPersister;
+use App\Services\SessionConsultationPersister;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -21,7 +21,7 @@ class AuthenticatedSessionController extends Controller
         return view('auth.login');
     }
 
-    public function store(Request $request, SessionReadingPersister $sessionReadingPersister): RedirectResponse
+    public function store(Request $request, SessionConsultationPersister $sessionConsultationPersister): RedirectResponse
     {
         $credentials = $request->validate([
             'email' => ['required', 'email'],
@@ -42,7 +42,7 @@ class AuthenticatedSessionController extends Controller
             return redirect()->route('verification.notice');
         }
 
-        $sessionReadingPersister->persist($user, $request);
+        $sessionConsultationPersister->persist($user, $request);
 
         return redirect()->intended(route('home'));
     }

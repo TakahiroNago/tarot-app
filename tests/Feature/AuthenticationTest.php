@@ -39,17 +39,15 @@ test('a visitor can register and is assigned the user role', function () {
 
 test('registration saves the current session readings to the new account', function () {
     $this->withSession([
-        'tarot_readings' => [[
-            'question' => 'Before registration?',
-            'card' => 'The Fool',
-            'interpretation' => 'A reading before registration.',
-            'category' => '将来',
+        'zen_consultations' => [[
+            'concern' => 'Before registration?',
+            'response' => 'A reading before registration.',
+            'topic' => '将来',
             'summary' => '登録前のリーディングの要約です。',
         ], [
-            'question' => 'Before registration without a card?',
-            'card' => null,
-            'interpretation' => 'A card-free consultation response.',
-            'category' => '自分自身',
+            'concern' => 'Before registration without a card?',
+            'response' => 'A card-free consultation response.',
+            'topic' => '自分自身',
             'summary' => '自分自身について考えるための回答です。',
         ]],
     ])->post(route('register.store'), [
@@ -58,23 +56,21 @@ test('registration saves the current session readings to the new account', funct
         'password' => 'A-strong-password-2026',
         'password_confirmation' => 'A-strong-password-2026',
     ])->assertRedirect(route('verification.notice'))
-        ->assertSessionMissing('tarot_readings');
+        ->assertSessionMissing('zen_consultations');
 
     $user = User::where('email', 'new-reader@example.com')->sole();
-    $this->assertDatabaseHas('tarot_readings', [
+    $this->assertDatabaseHas('zen_consultations', [
         'user_id' => $user->id,
-        'question' => 'Before registration?',
-        'card' => 'The Fool',
-        'interpretation' => 'A reading before registration.',
-        'category' => '将来',
+        'concern' => 'Before registration?',
+        'response' => 'A reading before registration.',
+        'topic' => '将来',
         'summary' => '登録前のリーディングの要約です。',
     ]);
-    $this->assertDatabaseHas('tarot_readings', [
+    $this->assertDatabaseHas('zen_consultations', [
         'user_id' => $user->id,
-        'question' => 'Before registration without a card?',
-        'card' => null,
-        'interpretation' => 'A card-free consultation response.',
-        'category' => '自分自身',
+        'concern' => 'Before registration without a card?',
+        'response' => 'A card-free consultation response.',
+        'topic' => '自分自身',
         'summary' => '自分自身について考えるための回答です。',
     ]);
 });
@@ -84,19 +80,18 @@ test('the welcome page shows navigation for guests and signed-in admins', functi
         ->assertOk()
         ->assertSee(route('login'))
         ->assertSee(route('register'))
-        ->assertDontSee(route('readings.index'))
+        ->assertDontSee(route('consultations.index'))
         ->assertDontSee(route('plans'))
         ->assertDontSee(route('admin.users.index'));
 
     $this->withSession([
-        'tarot_readings' => [[
-            'question' => 'Guest question?',
-            'card' => 'The Star',
-            'interpretation' => 'A session answer.',
+        'zen_consultations' => [[
+            'concern' => 'Guest question?',
+            'response' => 'A session answer.',
         ]],
     ])->get(route('home'))
         ->assertOk()
-        ->assertDontSee(route('readings.index'))
+        ->assertDontSee(route('consultations.index'))
         ->assertDontSee(route('plans'))
         ->assertDontSee('相談の記録')
         ->assertDontSee('料金・プラン');
@@ -111,7 +106,7 @@ test('the welcome page shows navigation for guests and signed-in admins', functi
         ->assertDontSee(route('plans', ['account_menu' => 'open']))
         ->assertSee($admin->name)
         ->assertSee($admin->email)
-        ->assertSee(route('readings.index'))
+        ->assertSee(route('consultations.index'))
         ->assertSee(route('logout'))
         ->assertDontSee(route('register'));
 });
@@ -138,7 +133,7 @@ test('the header shows the total credit balance on other authenticated pages', f
         'purchased_credits' => 7,
     ])->save();
 
-    foreach ([route('home'), route('plans'), route('readings.index')] as $url) {
+    foreach ([route('home'), route('plans'), route('consultations.index')] as $url) {
         $this->actingAs($user)
             ->get($url)
             ->assertOk()
@@ -217,7 +212,7 @@ test('an unverified user can request a verification email and cannot access read
         ->assertSee('メールに記載された確認リンクを開いてください。');
 
     $this->actingAs($user)
-        ->get(route('readings.index'))
+        ->get(route('consultations.index'))
         ->assertRedirect(route('verification.notice'));
 
     $this->actingAs($user)
@@ -259,7 +254,7 @@ test('a verification link for a different email address is rejected', function (
     expect($user->fresh()->hasVerifiedEmail())->toBeFalse();
 });
 
-test('the email verification confirmation is marked to auto-dismiss on the welcome and tarot pages', function () {
+test('the email verification confirmation is marked to auto-dismiss on the welcome and Zen pages', function () {
     $user = User::factory()->create();
 
     $this->actingAs($user)
@@ -271,7 +266,7 @@ test('the email verification confirmation is marked to auto-dismiss on the welco
 
     $this->actingAs($user)
         ->withSession(['status' => 'email-verified'])
-        ->get(route('tarot'))
+        ->get(route('zen'))
         ->assertOk()
         ->assertSee('data-auto-dismiss', false)
         ->assertSee('メールアドレスを確認しました。');
@@ -302,14 +297,13 @@ test('Google login creates and authenticates a verified Google account', functio
     Socialite::shouldReceive('driver')->once()->with('google')->andReturn($provider);
 
     $this->withSession([
-        'tarot_readings' => [[
-            'question' => 'Before Google login?',
-            'card' => 'The Star',
-            'interpretation' => 'A reading before Google login.',
+        'zen_consultations' => [[
+            'concern' => 'Before Google login?',
+            'response' => 'A reading before Google login.',
         ]],
     ])->get(route('login.google.callback'))
         ->assertRedirect(route('home'))
-        ->assertSessionMissing('tarot_readings');
+        ->assertSessionMissing('zen_consultations');
 
     $user = User::where('email', 'google-reader@example.com')->sole();
     $this->assertAuthenticatedAs($user);
@@ -320,11 +314,10 @@ test('Google login creates and authenticates a verified Google account', functio
         'is_active' => true,
     ]);
     expect($user->email_verified_at)->not->toBeNull();
-    $this->assertDatabaseHas('tarot_readings', [
+    $this->assertDatabaseHas('zen_consultations', [
         'user_id' => $user->id,
-        'question' => 'Before Google login?',
-        'card' => 'The Star',
-        'interpretation' => 'A reading before Google login.',
+        'concern' => 'Before Google login?',
+        'response' => 'A reading before Google login.',
     ]);
 });
 
@@ -423,22 +416,20 @@ test('login saves the current session readings to the account', function () {
     ]);
 
     $this->withSession([
-        'tarot_readings' => [[
-            'question' => 'Before login?',
-            'card' => 'The Star',
-            'interpretation' => 'A reading before login.',
+        'zen_consultations' => [[
+            'concern' => 'Before login?',
+            'response' => 'A reading before login.',
         ]],
     ])->post(route('login.store'), [
         'email' => $user->email,
         'password' => 'A-strong-password-2026',
     ])->assertRedirect(route('home'))
-        ->assertSessionMissing('tarot_readings');
+        ->assertSessionMissing('zen_consultations');
 
-    $this->assertDatabaseHas('tarot_readings', [
+    $this->assertDatabaseHas('zen_consultations', [
         'user_id' => $user->id,
-        'question' => 'Before login?',
-        'card' => 'The Star',
-        'interpretation' => 'A reading before login.',
+        'concern' => 'Before login?',
+        'response' => 'A reading before login.',
     ]);
 });
 
@@ -487,7 +478,7 @@ test('password reset and email verification notifications are written in Japanes
             Lang::get('If you did not create an account, no further action is required.'),
         )
         ->and($verificationMail->actionText)->toBe(Lang::get('Verify Email Address'))
-        ->and(config('app.name'))->toBe("\u{6708}\u{8A60} TAROT JOURNAL")
+        ->and(config('app.name'))->toBe("\u{6708}\u{8A60} ZEN JOURNAL")
         ->and((string) $passwordResetMail->render())->toContain(
             Lang::get('Hello!'),
             Lang::get('Regards,'),

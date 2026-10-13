@@ -1,8 +1,8 @@
 <?php
 
 use App\Models\User;
+use App\Services\ConsultationCreditService;
 use App\Services\GuestTrialCreditService;
-use App\Services\ReadingCreditService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\RateLimiter;
@@ -54,19 +54,19 @@ test('guests can use three trial readings and are prompted to register afterward
     $responses = [];
     foreach (['First result.', 'Second result.', 'Third result.', 'New device result.'] as $interpretation) {
         $responses[] = CreateResponse::fake(['choices' => [['message' => ['content' => $interpretation]]]]);
-        $responses[] = CreateResponse::fake(['choices' => [['message' => ['content' => '{"category":"その他","summary":"テスト要約"}']]]]);
+        $responses[] = CreateResponse::fake(['choices' => [['message' => ['content' => '{"topic":"その他","summary":"テスト要約"}']]]]);
     }
     OpenAI::fake($responses);
 
-    $tarotPage = $this->withServerVariables(['REMOTE_ADDR' => '192.0.2.10'])
-        ->get(route('tarot'));
-    $tarotPage->assertOk()->assertCookie('guest_trial_device');
-    $firstDevice = $tarotPage->getCookie('guest_trial_device')->getValue();
+    $zenPage = $this->withServerVariables(['REMOTE_ADDR' => '192.0.2.10'])
+        ->get(route('zen'));
+    $zenPage->assertOk()->assertCookie('guest_trial_device');
+    $firstDevice = $zenPage->getCookie('guest_trial_device')->getValue();
 
     foreach (['One?', 'Two?', 'Three?'] as $question) {
         $response = $this->withServerVariables(['REMOTE_ADDR' => '192.0.2.10'])
             ->withCookie('guest_trial_device', $firstDevice)
-            ->post(route('tarot.draw'), ['question' => $question]);
+            ->post(route('zen.respond'), ['concern' => $question]);
 
         $response->assertOk();
         if ($question === 'Three?') {
@@ -82,18 +82,18 @@ test('guests can use three trial readings and are prompted to register afterward
     $this->flushSession();
     $this->withServerVariables(['REMOTE_ADDR' => '192.0.2.11'])
         ->withCookie('guest_trial_device', $firstDevice)
-        ->post(route('tarot.draw'), ['question' => 'Same device from a new IP?'])
-        ->assertRedirect(route('tarot'))
+        ->post(route('zen.respond'), ['concern' => 'Same device from a new IP?'])
+        ->assertRedirect(route('zen'))
         ->assertSessionHas('credit_exhausted');
 
     $secondDevice = str_repeat('b', 64);
     $this->withServerVariables(['REMOTE_ADDR' => '192.0.2.10'])
         ->withCookie('guest_trial_device', $secondDevice)
-        ->post(route('tarot.draw'), ['question' => 'New connection?'])
+        ->post(route('zen.respond'), ['concern' => 'New connection?'])
         ->assertOk();
 
-    expect(session('tarot_readings'))->toHaveCount(1);
-    $this->assertDatabaseCount('tarot_readings', 0);
+    expect(session('zen_consultations'))->toHaveCount(1);
+    $this->assertDatabaseCount('zen_consultations', 0);
     $this->assertDatabaseCount('guest_trial_credits', 2);
 });
 
@@ -105,7 +105,7 @@ test('guests with no trial credits see a full-width registration link and cannot
     }
 
     $this->withCookie('guest_trial_device', $deviceToken)
-        ->get(route('tarot'))
+        ->get(route('zen'))
         ->assertOk()
         ->assertSee('href="'.route('register').'"', false)
         ->assertSee('class="primary-action" type="submit" disabled', false)
@@ -120,7 +120,7 @@ test('free members receive three readings per day without carrying unused credit
         'purchased_credits' => 0,
     ])->save();
 
-    $this->actingAs($user)->get(route('tarot'))
+    $this->actingAs($user)->get(route('zen'))
         ->assertOk()
         ->assertSee('class="credit-balance-link"', false)
         ->assertSee('<strong>3</strong> 回', false)
@@ -130,12 +130,12 @@ test('free members receive three readings per day without carrying unused credit
     expect($user->fresh()->daily_credits)->toBe(3);
 });
 
-test('only premium members do not see the plans link on the tarot page', function () {
+test('only premium members do not see the plans link on the Zen page', function () {
     $plansLink = '<a class="text-link" href="'.route('plans').'">料金・プランを見る</a>';
     $freeMember = User::factory()->create();
 
     $this->actingAs($freeMember)
-        ->get(route('tarot'))
+        ->get(route('zen'))
         ->assertOk()
         ->assertSee($plansLink, false);
 
@@ -143,22 +143,22 @@ test('only premium members do not see the plans link on the tarot page', functio
     $premiumMember->forceFill(['plan' => User::PLAN_PREMIUM])->save();
 
     $this->actingAs($premiumMember)
-        ->get(route('tarot'))
+        ->get(route('zen'))
         ->assertOk()
         ->assertSee('<strong>無制限</strong>', false)
         ->assertDontSee($plansLink, false);
 });
 
 test('legacy users with a null plan are treated as free members', function () {
-    $dailyCreditLimit = new ReflectionMethod(ReadingCreditService::class, 'dailyCreditLimit');
+    $dailyCreditLimit = new ReflectionMethod(ConsultationCreditService::class, 'dailyCreditLimit');
 
-    expect($dailyCreditLimit->invoke(app(ReadingCreditService::class), null))->toBe(3);
+    expect($dailyCreditLimit->invoke(app(ConsultationCreditService::class), null))->toBe(3);
 });
 
 test('purchased credits remain separate and can be spent after daily credits run out', function () {
     OpenAI::fake([
         CreateResponse::fake(['choices' => [['message' => ['content' => 'Purchased result.']]]]),
-        CreateResponse::fake(['choices' => [['message' => ['content' => '{"category":"その他","summary":"テスト要約"}']]]]),
+        CreateResponse::fake(['choices' => [['message' => ['content' => '{"topic":"その他","summary":"テスト要約"}']]]]),
     ]);
     $user = User::factory()->create();
     $user->forceFill([
@@ -168,7 +168,7 @@ test('purchased credits remain separate and can be spent after daily credits run
     ])->save();
 
     $this->actingAs($user)
-        ->post(route('tarot.draw'), ['question' => 'A question?'])
+        ->post(route('zen.respond'), ['concern' => 'A question?'])
         ->assertOk()
         ->assertSee('相談残り 100回');
 
@@ -185,7 +185,7 @@ test('members with no credits see a full-width plans link and cannot draw a card
     ])->save();
 
     $this->actingAs($user)
-        ->get(route('tarot'))
+        ->get(route('zen'))
         ->assertOk()
         ->assertSee('href="'.route('plans').'"', false)
         ->assertSee('class="primary-action" type="submit" disabled', false)
@@ -195,7 +195,7 @@ test('members with no credits see a full-width plans link and cannot draw a card
 test('the result page links the entire exhausted member-credit notice to plans', function () {
     OpenAI::fake([
         CreateResponse::fake(['choices' => [['message' => ['content' => 'Last credit result.']]]]),
-        CreateResponse::fake(['choices' => [['message' => ['content' => '{"category":"その他","summary":"テスト要約"}']]]]),
+        CreateResponse::fake(['choices' => [['message' => ['content' => '{"topic":"その他","summary":"テスト要約"}']]]]),
     ]);
     $user = User::factory()->create();
     $user->forceFill([
@@ -205,7 +205,7 @@ test('the result page links the entire exhausted member-credit notice to plans',
     ])->save();
 
     $this->actingAs($user)
-        ->post(route('tarot.draw'), ['question' => 'Last question?'])
+        ->post(route('zen.respond'), ['concern' => 'Last question?'])
         ->assertOk()
         ->assertSee('<a class="form-notice credit-notice credit-notice-link" href="'.route('plans').'">', false)
         ->assertSee('本日利用可能なクレジットを使い切りました。→ 有料プランを見る');
@@ -221,9 +221,9 @@ test('lite members receive ten daily credits up to a fifty-credit carryover cap'
         'purchased_credits' => 105,
     ])->save();
 
-    $this->actingAs($user)->get(route('tarot'))->assertOk();
+    $this->actingAs($user)->get(route('zen'))->assertOk();
 
-    expect(app(ReadingCreditService::class)->balance($user)['total'])->toBe(155)
+    expect(app(ConsultationCreditService::class)->balance($user)['total'])->toBe(155)
         ->and($user->fresh()->daily_credits)->toBe(50)
         ->and($user->fresh()->purchased_credits)->toBe(105);
 });
@@ -234,7 +234,7 @@ test('upgrading to lite grants ten daily credits and upgrading to premium enable
         [User::PLAN_FREE, User::PLAN_PREMIUM, 0],
         [User::PLAN_LITE, User::PLAN_PREMIUM, 0],
     ];
-    $creditService = app(ReadingCreditService::class);
+    $creditService = app(ConsultationCreditService::class);
 
     foreach ($upgrades as [$previousPlan, $newPlan, $expectedCredits]) {
         $user = User::factory()->create();
@@ -265,8 +265,8 @@ test('plan upgrades do not grant paid daily credits for days before the upgrade'
     ])->save();
     $user->forceFill(['plan' => User::PLAN_PREMIUM])->save();
 
-    expect(app(ReadingCreditService::class)->balance($user)['daily'])->toBe(0)
-        ->and(app(ReadingCreditService::class)->balance($user)['unlimited'])->toBeTrue()
+    expect(app(ConsultationCreditService::class)->balance($user)['daily'])->toBe(0)
+        ->and(app(ConsultationCreditService::class)->balance($user)['unlimited'])->toBeTrue()
         ->and($user->fresh()->daily_credits_refreshed_at->toDateString())->toBe(now()->toDateString());
 });
 
@@ -284,7 +284,7 @@ test('premium members can draw without spending daily or purchased credits', fun
     ])->save();
 
     $this->actingAs($user)
-        ->post(route('tarot.draw'), ['question' => 'How will work go?'])
+        ->post(route('zen.respond'), ['concern' => 'How will work go?'])
         ->assertOk()
         ->assertSee('相談回数は無制限です');
 
@@ -303,18 +303,18 @@ test('premium members are limited to five readings per minute', function () {
 
     $user = User::factory()->create();
     $user->forceFill(['plan' => User::PLAN_PREMIUM])->save();
-    $rateLimitKey = 'premium-reading:'.$user->getAuthIdentifier();
+    $rateLimitKey = 'premium-consultation:'.$user->getAuthIdentifier();
     RateLimiter::clear($rateLimitKey);
 
     $this->actingAs($user);
     foreach (range(1, 5) as $index) {
-        $this->post(route('tarot.draw'), ['question' => "Question {$index}?"])->assertOk();
+        $this->post(route('zen.respond'), ['concern' => "Question {$index}?"])->assertOk();
     }
 
-    $this->post(route('tarot.draw'), ['question' => 'One more question?'])
-        ->assertRedirect(route('tarot'))
-        ->assertSessionHas('reading_rate_limited');
-    $this->get(route('tarot'))
+    $this->post(route('zen.respond'), ['concern' => 'One more question?'])
+        ->assertRedirect(route('zen'))
+        ->assertSessionHas('consultation_rate_limited');
+    $this->get(route('zen'))
         ->assertOk()
         ->assertSee('1分あたり5回までです。');
 
@@ -331,8 +331,8 @@ test('premium members are limited to one thousand readings per calendar day', fu
 
     $user = User::factory()->create();
     $user->forceFill(['plan' => User::PLAN_PREMIUM])->save();
-    $dailyRateLimitKey = 'premium-daily-reading:'.$user->getAuthIdentifier().':'.now()->toDateString();
-    $minuteRateLimitKey = 'premium-reading:'.$user->getAuthIdentifier();
+    $dailyRateLimitKey = 'premium-daily-consultation:'.$user->getAuthIdentifier().':'.now()->toDateString();
+    $minuteRateLimitKey = 'premium-consultation:'.$user->getAuthIdentifier();
     RateLimiter::clear($dailyRateLimitKey);
     RateLimiter::clear($minuteRateLimitKey);
     foreach (range(1, 999) as $unused) {
@@ -340,12 +340,12 @@ test('premium members are limited to one thousand readings per calendar day', fu
     }
 
     $this->actingAs($user)
-        ->post(route('tarot.draw'), ['question' => 'The thousandth question?'])
+        ->post(route('zen.respond'), ['concern' => 'The thousandth question?'])
         ->assertOk();
 
-    $this->post(route('tarot.draw'), ['question' => 'The next question?'])
-        ->assertRedirect(route('tarot'))
-        ->assertSessionHas('reading_rate_limited', '本日のプレミアムプランの利用上限に達しました。明日以降に再度お試しください。');
+    $this->post(route('zen.respond'), ['concern' => 'The next question?'])
+        ->assertRedirect(route('zen'))
+        ->assertSessionHas('consultation_rate_limited', '本日のプレミアムプランの利用上限に達しました。明日以降に再度お試しください。');
 
     expect(RateLimiter::attempts($dailyRateLimitKey))->toBe(1000);
     RateLimiter::clear($dailyRateLimitKey);
@@ -362,7 +362,7 @@ test('only one reading can run concurrently for each member or guest device', fu
         $lockIdentity = 'user:'.$user->getAuthIdentifier();
     }
 
-    $lock = Cache::lock('tarot-reading:'.$lockIdentity, 300);
+    $lock = Cache::lock('zen-consultation:'.$lockIdentity, 300);
     expect($lock->get())->toBeTrue();
 
     if ($user instanceof User) {
@@ -371,9 +371,9 @@ test('only one reading can run concurrently for each member or guest device', fu
         $this->withCookie('guest_trial_device', $deviceToken);
     }
 
-    $this->post(route('tarot.draw'), ['question' => 'Another reading?'])
-        ->assertRedirect(route('tarot'))
-        ->assertSessionHas('reading_rate_limited', '別の相談に回答中です。完了後にもう一度お試しください。');
+    $this->post(route('zen.respond'), ['concern' => 'Another reading?'])
+        ->assertRedirect(route('zen'))
+        ->assertSessionHas('consultation_rate_limited', '別の相談に回答中です。完了後にもう一度お試しください。');
 
     $lock->release();
 })->with([
@@ -388,50 +388,47 @@ test('free members see only recent readings within the fifty-reading cap and rec
 
     foreach (range(0, 54) as $index) {
         $createdAt = now()->subDays(54 - $index);
-        $reading = $user->tarotReadings()->create([
-            'question' => match ($index) {
+        $reading = $user->zenConsultations()->create([
+            'concern' => match ($index) {
                 4 => 'Outside-cap marker',
                 5 => 'Inside-cap marker',
                 default => "Recent question {$index}",
             },
-            'card' => 'The Star',
-            'interpretation' => 'A reading.',
+            'response' => 'A reading.',
         ]);
         $reading->forceFill(['created_at' => $createdAt, 'updated_at' => $createdAt])->save();
     }
 
-    $oldReading = $user->tarotReadings()->create([
-        'question' => 'Older question',
-        'card' => 'The Moon',
-        'interpretation' => 'An old reading.',
+    $oldReading = $user->zenConsultations()->create([
+        'concern' => 'Older question',
+        'response' => 'An old reading.',
     ]);
     $oldCreatedAt = now()->subMonths(4);
     $oldReading->forceFill(['created_at' => $oldCreatedAt, 'updated_at' => $oldCreatedAt])->save();
 
     expect($user->plan)->toBe(User::PLAN_FREE)
-        ->and($user->tarotReadings()->where('created_at', '>=', now()->subMonths(3))->count())->toBe(55);
-    $response = $this->actingAs($user)->get(route('readings.index', ['page' => 3]));
+        ->and($user->zenConsultations()->where('created_at', '>=', now()->subMonths(3))->count())->toBe(55);
+    $response = $this->actingAs($user)->get(route('consultations.index', ['page' => 3]));
     $response->assertOk();
     expect($response->viewData('historyUpgradePrompt'))->toBeTrue()
-        ->and($response->viewData('databaseReadings')->total())->toBe(50)
-        ->and($response->viewData('databaseReadings')->perPage())->toBe(20)
-        ->and($response->viewData('databaseReadings')->count())->toBe(10);
+        ->and($response->viewData('databaseConsultations')->total())->toBe(50)
+        ->and($response->viewData('databaseConsultations')->perPage())->toBe(20)
+        ->and($response->viewData('databaseConsultations')->count())->toBe(10);
     $response->assertSee('有料プランを見る')
         ->assertSee('page=2');
-    $readingsOnPage = $response->viewData('databaseReadings');
-    expect($readingsOnPage->total())->toBe(50)
-        ->and($readingsOnPage->count())->toBe(10)
-        ->and($readingsOnPage->getCollection()->pluck('question')->all())
+    $consultationsOnPage = $response->viewData('databaseConsultations');
+    expect($consultationsOnPage->total())->toBe(50)
+        ->and($consultationsOnPage->count())->toBe(10)
+        ->and($consultationsOnPage->getCollection()->pluck('concern')->all())
         ->toContain('Inside-cap marker')
         ->not->toContain('Outside-cap marker', 'Older question');
 });
 
 test('free members cannot open history older than three months or beyond the fifty-reading cap', function () {
     $user = User::factory()->create();
-    $olderReading = $user->tarotReadings()->create([
-        'question' => 'Older than three months',
-        'card' => 'The Moon',
-        'interpretation' => 'An old reading.',
+    $olderReading = $user->zenConsultations()->create([
+        'concern' => 'Older than three months',
+        'response' => 'An old reading.',
     ]);
     $olderCreatedAt = now()->subMonths(4);
     $olderReading->forceFill(['created_at' => $olderCreatedAt, 'updated_at' => $olderCreatedAt])->save();
@@ -439,39 +436,37 @@ test('free members cannot open history older than three months or beyond the fif
     $readings = [];
     foreach (range(1, 51) as $index) {
         $createdAt = now()->subDays(51 - $index);
-        $reading = $user->tarotReadings()->create([
-            'question' => "Newer question {$index}",
-            'card' => 'The Star',
-            'interpretation' => 'A recent reading.',
+        $reading = $user->zenConsultations()->create([
+            'concern' => "Newer question {$index}",
+            'response' => 'A recent reading.',
         ]);
         $reading->forceFill(['created_at' => $createdAt, 'updated_at' => $createdAt])->save();
         $readings[] = $reading;
     }
 
     expect($user->plan)->toBe(User::PLAN_FREE)
-        ->and($user->tarotReadings()->where('created_at', '>', $readings[0]->created_at)->count())->toBe(50)
+        ->and($user->zenConsultations()->where('created_at', '>', $readings[0]->created_at)->count())->toBe(50)
         ->and($readings[0]->created_at->toDateString())->toBe(now()->subDays(50)->toDateString());
 
     $this->actingAs($user)
-        ->get(route('readings.show', $olderReading->id))
+        ->get(route('consultations.show', $olderReading->id))
         ->assertNotFound();
-    $this->get(route('readings.show', $readings[0]->id))->assertNotFound();
-    $this->get(route('readings.show', $readings[1]->id))->assertOk();
+    $this->get(route('consultations.show', $readings[0]->id))->assertNotFound();
+    $this->get(route('consultations.show', $readings[1]->id))->assertOk();
 });
 
 test('premium members can open older history without a display cap', function () {
     $user = User::factory()->create();
     $user->forceFill(['plan' => User::PLAN_PREMIUM])->save();
-    $oldReading = $user->tarotReadings()->create([
-        'question' => 'Premium history',
-        'card' => 'The World',
-        'interpretation' => 'A preserved reading.',
+    $oldReading = $user->zenConsultations()->create([
+        'concern' => 'Premium history',
+        'response' => 'A preserved reading.',
     ]);
     $oldCreatedAt = now()->subYears(2);
     $oldReading->forceFill(['created_at' => $oldCreatedAt, 'updated_at' => $oldCreatedAt])->save();
 
     $this->actingAs($user)
-        ->get(route('readings.show', $oldReading->id))
+        ->get(route('consultations.show', $oldReading->id))
         ->assertOk()
         ->assertSee('A preserved reading.');
 });
@@ -479,11 +474,10 @@ test('premium members can open older history without a display cap', function ()
 test('category filtering does not reveal readings outside the free history cap', function () {
     $user = User::factory()->create();
     foreach (range(1, 51) as $daysAgo) {
-        $reading = $user->tarotReadings()->create([
-            'question' => "Recent question {$daysAgo}",
-            'card' => 'The Star',
-            'interpretation' => 'A reading.',
-            'category' => $daysAgo === 51 ? '仕事' : '恋愛',
+        $reading = $user->zenConsultations()->create([
+            'concern' => "Recent question {$daysAgo}",
+            'response' => 'A reading.',
+            'topic' => $daysAgo === 51 ? '仕事' : '恋愛',
             'summary' => 'テスト要約です。',
         ]);
         $createdAt = now()->subDays($daysAgo);
@@ -491,16 +485,16 @@ test('category filtering does not reveal readings outside the free history cap',
     }
 
     $categoryResponse = $this->actingAs($user)
-        ->get(route('readings.index'))
+        ->get(route('consultations.index'))
         ->assertOk();
-    expect($categoryResponse->viewData('categories')->all())->toBe(['恋愛']);
+    expect($categoryResponse->viewData('topics')->all())->toBe(['恋愛']);
 
-    $response = $this->get(route('readings.index', ['category' => '仕事']));
+    $response = $this->get(route('consultations.index', ['topic' => '仕事']));
 
     $response->assertOk()
-        ->assertSee('「仕事」カテゴリの履歴はありません。')
+        ->assertSee('「仕事」テーマの相談記録はありません。')
         ->assertDontSee('Recent question 51');
 
     expect($response->viewData('historyUpgradePrompt'))->toBeTrue()
-        ->and($response->viewData('databaseReadings')->total())->toBe(0);
+        ->and($response->viewData('databaseConsultations')->total())->toBe(0);
 });

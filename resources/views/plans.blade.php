@@ -87,7 +87,7 @@
                         プランの解約・変更は<a href="{{ route('account.settings.edit') }}"><strong>アカウント設定</strong></a>から手続きできます。解約後も、お支払い済み期間の終了までは有料機能をご利用いただけます。
                     </p>
                 @endauth
-                <a class="text-link" href="{{ route('tarot') }}">→ 相談に戻る</a>
+                <a class="text-link" href="{{ route('zen') }}">→ 相談に戻る</a>
             </section>
         </main>
         @include('partials.site-footer')

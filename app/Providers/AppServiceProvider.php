@@ -3,7 +3,7 @@
 namespace App\Providers;
 
 use App\Models\User;
-use App\Services\ReadingCreditService;
+use App\Services\ConsultationCreditService;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\View\View as ViewInstance;
@@ -27,7 +27,7 @@ class AppServiceProvider extends ServiceProvider
             $user = request()->user();
 
             if ($user instanceof User) {
-                $view->with('creditSummary', app(ReadingCreditService::class)->balance($user));
+                $view->with('creditSummary', app(ConsultationCreditService::class)->balance($user));
             }
         });
     }

@@ -11,8 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('tarot_readings', function (Blueprint $table) {
-            $table->string('category', 20)->nullable();
+        Schema::table('zen_consultations', function (Blueprint $table) {
+            $table->string('topic', 20)->nullable();
             $table->string('summary', 150)->nullable();
         });
     }
@@ -22,8 +22,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('tarot_readings', function (Blueprint $table) {
-            $table->dropColumn(['category', 'summary']);
+        Schema::table('zen_consultations', function (Blueprint $table) {
+            $table->dropColumn(['topic', 'summary']);
         });
     }
 };
