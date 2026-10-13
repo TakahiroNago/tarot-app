@@ -17,28 +17,16 @@
                     @if (session('status') === 'email-verified')
                         <p class="form-notice" data-auto-dismiss role="status">メールアドレスを確認しました。</p>
                     @endif
-                    @if (session('daily_zen_message_rate_limited'))
-                        <p class="form-notice" role="status">{{ session('daily_zen_message_rate_limited') }}</p>
-                    @endif
                     <p class="eyebrow">今日のあなたへ</p>
                     <h1 class="welcome-title">迷いの中に<br>小さな一歩を</h1>
                     <p class="welcome-description">悩みを聞かせてください。AIが禅の視点を参考に、慈悲と智慧をもって心を見つめることばをお届けします。</p>
                     <a class="primary-action" href="{{ route('zen') }}">
-                        <span>禅師に相談する</span>
+                        <span>AI禅師に相談する</span>
                         <span class="action-arrow" aria-hidden="true">→</span>
                     </a>
-                    @auth
-                        <form class="daily-consultation-form" method="POST" action="{{ route('zen.daily') }}">
-                            @csrf
-                            <button class="primary-action" type="submit">
-                                <span>今日のメッセージ</span>
-                                <span class="action-arrow" aria-hidden="true">→</span>
-                            </button>
-                        </form>
-                    @endauth
                 </div>
-                <div class="art-stage" aria-hidden="true">
-                    <p class="zen-quote">静けさの中に、<br>答えの芽がある。</p>
+                <div class="art-stage">
+                    <img class="welcome-logo" src="{{ asset('images/logo.png') }}" alt="月詠 禅のことば">
                 </div>
             </section>
         </main>

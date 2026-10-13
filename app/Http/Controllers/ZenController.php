@@ -85,61 +85,6 @@ class ZenController extends Controller
         }
     }
 
-    public function daily(
-        Request $request,
-        ConsultationCreditService $creditService,
-        PublicConsultationShareService $shareService,
-    ): View|RedirectResponse {
-        $user = $request->user();
-        if (! $user instanceof User) {
-            abort(403);
-        }
-
-        $lock = Cache::lock(
-            'zen-consultation:user:'.$user->getAuthIdentifier(),
-            self::RESPONSE_LOCK_TTL_SECONDS,
-        );
-        if (! $lock->get()) {
-            return redirect()->route('home')->with(
-                'daily_zen_message_rate_limited',
-                '別の相談に回答中です。完了後にもう一度お試しください。',
-            );
-        }
-
-        try {
-            $consultationDate = now()->toDateString();
-            $savedConsultation = $user->zenConsultations()
-                ->whereDate('daily_consultation_date', $consultationDate)
-                ->first();
-
-            if ($savedConsultation === null) {
-                $consultation = $this->createDailyConsultation('今日のあなたに向けた禅のメッセージをお願いします');
-                $savedConsultation = $user->zenConsultations()->create([
-                    ...$consultation,
-                    'daily_consultation_date' => $consultationDate,
-                ]);
-            }
-
-            $consultation = $savedConsultation->only([
-                'concern',
-                'response',
-                'topic',
-                'summary',
-            ]);
-            $shareToken = $shareService->create($consultation);
-            $creditSummary = $creditService->balance($user);
-
-            return view('zen-result', [
-                ...$consultation,
-                'shareUrl' => route('consultations.share', ['token' => $shareToken]),
-                'creditsRemaining' => $creditSummary['total'],
-                'isGuest' => false,
-            ]);
-        } finally {
-            $lock->release();
-        }
-    }
-
     private function respondWithLock(
         Request $request,
         string $concern,
@@ -265,55 +210,6 @@ class ZenController extends Controller
             'creditsRemaining' => $creditsRemaining,
             'isGuest' => ! $user instanceof User,
         ]);
-    }
-
-    /**
-     * @return array{concern: string, response: string, topic: string, summary: string}
-     */
-    private function createDailyConsultation(string $concern): array
-    {
-        $response = OpenAI::chat()->create([
-            'model' => 'gpt-5.6-luna',
-            'messages' => [
-                [
-                    'role' => 'system',
-                    'content' => '[REDACTED]',
-                ],
-                [
-                    'role' => 'user',
-                    'content' => "相談：{$concern}",
-                ],
-            ],
-            'response_format' => ['type' => 'json_object'],
-        ]);
-
-        $content = $response->choices[0]->message->content;
-        if (! is_string($content)) {
-            throw new UnexpectedValueException('OpenAI returned no daily Zen message.');
-        }
-
-        $result = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
-        $answer = is_array($result) ? ($result['response'] ?? null) : null;
-        $topic = is_array($result) ? ($result['topic'] ?? null) : null;
-        $summary = is_array($result) ? ($result['summary'] ?? null) : null;
-        if (
-            ! is_string($answer)
-            || trim($answer) === ''
-            || ! is_string($topic)
-            || ! in_array($topic, ZenConsultation::TOPICS, true)
-            || ! is_string($summary)
-            || trim($summary) === ''
-            || mb_strlen($summary) > ZenConsultation::SUMMARY_MAX_LENGTH
-        ) {
-            throw new UnexpectedValueException('OpenAI returned invalid daily Zen message data.');
-        }
-
-        return [
-            'concern' => '今日のメッセージ',
-            'response' => $answer,
-            'topic' => $topic,
-            'summary' => $summary,
-        ];
     }
 
     private function consultationTopic(string $concern): string

@@ -37,7 +37,6 @@
                             @foreach ($sessionConsultations as $consultation)
                                 <div class="consultation-row consultation-row-session">
                                     <a class="consultation-question" href="{{ route('consultations.show', $consultation['id']) }}">{{ $consultation['concern'] }}</a>
-                                    <span class="consultation-label">禅師のことば</span>
                                     <a class="consultation-open" href="{{ route('consultations.show', $consultation['id']) }}">詳細 <span aria-hidden="true">→</span></a>
                                 </div>
                             @endforeach
@@ -52,7 +51,6 @@
                             @foreach ($databaseConsultations as $consultation)
                                 <a class="consultation-row" href="{{ route('consultations.show', $consultation->id) }}">
                                     <span class="consultation-question">{{ $consultation->concern }}</span>
-                                    <span class="consultation-label">禅師のことば</span>
                                     <time class="consultation-date" datetime="{{ $consultation->created_at->toISOString() }}" data-local-time>{{ $consultation->created_at->format('Y/m/d H:i') }}</time>
                                     <span class="consultation-open">詳細 <span aria-hidden="true">→</span></span>
                                 </a>

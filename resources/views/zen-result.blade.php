@@ -23,7 +23,7 @@
 
                     <section class="result-section">
                         <h2 class="section-label">お答え</h2>
-                        <p class="consultation-copy">{{ $response }}</p>
+                        <div class="consultation-copy">{!! app(App\Services\ConsultationResponseFormatter::class)->toHtml($response) !!}</div>
                     </section>
 
                     <section class="consultation-share" aria-labelledby="consultation-share-heading">
@@ -31,7 +31,7 @@
                         <p class="consultation-share-note">公開用URLにはメールアドレスやユーザーIDは含まれません。URLを知っている人は結果を閲覧できます（有効期限30日）。</p>
 
                         <div class="consultation-share-actions">
-                            <button class="consultation-share-button" type="button" data-share-link aria-label="Share Linkでシェア">Share Link</button>
+                            <button class="consultation-share-button" type="button" data-share-link aria-label="Share Linkでシェア">シェア</button>
                         </div>
                         <div class="consultation-share-url">
                             <input

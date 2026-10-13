@@ -1,7 +1,7 @@
 <header class="site-header">
     <a class="brand" href="{{ route('home') }}">
         <span class="brand-mark" aria-hidden="true">✦</span>
-        <span class="brand-name">月詠</span>
+        <span class="brand-name">心の庵</span>
         <span class="brand-caption">ZEN REFLECTIONS</span>
     </a>
     <nav class="account-navigation" aria-label="アカウント">

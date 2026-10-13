@@ -1,7 +1,6 @@
 <?php
 
 use App\Models\User;
-use App\Services\ConsultationCreditService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 use OpenAI\Laravel\Facades\OpenAI;
@@ -15,7 +14,7 @@ test('authenticated consultations are stored with their topic and summary', func
         CreateResponse::fake([
             'choices' => [[
                 'message' => [
-                    'content' => 'A useful interpretation.',
+                    'content' => "### A useful interpretation\n\n**One step at a time.**\n\n<script>alert('unsafe')</script>",
                 ],
             ]],
         ]),
@@ -33,10 +32,13 @@ test('authenticated consultations are stored with their topic and summary', func
         ->post(route('zen.respond'), ['concern' => 'What should I focus on?'])
         ->assertOk()
         ->assertViewHas('concern', 'What should I focus on?')
-        ->assertViewHas('response', 'A useful interpretation.')
+        ->assertViewHas('response', "### A useful interpretation\n\n**One step at a time.**\n\n<script>alert('unsafe')</script>")
         ->assertViewHas('topic', '仕事')
         ->assertViewHas('summary', '仕事に関する前向きな助言です。')
         ->assertSee('禅師からのことば')
+        ->assertSee('<h3>A useful interpretation</h3>', false)
+        ->assertSee('<strong>One step at a time.</strong>', false)
+        ->assertDontSee("<script>alert('unsafe')</script>", false)
         ->assertDontSee('card-number')
         ->assertViewHas('shareUrl');
 
@@ -47,8 +49,10 @@ test('authenticated consultations are stored with their topic and summary', func
 
     $this->get($shareUrl)
         ->assertOk()
-        ->assertSee('A useful interpretation.')
+        ->assertSee('<h3>A useful interpretation</h3>', false)
+        ->assertSee('<strong>One step at a time.</strong>', false)
         ->assertSee('What should I focus on?')
+        ->assertDontSee("<script>alert('unsafe')</script>", false)
         ->assertDontSee('card-number')
         ->assertDontSee($user->email)
         ->assertDontSee('account-profile-email');
@@ -58,13 +62,20 @@ test('authenticated consultations are stored with their topic and summary', func
 
     $reading = $user->zenConsultations()->sole();
 
+    $this->get(route('consultations.show', $reading->id))
+        ->assertOk()
+        ->assertSee('<h3>A useful interpretation</h3>', false)
+        ->assertSee('<strong>One step at a time.</strong>', false)
+        ->assertDontSee("<script>alert('unsafe')</script>", false);
+
     expect($reading->concern)->toBe('What should I focus on?')
-        ->and($reading->response)->toBe('A useful interpretation.')
+        ->and($reading->response)->toBe("### A useful interpretation\n\n**One step at a time.**\n\n<script>alert('unsafe')</script>")
         ->and($reading->topic)->toBe('仕事')
         ->and($reading->summary)->toBe('仕事に関する前向きな助言です。');
     $openAiFake->assertSent(Chat::class, function (string $method, array $parameters): bool {
         return $method === 'create'
-            && str_contains($parameters['messages'][0]['content'], '仏教禅師')
+            && str_contains($parameters['messages'][0]['content'], '仏教の禅師')
+            && str_contains($parameters['messages'][0]['content'], '相談者の悩みや人生の迷い')
             && $parameters['messages'][1]['content'] === '相談：What should I focus on?';
     });
 
@@ -151,85 +162,21 @@ test('premium consultations use the three latest summaries from the concern topi
     $openAiFake->assertSent(Chat::class, 3);
 });
 
-test('authenticated users can receive one daily Zen message per day without spending a credit', function () {
-    $this->travelTo(now()->startOfDay());
+test('daily Zen messages are no longer available', function () {
     $user = User::factory()->create();
-    $user->forceFill(['email_verified_at' => now()])->save();
-    $creditService = app(ConsultationCreditService::class);
-    $creditService->balance($user);
-    $user->forceFill(['daily_credits' => 0])->save();
-    $initialBalance = $creditService->balance($user)['total'];
-    $openAiFake = OpenAI::fake([
-        CreateResponse::fake([
-            'choices' => [['message' => ['content' => '{"response":"今日のメッセージです。","topic":"その他","summary":"穏やかな気持ちで過ごせる日です。"}']]],
-        ]),
-        CreateResponse::fake([
-            'choices' => [['message' => ['content' => '{"response":"明日のメッセージです。","topic":"将来","summary":"明日への希望を持てる日です。"}']]],
-        ]),
-    ]);
+    $this->actingAs($user)
+        ->get(route('home'))
+        ->assertOk()
+        ->assertDontSee('今日のメッセージ')
+        ->assertDontSee('zen.daily');
 
-    $this->get(route('home'))
+    $this->get(route('plans'))
         ->assertOk()
         ->assertDontSee('今日のメッセージ');
 
     $this->actingAs($user)
-        ->get(route('home'))
-        ->assertOk()
-        ->assertSee('今日のメッセージ')
-        ->assertSee(route('zen.daily'), false);
-
-    $this->post(route('zen.daily'))
-        ->assertOk()
-        ->assertViewHas('concern', '今日のメッセージ')
-        ->assertViewHas('response', '今日のメッセージです。')
-        ->assertViewHas('creditsRemaining', $initialBalance);
-
-    $this->post(route('zen.daily'))
-        ->assertOk()
-        ->assertViewHas('concern', '今日のメッセージ')
-        ->assertViewHas('response', '今日のメッセージです。');
-
-    $this->get(route('consultations.index'))
-        ->assertOk()
-        ->assertSee('今日のメッセージ')
-        ->assertDontSee('今日のメッセージをお願いします');
-
-    $openAiFake->assertSent(Chat::class, 1);
-    $openAiFake->assertSent(Chat::class, function (string $method, array $parameters): bool {
-        return $method === 'create'
-            && str_starts_with(
-                $parameters['messages'][1]['content'],
-                '相談：今日のあなたに向けた禅のメッセージをお願いします',
-            );
-    });
-    $this->assertDatabaseHas('zen_consultations', [
-        'user_id' => $user->id,
-        'concern' => '今日のメッセージ',
-        'response' => '今日のメッセージです。',
-    ]);
-    expect($user->zenConsultations()
-        ->whereDate('daily_consultation_date', now()->toDateString())
-        ->sole()
-        ->daily_consultation_date->toDateString())->toBe(now()->toDateString());
-    expect($user->refresh()->daily_credits)->toBe(0);
-
-    $this->travelTo(now()->addDay()->startOfDay());
-    $this->post(route('zen.daily'))
-        ->assertOk()
-        ->assertViewHas('response', '明日のメッセージです。');
-
-    $openAiFake->assertSent(Chat::class, 2);
-    $this->assertDatabaseCount('zen_consultations', 2);
-    $this->assertDatabaseHas('zen_consultations', [
-        'user_id' => $user->id,
-        'concern' => '今日のメッセージ',
-        'response' => '明日のメッセージです。',
-    ]);
-    expect($user->zenConsultations()
-        ->whereDate('daily_consultation_date', now()->toDateString())
-        ->sole()
-        ->daily_consultation_date->toDateString())->toBe(now()->toDateString());
-    expect($user->refresh()->daily_credits)->toBe(3);
+        ->post('/zen/daily')
+        ->assertNotFound();
 });
 
 test('guest consultations stay in the same session and are not written to the database', function () {
