@@ -28,7 +28,7 @@
                     </section>
                     <section class="result-section">
                         <h2 class="section-label">お答え</h2>
-                        <p class="consultation-copy">{{ $consultation['response'] }}</p>
+                        <div class="consultation-copy">{!! app(App\Services\ConsultationResponseFormatter::class)->toHtml($consultation['response']) !!}</div>
                     </section>
                     <a class="text-link" href="{{ route('zen') }}">もう一度相談する</a>
                 </div>

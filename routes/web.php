@@ -26,7 +26,6 @@ Route::get('/', function () {
 Route::get('/zen', [ZenController::class, 'index'])->name('zen');
 
 Route::post('/zen/respond', [ZenController::class, 'respond'])->name('zen.respond');
-Route::post('/zen/daily', [ZenController::class, 'daily'])->middleware('auth')->name('zen.daily');
 
 Route::get('/shared-consultations/{token}', SharedConsultationController::class)
     ->where('token', '[a-f0-9]{64}')
