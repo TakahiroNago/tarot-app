@@ -10,11 +10,11 @@ use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\BillingController;
+use App\Http\Controllers\ConsultationHistoryController;
 use App\Http\Controllers\ContactController;
-use App\Http\Controllers\ReadingHistoryController;
-use App\Http\Controllers\SharedReadingController;
+use App\Http\Controllers\SharedConsultationController;
 use App\Http\Controllers\StripeWebhookController;
-use App\Http\Controllers\TarotController;
+use App\Http\Controllers\ZenController;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -23,14 +23,14 @@ Route::get('/', function () {
     return view('welcome');
 })->name('home');
 
-Route::get('/tarot', [TarotController::class, 'index'])->name('tarot');
+Route::get('/zen', [ZenController::class, 'index'])->name('zen');
 
-Route::post('/tarot/draw', [TarotController::class, 'draw'])->name('tarot.draw');
-Route::post('/tarot/daily', [TarotController::class, 'daily'])->middleware('auth')->name('tarot.daily');
+Route::post('/zen/respond', [ZenController::class, 'respond'])->name('zen.respond');
+Route::post('/zen/daily', [ZenController::class, 'daily'])->middleware('auth')->name('zen.daily');
 
-Route::get('/shared-readings/{token}', SharedReadingController::class)
+Route::get('/shared-consultations/{token}', SharedConsultationController::class)
     ->where('token', '[a-f0-9]{64}')
-    ->name('readings.share');
+    ->name('consultations.share');
 
 Route::view('/plans', 'plans')->name('plans');
 
@@ -50,8 +50,8 @@ Route::middleware('active')->group(function () {
     Route::post('/billing/portal', [BillingController::class, 'portal'])->middleware(['auth', 'verified'])->name('billing.portal');
     Route::post('/billing/plan', [BillingController::class, 'changePlan'])->middleware(['auth', 'verified'])->name('billing.plan.change');
     Route::delete('/billing/plan', [BillingController::class, 'cancelPlanChange'])->middleware(['auth', 'verified'])->name('billing.plan.cancel');
-    Route::get('/readings', [ReadingHistoryController::class, 'index'])->name('readings.index');
-    Route::get('/readings/{reading}', [ReadingHistoryController::class, 'show'])->name('readings.show');
+    Route::get('/consultations', [ConsultationHistoryController::class, 'index'])->name('consultations.index');
+    Route::get('/consultations/{consultation}', [ConsultationHistoryController::class, 'show'])->name('consultations.show');
 });
 
 Route::middleware(['auth', 'active'])->group(function () {

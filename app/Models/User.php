@@ -64,9 +64,9 @@ class User extends Authenticatable implements HasLocalePreference, MustVerifyEma
         return 'ja';
     }
 
-    /** @return HasMany<TarotReading, $this> */
-    public function tarotReadings(): HasMany
+    /** @return HasMany<ZenConsultation, $this> */
+    public function zenConsultations(): HasMany
     {
-        return $this->hasMany(TarotReading::class);
+        return $this->hasMany(ZenConsultation::class);
     }
 }

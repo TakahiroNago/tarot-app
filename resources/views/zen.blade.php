@@ -1,4 +1,4 @@
-{{-- resoureces/veiws/tarot.blade.php --}}
+{{-- Zen consultation form. --}}
 
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
@@ -17,8 +17,8 @@
                 @if (session('status') === 'email-verified')
                     <p class="form-notice" data-auto-dismiss role="status">メールアドレスを確認しました。</p>
                 @endif
-                @if (session('reading_rate_limited'))
-                    <p class="form-notice credit-notice" role="alert">{{ session('reading_rate_limited') }}</p>
+                @if (session('consultation_rate_limited'))
+                    <p class="form-notice credit-notice" role="alert">{{ session('consultation_rate_limited') }}</p>
                 @endif
                 <p class="eyebrow">A MOMENT FOR YOU</p>
                 <h1>心にある悩みを<br>聞かせてください</h1>
@@ -49,20 +49,20 @@
                     @endif
                 @endauth
 
-                <form class="question-form" method="POST" action="{{ route('tarot.draw') }}">
+                <form class="question-form" method="POST" action="{{ route('zen.respond') }}">
                     @csrf
-                    <label class="question-label" for="question">あなたのお悩み</label>
+                    <label class="question-label" for="concern">あなたのお悩み</label>
                     <input
                         class="question-input"
-                        id="question"
+                        id="concern"
                         type="text"
-                        name="question"
-                        value="{{ old('question') }}"
-                        placeholder="例：新しい一歩を踏み出すには？"
+                        name="concern"
+                        value="{{ old('concern') }}"
+                        placeholder="例：新しい一歩を踏み出すには、どうしたらいいですか？"
                         maxlength="200"
                         required
                     >
-                    @error('question')
+                    @error('concern')
                         <p class="form-error" role="alert">{{ $message }}</p>
                     @enderror
                     <button class="primary-action" type="submit" @disabled(auth()->check() ? (! $creditSummary['unlimited'] && $creditSummary['total'] === 0) : $guestCredits === 0)>
@@ -75,7 +75,7 @@
                 @if (! auth()->check() || auth()->user()->plan !== \App\Models\User::PLAN_PREMIUM)
                     <a class="text-link" href="{{ route('plans') }}">料金・プランを見る</a>
                 @endif
-                <a class="text-link tarot-home-link" href="{{ route('home') }}">トップページへ戻る</a>
+                <a class="text-link zen-home-link" href="{{ route('home') }}">トップページへ戻る</a>
             </section>
         </main>
 

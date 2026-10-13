@@ -1,12 +1,12 @@
 const questionForm = document.querySelector('.question-form');
-const historyCategoryFilter = document.querySelector('[data-history-category-filter]');
+const historyTopicFilter = document.querySelector('[data-history-topic-filter]');
 const plansPanel = document.querySelector('.plans-panel');
 const accountMenu = document.querySelector('.account-menu');
 const accountPopover = accountMenu?.querySelector('.account-popover');
 const accountMenuTrigger = accountMenu?.querySelector('.account-menu-trigger');
 
-historyCategoryFilter?.addEventListener('change', () => {
-	historyCategoryFilter.form?.requestSubmit();
+historyTopicFilter?.addEventListener('change', () => {
+	historyTopicFilter.form?.requestSubmit();
 });
 
 document.querySelectorAll('[data-local-time]').forEach((timeElement) => {

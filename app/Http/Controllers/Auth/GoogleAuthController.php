@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Services\SessionReadingPersister;
+use App\Services\SessionConsultationPersister;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,7 +19,7 @@ class GoogleAuthController extends Controller
         return Socialite::driver('google')->redirect();
     }
 
-    public function callback(Request $request, SessionReadingPersister $sessionReadingPersister): RedirectResponse
+    public function callback(Request $request, SessionConsultationPersister $sessionConsultationPersister): RedirectResponse
     {
         $googleUser = Socialite::driver('google')->user();
         $email = $googleUser->getEmail();
@@ -72,7 +72,7 @@ class GoogleAuthController extends Controller
 
         Auth::login($user);
         $request->session()->regenerate();
-        $sessionReadingPersister->persist($user, $request);
+        $sessionConsultationPersister->persist($user, $request);
 
         return redirect()->intended(route('home'));
     }

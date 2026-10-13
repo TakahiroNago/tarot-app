@@ -198,10 +198,9 @@ test('users can permanently delete their account and associated records after co
     $user = User::factory()->create([
         'password' => Hash::make('A-strong-password-2026'),
     ]);
-    $reading = $user->tarotReadings()->create([
-        'question' => 'Will I succeed?',
-        'card' => 'The Star',
-        'interpretation' => 'A hopeful reading.',
+    $reading = $user->zenConsultations()->create([
+        'concern' => 'Will I succeed?',
+        'response' => 'A hopeful reading.',
     ]);
     DB::table('sessions')->insert([
         'id' => 'account-session',
@@ -226,7 +225,7 @@ test('users can permanently delete their account and associated records after co
 
     $this->assertGuest();
     $this->assertDatabaseMissing('users', ['id' => $user->id]);
-    $this->assertDatabaseMissing('tarot_readings', ['id' => $reading->id]);
+    $this->assertDatabaseMissing('zen_consultations', ['id' => $reading->id]);
     $this->assertDatabaseMissing('sessions', ['id' => 'account-session']);
     $this->assertDatabaseMissing('password_reset_tokens', ['email' => $user->email]);
 });

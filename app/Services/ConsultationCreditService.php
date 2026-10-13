@@ -6,7 +6,7 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
-class ReadingCreditService
+class ConsultationCreditService
 {
     /** @return array{daily: int, purchased: int, total: int|null, plan: string, unlimited: bool} */
     public function balance(User $user): array
@@ -53,7 +53,7 @@ class ReadingCreditService
     public function refund(User $user, string $bucket): void
     {
         if (! in_array($bucket, ['daily', 'purchased', 'unlimited'], true)) {
-            throw new \InvalidArgumentException('Unknown reading credit bucket.');
+            throw new \InvalidArgumentException('Unknown consultation credit bucket.');
         }
 
         if ($bucket === 'unlimited') {

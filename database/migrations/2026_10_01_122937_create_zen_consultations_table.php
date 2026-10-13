@@ -11,12 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('tarot_readings', function (Blueprint $table) {
+        Schema::create('zen_consultations', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->string('question', 200);
-            $table->string('card');
-            $table->text('interpretation');
+            $table->string('concern', 200);
+            $table->text('response');
             $table->index(['user_id', 'created_at']);
             $table->timestamps();
         });
@@ -27,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('tarot_readings');
+        Schema::dropIfExists('zen_consultations');
     }
 };

@@ -9,7 +9,7 @@ test('unverified users are redirected to the verification notice', function (str
     $user = User::factory()->unverified()->create();
 
     $this->actingAs($user)->get($uri)->assertRedirect(route('verification.notice'));
-})->with(['/', '/tarot', '/plans']);
+})->with(['/', '/zen', '/plans']);
 
 test('unverified users can see the verification notice', function () {
     $user = User::factory()->unverified()->create();
@@ -18,7 +18,6 @@ test('unverified users can see the verification notice', function () {
 });
 
 test('verified users and guests can open public pages', function () {
-    $this->get('/tarot')->assertOk();
+    $this->get('/zen')->assertOk();
     $this->actingAs(User::factory()->create())->get('/plans')->assertOk();
 });
-
