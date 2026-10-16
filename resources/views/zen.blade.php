@@ -58,7 +58,7 @@
                         type="text"
                         name="concern"
                         value="{{ old('concern') }}"
-                        placeholder="例：新しい一歩を踏み出すには、どうしたらいいですか？"
+                        placeholder="例：新しい一歩を踏み出すには？"
                         maxlength="200"
                         required
                     >
