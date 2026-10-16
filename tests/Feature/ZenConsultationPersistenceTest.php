@@ -84,6 +84,10 @@ test('authenticated consultations are stored with their topic and summary', func
         return $method === 'create'
             && str_contains($parameters['messages'][0]['content'], '仏教の禅師')
             && str_contains($parameters['messages'][0]['content'], '相談者の悩みや人生の迷い')
+            && str_contains($parameters['messages'][0]['content'], '最も適切なものを一つだけ')
+            && str_contains($parameters['messages'][0]['content'], '「『○○』という言葉があります。これは××という意味です。」')
+            && str_contains($parameters['messages'][0]['content'], '今回の相談に結びつけ')
+            && str_contains($parameters['messages'][0]['content'], '作ったりせず')
             && $parameters['messages'][1]['content'] === '相談：What should I focus on?';
     });
 
