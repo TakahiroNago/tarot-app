@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', "\u{6708}\u{8A60} ZEN JOURNAL"),
+    'name' => env('APP_NAME', "\u{5FC3}の\u{5EB5} ZEN REFLECTIONS"),
 
     /*
     |--------------------------------------------------------------------------
