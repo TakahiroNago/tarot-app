@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>パスワード再設定 | 月詠 禅のことば</title>
+    <title>パスワード再設定 | 心の庵 禅のことば</title>
     @vite(['resources/css/app.css'])
 </head>
 <body>

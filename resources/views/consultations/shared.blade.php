@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex, nofollow, noarchive">
     <meta name="referrer" content="no-referrer">
-    <title>共有されたことば | 月詠 禅のことば</title>
+    <title>共有されたことば | 心の庵 禅のことば</title>
     @vite(['resources/css/app.css'])
 </head>
 <body>
@@ -13,7 +13,7 @@
         <header class="site-header">
             <a class="brand" href="{{ route('home') }}">
                 <span class="brand-mark" aria-hidden="true">✦</span>
-                <span class="brand-name">月詠</span>
+                <span class="brand-name">心の庵</span>
                 <span class="brand-caption">ZEN REFLECTIONS</span>
             </a>
         </header>

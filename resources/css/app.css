@@ -647,10 +647,6 @@ h2 {
     text-underline-offset: 5px;
 }
 
-.zen-home-link {
-    margin-left: 20px;
-}
-
 @media (prefers-reduced-motion: reduce) {
     .question-form.is-submitting .loading-spinner {
         animation-duration: 2s;
