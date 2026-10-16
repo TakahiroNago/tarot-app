@@ -5,7 +5,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>禅師に相談 | 月詠 禅のことば</title>
+    <title>禅師に相談 | 心の庵 禅のことば</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body>
@@ -71,11 +71,6 @@
                         <span class="action-arrow" aria-hidden="true">→</span>
                     </button>
                 </form>
-
-                @if (! auth()->check() || auth()->user()->plan !== \App\Models\User::PLAN_PREMIUM)
-                    <a class="text-link" href="{{ route('plans') }}">料金・プランを見る</a>
-                @endif
-                <a class="text-link zen-home-link" href="{{ route('home') }}">トップページへ戻る</a>
             </section>
         </main>
 

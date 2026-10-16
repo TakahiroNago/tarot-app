@@ -62,11 +62,19 @@ test('authenticated consultations are stored with their topic and summary', func
 
     $reading = $user->zenConsultations()->sole();
 
-    $this->get(route('consultations.show', $reading->id))
+    $historyResponse = $this->get(route('consultations.show', $reading->id))
         ->assertOk()
         ->assertSee('<h3>A useful interpretation</h3>', false)
         ->assertSee('<strong>One step at a time.</strong>', false)
-        ->assertDontSee("<script>alert('unsafe')</script>", false);
+        ->assertDontSee("<script>alert('unsafe')</script>", false)
+        ->assertSee('ことばをシェア')
+        ->assertViewHas('shareUrl');
+
+    $this->get($historyResponse->viewData('shareUrl'))
+        ->assertOk()
+        ->assertSee('What should I focus on?')
+        ->assertSee('<h3>A useful interpretation</h3>', false)
+        ->assertDontSee($user->email);
 
     expect($reading->concern)->toBe('What should I focus on?')
         ->and($reading->response)->toBe("### A useful interpretation\n\n**One step at a time.**\n\n<script>alert('unsafe')</script>")
@@ -217,11 +225,17 @@ test('guest consultations stay in the same session and are not written to the da
         ->assertDontSee('card-number')
         ->assertDontSee('account-profile-email');
 
-    $this->get(route('consultations.show', 'session-0'))
+    $sessionHistoryResponse = $this->get(route('consultations.show', 'session-0'))
         ->assertOk()
         ->assertSee('禅師からのことば')
         ->assertSee('First interpretation.')
-        ->assertDontSee('card-number');
+        ->assertDontSee('card-number')
+        ->assertViewHas('shareUrl');
+
+    $this->get($sessionHistoryResponse->viewData('shareUrl'))
+        ->assertOk()
+        ->assertSee('First question?')
+        ->assertSee('First interpretation.');
 
     $consultations = session('zen_consultations');
 

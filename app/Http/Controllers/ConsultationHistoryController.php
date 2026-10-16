@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\ZenConsultation;
+use App\Services\PublicConsultationShareService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -101,8 +102,11 @@ class ConsultationHistoryController extends Controller
         ));
     }
 
-    public function show(Request $request, string $consultation): View|RedirectResponse
-    {
+    public function show(
+        Request $request,
+        string $consultation,
+        PublicConsultationShareService $shareService,
+    ): View|RedirectResponse {
         if (preg_match('/^session-(\d+)$/', $consultation, $matches) === 1) {
             $sessionConsultation = $request->session()->get('zen_consultations.'.$matches[1]);
             abort_unless($this->isConsultation($sessionConsultation), 404);
@@ -145,7 +149,12 @@ class ConsultationHistoryController extends Controller
             $consultationData = $savedConsultation->only(['concern', 'response', 'created_at']);
         }
 
-        return view('consultations.show', ['consultation' => $consultationData]);
+        $shareToken = $shareService->create($consultationData);
+
+        return view('consultations.show', [
+            'consultation' => $consultationData,
+            'shareUrl' => route('consultations.share', ['token' => $shareToken]),
+        ]);
     }
 
     /** @return Collection<int, array{id: string, concern: string, response: string}> */

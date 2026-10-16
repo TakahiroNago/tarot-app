@@ -5,7 +5,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>禅師に相談 | 月詠 禅のことば</title>
+    <title>禅師に相談 | 心の庵 禅のことば</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body>
@@ -19,14 +19,14 @@
                     @endif
                     <p class="eyebrow">今日のあなたへ</p>
                     <h1 class="welcome-title">迷いの中に<br>小さな一歩を</h1>
-                    <p class="welcome-description">悩みを聞かせてください。AIが禅の視点を参考に、慈悲と智慧をもって心を見つめることばをお届けします。</p>
+                    <p class="welcome-description">悩みを聞かせてください。AIが禅の視点で、心を見つめることばをお届けします。</p>
                     <a class="primary-action" href="{{ route('zen') }}">
                         <span>AI禅師に相談する</span>
                         <span class="action-arrow" aria-hidden="true">→</span>
                     </a>
                 </div>
                 <div class="art-stage">
-                    <img class="welcome-logo" src="{{ asset('images/logo.png') }}" alt="月詠 禅のことば">
+                    <img class="welcome-logo" src="{{ asset('images/logo.png') }}" alt="心の庵 禅のことば">
                 </div>
             </section>
         </main>
