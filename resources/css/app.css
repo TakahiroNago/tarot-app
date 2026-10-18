@@ -1255,6 +1255,10 @@ h2 {
     max-width: 560px;
 }
 
+.account-settings-section .question-form + .question-form {
+    margin-top: 24px;
+}
+
 .settings-note {
     color: var(--color-muted);
     font-size: 13px;

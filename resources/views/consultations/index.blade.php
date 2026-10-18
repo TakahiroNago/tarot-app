@@ -13,7 +13,7 @@
             <section class="history-panel">
                 <p class="eyebrow">ZEN JOURNAL</p>
                 <div class="history-heading">
-                    <h1>相談の記録</h1>
+                    <h1>ご相談の記録</h1>
                     <form class="history-filter" method="GET" action="{{ route('consultations.index') }}">
                         <select id="history-topic" name="topic" aria-label="表示するテーマ" data-history-topic-filter>
                             <option value="">すべて</option>

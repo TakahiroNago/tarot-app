@@ -96,9 +96,16 @@ Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
     ->middleware(['auth', 'active'])
     ->name('logout');
 
+Route::middleware(['auth', 'active'])->prefix('account')->name('account.')->group(function () {
+    Route::get('/email/verify/{user}', [AccountSettingsController::class, 'confirmEmailChange'])
+        ->middleware(['signed', 'throttle:6,1'])
+        ->name('email.verify');
+});
+
 Route::middleware(['auth', 'active', 'verified'])->prefix('account')->name('account.')->group(function () {
     Route::get('/settings', [AccountSettingsController::class, 'edit'])->name('settings.edit');
     Route::put('/settings', [AccountSettingsController::class, 'update'])->name('settings.update');
+    Route::put('/settings/email', [AccountSettingsController::class, 'requestEmailChange'])->name('settings.email.update');
     Route::delete('/settings', [AccountSettingsController::class, 'destroy'])->name('settings.destroy');
 });
 

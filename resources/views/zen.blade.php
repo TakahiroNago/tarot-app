@@ -22,7 +22,7 @@
                 @endif
                 <p class="eyebrow">A MOMENT FOR YOU</p>
                 <h1>心にある悩みを<br>聞かせてください</h1>
-                <p class="page-description">AIが禅の考え方を参考に、慈悲と智慧をもってあなたの悩みに向き合います。</p>
+                <p class="page-description">AIが禅の考え方を基にして、あなたの悩みに向き合います。</p>
 
                 @auth
                     @if (! $creditSummary['unlimited'] && $creditSummary['total'] === 0)

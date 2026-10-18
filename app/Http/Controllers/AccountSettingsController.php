@@ -3,12 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Notifications\AccountEmailChangeVerification;
 use App\Services\StripeBillingService;
+use Illuminate\Auth\Events\Verified;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -29,16 +33,55 @@ class AccountSettingsController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email:rfc', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
         ]);
-
-        if ($user->email !== $validated['email']) {
-            $user->email_verified_at = null;
-        }
 
         $user->fill($validated)->save();
 
-        return to_route('account.settings.edit')->with('status', 'アカウント情報を更新しました。');
+        return to_route('account.settings.edit')->with('status', 'お名前を更新しました。');
+    }
+
+    public function requestEmailChange(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        abort_unless($user instanceof User, 403);
+
+        $validated = $request->validate([
+            'email' => ['required', 'email:rfc', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+        ]);
+
+        if ($user->email === $validated['email']) {
+            return to_route('account.settings.edit')->with('status', 'このメールアドレスは現在登録されています。');
+        }
+
+        $verificationUrl = URL::temporarySignedRoute(
+            'account.email.verify',
+            now()->addMinutes(60),
+            ['user' => $user->id, 'email' => $validated['email']],
+        );
+
+        Notification::route('mail', $validated['email'])
+            ->notify(new AccountEmailChangeVerification($verificationUrl));
+
+        return to_route('account.settings.edit')->with('status', '確認用メールを送信しました。メール内のリンクを開くと変更が完了します。');
+    }
+
+    public function confirmEmailChange(Request $request, User $user): RedirectResponse
+    {
+        $authenticatedUser = $request->user();
+        abort_unless($authenticatedUser instanceof User && $authenticatedUser->is($user), 403);
+
+        $validated = $request->validate([
+            'email' => ['required', 'email:rfc', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+        ]);
+
+        $user->forceFill([
+            'email' => $validated['email'],
+            'email_verified_at' => now(),
+        ])->save();
+
+        event(new Verified($user));
+
+        return to_route('account.settings.edit')->with('status', 'メールアドレスを変更しました。');
     }
 
     public function destroy(Request $request, StripeBillingService $billingService): RedirectResponse

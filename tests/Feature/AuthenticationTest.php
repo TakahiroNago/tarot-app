@@ -479,13 +479,13 @@ test('password reset and email verification notifications are written in Japanes
         )
         ->and($verificationMail->actionText)->toBe(Lang::get('Verify Email Address'))
         ->and(config('app.name'))->toBe("\u{5FC3}の\u{5EB5} ZEN REFLECTIONS")
+        ->and((string) $passwordResetMail->render())->not->toContain('Hello!')
         ->and((string) $passwordResetMail->render())->toContain(
-            Lang::get('Hello!'),
             Lang::get('Regards,'),
             config('app.name'),
         )
+        ->and((string) $verificationMail->render())->not->toContain('Hello!')
         ->and((string) $verificationMail->render())->toContain(
-            Lang::get('Hello!'),
             Lang::get('Regards,'),
             config('app.name'),
         );

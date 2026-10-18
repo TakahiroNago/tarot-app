@@ -36,14 +36,21 @@
                         <input class="question-input" id="name" name="name" type="text" value="{{ old('name', $user->name) }}" autocomplete="name" required maxlength="255">
                         @error('name')<p class="form-error" role="alert">{{ $message }}</p>@enderror
 
+                        <button class="primary-action" type="submit">お名前を変更</button>
+                    </form>
+
+                    <form class="question-form" method="POST" action="{{ route('account.settings.email.update') }}">
+                        @csrf
+                        @method('PUT')
                         <label class="question-label" for="email">メールアドレス</label>
                         <input class="question-input" id="email" name="email" type="email" value="{{ old('email', $user->email) }}" autocomplete="email" required maxlength="255">
                         @error('email')<p class="form-error" role="alert">{{ $message }}</p>@enderror
+                        <p class="settings-note">入力したメールアドレスに確認メールを送信します。メール内のリンクを開くまで登録情報は変更されません。</p>
                         @if ($user->google_id !== null)
                             <p class="settings-note">Googleアカウントでログインしている場合、メールアドレスを変更してもGoogleログインには元の連携アカウントを使用します。</p>
                         @endif
 
-                        <button class="primary-action" type="submit">登録情報を保存</button>
+                        <button class="primary-action" type="submit">メールアドレスを変更</button>
                     </form>
                 </section>
 

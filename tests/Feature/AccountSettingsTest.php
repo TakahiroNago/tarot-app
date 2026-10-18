@@ -1,10 +1,14 @@
 <?php
 
 use App\Models\User;
+use App\Notifications\AccountEmailChangeVerification;
 use App\Services\StripeBillingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\URL;
 use Stripe\ApiRequestor;
 use Stripe\HttpClient\ClientInterface;
 use Stripe\HttpClient\CurlClient;
@@ -19,7 +23,7 @@ test('guests cannot access account settings', function () {
         ->assertRedirect(route('login'));
 });
 
-test('users can update their account name and email', function () {
+test('users can update their account name independently', function () {
     $user = User::factory()->create([
         'email_verified_at' => now(),
     ]);
@@ -28,19 +32,88 @@ test('users can update their account name and email', function () {
         ->get(route('account.settings.edit'))
         ->assertOk()
         ->assertSee('アカウントを削除する')
-        ->assertSee(route('account.settings.destroy'));
+        ->assertSee(route('account.settings.destroy'))
+        ->assertSee('名前を変更')
+        ->assertSee('メールアドレスを変更')
+        ->assertSee(route('account.settings.email.update'));
 
     $this->actingAs($user)
         ->put(route('account.settings.update'), [
             'name' => 'Updated Name',
-            'email' => 'updated@example.com',
         ])
         ->assertRedirect(route('account.settings.edit'))
         ->assertSessionHas('status');
 
     expect($user->fresh()->name)->toBe('Updated Name')
-        ->and($user->fresh()->email)->toBe('updated@example.com')
-        ->and($user->fresh()->email_verified_at)->toBeNull();
+        ->and($user->fresh()->email)->toBe($user->email)
+        ->and($user->fresh()->email_verified_at)->not->toBeNull();
+});
+
+test('email changes are not saved until the new address is confirmed', function () {
+    Notification::fake();
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+    $newEmail = 'updated@example.com';
+
+    $this->actingAs($user)
+        ->put(route('account.settings.email.update'), [
+            'email' => $newEmail,
+        ])
+        ->assertRedirect(route('account.settings.edit'))
+        ->assertSessionHas('status');
+
+    expect($user->fresh()->email)->toBe($user->email)
+        ->and($user->fresh()->name)->toBe($user->name)
+        ->and($user->fresh()->email_verified_at)->not->toBeNull();
+
+    Notification::assertSentOnDemand(AccountEmailChangeVerification::class, function ($notification, array $channels, $notifiable) use ($newEmail): bool {
+        parse_str((string) parse_url($notification->verificationUrl, PHP_URL_QUERY), $query);
+
+        return $channels === ['mail']
+            && $notifiable->routeNotificationFor('mail') === $newEmail
+            && ($query['email'] ?? null) === $newEmail
+            && URL::hasValidSignature(Request::create($notification->verificationUrl));
+    });
+});
+
+test('users can confirm their new email address using the signed link', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+    $newEmail = 'confirmed@example.com';
+    $verificationUrl = URL::temporarySignedRoute(
+        'account.email.verify',
+        now()->addMinutes(60),
+        ['user' => $user->id, 'email' => $newEmail],
+    );
+
+    $this->actingAs($user)
+        ->get($verificationUrl)
+        ->assertRedirect(route('account.settings.edit'))
+        ->assertSessionHas('status', 'メールアドレスを変更しました。');
+
+    expect($user->fresh()->email)->toBe($newEmail)
+        ->and($user->fresh()->email_verified_at)->not->toBeNull();
+});
+
+test('email confirmation does not save an address that has since been registered', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+    $existingUser = User::factory()->create(['email' => 'taken@example.com']);
+    $verificationUrl = URL::temporarySignedRoute(
+        'account.email.verify',
+        now()->addMinutes(60),
+        ['user' => $user->id, 'email' => $existingUser->email],
+    );
+
+    $this->actingAs($user)
+        ->get($verificationUrl)
+        ->assertSessionHasErrors('email');
+
+    expect($user->fresh()->email)->not->toBe($existingUser->email)
+        ->and($user->fresh()->email_verified_at)->not->toBeNull();
 });
 
 test('users can manage Stripe billing from account settings', function () {

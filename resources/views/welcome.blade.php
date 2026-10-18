@@ -19,7 +19,7 @@
                     @endif
                     <p class="eyebrow">今日のあなたへ</p>
                     <h1 class="welcome-title">迷いの中に<br>小さな一歩を</h1>
-                    <p class="welcome-description">悩みを聞かせてください。AIが禅の視点で、心を見つめることばをお届けします。</p>
+                    <p class="welcome-description">お悩みを聞かせてください。AIが禅の視点で、心を見つめることばをお届けします。</p>
                     <a class="primary-action" href="{{ route('zen') }}">
                         <span>AI禅師に相談する</span>
                         <span class="action-arrow" aria-hidden="true">→</span>
