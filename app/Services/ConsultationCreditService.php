@@ -66,7 +66,7 @@ class ConsultationCreditService
                 $limit = match ($lockedUser->plan) {
                     User::PLAN_LITE => 50,
                     User::PLAN_PREMIUM => 0,
-                    default => 3,
+                    default => 1,
                 };
                 $lockedUser->daily_credits = min($limit, $lockedUser->daily_credits + 1);
                 $lockedUser->save();
@@ -101,7 +101,7 @@ class ConsultationCreditService
             $maximumBalance = match ($plan) {
                 User::PLAN_LITE => 50,
                 User::PLAN_PREMIUM => 0,
-                default => 3,
+                default => 1,
             };
             $user->daily_credits = min(
                 $maximumBalance,
@@ -137,8 +137,8 @@ class ConsultationCreditService
             return;
         }
 
-        if ($plan === User::PLAN_FREE && $user->daily_credits > 3) {
-            $user->daily_credits = 3;
+        if ($plan === User::PLAN_FREE && $user->daily_credits > 1) {
+            $user->daily_credits = 1;
             $user->save();
         }
     }
@@ -148,7 +148,7 @@ class ConsultationCreditService
         return match ($plan ?? User::PLAN_FREE) {
             User::PLAN_LITE => 10,
             User::PLAN_PREMIUM => 0,
-            default => 3,
+            default => 1,
         };
     }
 }

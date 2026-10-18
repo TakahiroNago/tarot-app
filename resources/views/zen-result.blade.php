@@ -51,7 +51,7 @@
                     @elseif ($creditsRemaining === 0)
                         @if ($isGuest)
                             <a class="form-notice credit-notice credit-notice-link" href="{{ route('register') }}">
-                                無料体験を使い切りました。無料会員登録すると毎日3回相談できます。→ 会員登録はこちら
+                                無料体験を使い切りました。無料会員登録すると毎日1回相談できます。→ 会員登録はこちら
                             </a>
                         @else
                             <a class="form-notice credit-notice credit-notice-link" href="{{ route('plans') }}">

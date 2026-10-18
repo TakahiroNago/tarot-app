@@ -23,7 +23,7 @@ class StripeBillingService
             'credits_10' => ['price_id' => config('services.stripe.prices.credits_10'), 'amount' => 100, 'credits' => 10],
             'credits_50' => ['price_id' => config('services.stripe.prices.credits_50'), 'amount' => 400, 'credits' => 50],
             'credits_100' => ['price_id' => config('services.stripe.prices.credits_100'), 'amount' => 500, 'credits' => 100],
-            'lite' => ['price_id' => config('services.stripe.prices.lite'), 'amount' => 180, 'plan' => User::PLAN_LITE],
+            'lite' => ['price_id' => config('services.stripe.prices.lite'), 'amount' => 220, 'plan' => User::PLAN_LITE],
             'premium' => ['price_id' => config('services.stripe.prices.premium'), 'amount' => 580, 'plan' => User::PLAN_PREMIUM],
         ];
     }

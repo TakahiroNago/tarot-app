@@ -37,10 +37,10 @@
                 @else
                     @if ($guestCredits === 0)
                         <a class="form-notice credit-notice credit-notice-link" href="{{ route('register') }}" role="alert">
-                            無料体験を使い切りました。無料会員登録すると毎日3回相談できます。→ 会員登録はこちら
+                            無料体験を使い切りました。無料会員登録すると毎日1回相談できます。→ 会員登録はこちら
                         </a>
                     @else
-                        <p class="credit-summary">無料体験の残り {{ $guestCredits }}回（全3回）</p>
+                        <p class="credit-summary">無料体験の残り {{ $guestCredits }}回</p>
                         @if (session('credit_exhausted'))
                             <a class="form-notice credit-notice credit-notice-link" href="{{ route('register') }}" role="alert">
                                 {{ session('credit_exhausted') }} 会員登録はこちら

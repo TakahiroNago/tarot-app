@@ -7,7 +7,7 @@ use RuntimeException;
 
 class GuestTrialCreditService
 {
-    private const CREDIT_LIMIT = 3;
+    private const CREDIT_LIMIT = 1;
 
     public function remaining(string $deviceToken): int
     {

@@ -15,14 +15,15 @@ test('the plans page explains free membership and does not offer credit purchase
     $response = $this->get(route('plans'));
 
     $response->assertOk()
-        ->assertSee('1日3回（回数引継ぎなし）')
-        ->assertSee('50件までの相談の記録')
+        ->assertSee('1日1回（回数引継ぎなし）')
+        ->assertSee('未ログインでの無料体験は1回まで')
+        ->assertSee('過去3か月（最大50件）までの相談の記録')
         ->assertDontSee('10回分を購入')
         ->assertDontSee('50回分を購入')
         ->assertDontSee('100回分を購入')
         ->assertSee('1日10回（最大50回まで引継ぎ）')
         ->assertSee('相談回数無制限')
-        ->assertSee('180円/')
+        ->assertSee('220円/')
         ->assertSee('580円/');
 });
 
@@ -50,9 +51,9 @@ test('signed-in users cannot purchase credits from the plans page', function () 
         ->assertDontSee('100回分を購入');
 });
 
-test('guests can use three trial readings and are prompted to register afterwards', function () {
+test('guests can use one trial reading and are prompted to register afterwards', function () {
     $responses = [];
-    foreach (['First result.', 'Second result.', 'Third result.', 'New device result.'] as $interpretation) {
+    foreach (['First result.', 'New device result.'] as $interpretation) {
         $responses[] = CreateResponse::fake(['choices' => [['message' => ['content' => $interpretation]]]]);
         $responses[] = CreateResponse::fake(['choices' => [['message' => ['content' => '{"topic":"その他","summary":"テスト要約"}']]]]);
     }
@@ -63,26 +64,19 @@ test('guests can use three trial readings and are prompted to register afterward
     $zenPage->assertOk()->assertCookie('guest_trial_device');
     $firstDevice = $zenPage->getCookie('guest_trial_device')->getValue();
 
-    foreach (['One?', 'Two?', 'Three?'] as $question) {
-        $response = $this->withServerVariables(['REMOTE_ADDR' => '192.0.2.10'])
-            ->withCookie('guest_trial_device', $firstDevice)
-            ->post(route('zen.respond'), ['concern' => $question]);
+    $this->withServerVariables(['REMOTE_ADDR' => '192.0.2.10'])
+        ->withCookie('guest_trial_device', $firstDevice)
+        ->post(route('zen.respond'), ['concern' => 'One?'])
+        ->assertOk()
+        ->assertSee('無料体験を使い切りました。無料会員登録すると毎日1回相談できます。→ 会員登録はこちら');
 
-        $response->assertOk();
-        if ($question === 'Three?') {
-            $response->assertSee('<a class="form-notice credit-notice credit-notice-link" href="'.route('register').'">', false)
-                ->assertSee('無料体験を使い切りました。無料会員登録すると毎日3回相談できます。→ 会員登録はこちら');
-        }
-    }
-
-    $this->assertDatabaseHas('guest_trial_credits', ['used_credits' => 3]);
-    $this->assertDatabaseMissing('guest_trial_credits', ['device_hash' => $firstDevice]);
+    $this->assertDatabaseHas('guest_trial_credits', ['used_credits' => 1]);
     $this->assertDatabaseCount('guest_trial_credits', 1);
 
     $this->flushSession();
     $this->withServerVariables(['REMOTE_ADDR' => '192.0.2.11'])
         ->withCookie('guest_trial_device', $firstDevice)
-        ->post(route('zen.respond'), ['concern' => 'Same device from a new IP?'])
+        ->post(route('zen.respond'), ['concern' => 'Second reading from the same device?'])
         ->assertRedirect(route('zen'))
         ->assertSessionHas('credit_exhausted');
 
@@ -100,22 +94,22 @@ test('guests can use three trial readings and are prompted to register afterward
 test('guests with no trial credits see a full-width registration link and cannot draw a card', function () {
     $deviceToken = str_repeat('c', 64);
     $guestCredits = app(GuestTrialCreditService::class);
-    foreach (range(1, 3) as $unused) {
-        $guestCredits->consume($deviceToken);
-    }
+    expect($guestCredits->consume($deviceToken))->toBeTrue()
+        ->and($guestCredits->remaining($deviceToken))->toBe(0);
 
     $this->withCookie('guest_trial_device', $deviceToken)
         ->get(route('zen'))
         ->assertOk()
         ->assertSee('href="'.route('register').'"', false)
         ->assertSee('class="primary-action" type="submit" disabled', false)
-        ->assertSee('無料体験を使い切りました。無料会員登録すると毎日3回相談できます。→ 会員登録はこちら');
+        ->assertSee('無料体験を使い切りました。無料会員登録すると毎日1回相談できます。→ 会員登録はこちら');
 });
 
-test('free members receive three readings per day without carrying unused credits forward', function () {
+test('free members receive one reading per day without carrying unused credits forward', function () {
     $user = User::factory()->create();
     $user->forceFill([
-        'daily_credits' => 1,
+        'daily_credits_plan' => User::PLAN_FREE,
+        'daily_credits' => 3,
         'daily_credits_refreshed_at' => now()->subDay()->toDateString(),
         'purchased_credits' => 0,
     ])->save();
@@ -123,21 +117,33 @@ test('free members receive three readings per day without carrying unused credit
     $this->actingAs($user)->get(route('zen'))
         ->assertOk()
         ->assertSee('class="credit-balance-link"', false)
-        ->assertSee('<strong>3</strong> 回', false)
+        ->assertSee('<strong>1</strong> 回', false)
         ->assertSee(route('plans'))
         ->assertDontSee('今日の残り')
         ->assertDontSee('購入クレジット');
-    expect($user->fresh()->daily_credits)->toBe(3);
+    expect($user->fresh()->daily_credits)->toBe(1);
 });
 
-test('only premium members do not see the plans link on the Zen page', function () {
-    $plansLink = '<a class="text-link" href="'.route('plans').'">料金・プランを見る</a>';
+test('free member balances are capped at one reading for the current day', function () {
+    $user = User::factory()->create();
+    $user->forceFill([
+        'daily_credits_plan' => User::PLAN_FREE,
+        'daily_credits' => 3,
+        'daily_credits_refreshed_at' => now()->toDateString(),
+    ])->save();
+
+    expect(app(ConsultationCreditService::class)->balance($user)['daily'])->toBe(1)
+        ->and($user->fresh()->daily_credits)->toBe(1);
+});
+
+test('premium members retain unlimited readings without an exhausted-credit notice', function () {
     $freeMember = User::factory()->create();
 
     $this->actingAs($freeMember)
         ->get(route('zen'))
         ->assertOk()
-        ->assertSee($plansLink, false);
+        ->assertSee('class="credit-balance-link"', false)
+        ->assertSee('href="'.route('plans').'"', false);
 
     $premiumMember = User::factory()->create();
     $premiumMember->forceFill(['plan' => User::PLAN_PREMIUM])->save();
@@ -146,13 +152,13 @@ test('only premium members do not see the plans link on the Zen page', function 
         ->get(route('zen'))
         ->assertOk()
         ->assertSee('<strong>無制限</strong>', false)
-        ->assertDontSee($plansLink, false);
+        ->assertDontSee('本日利用可能なクレジットを使い切りました。');
 });
 
 test('legacy users with a null plan are treated as free members', function () {
     $dailyCreditLimit = new ReflectionMethod(ConsultationCreditService::class, 'dailyCreditLimit');
 
-    expect($dailyCreditLimit->invoke(app(ConsultationCreditService::class), null))->toBe(3);
+    expect($dailyCreditLimit->invoke(app(ConsultationCreditService::class), null))->toBe(1);
 });
 
 test('purchased credits remain separate and can be spent after daily credits run out', function () {

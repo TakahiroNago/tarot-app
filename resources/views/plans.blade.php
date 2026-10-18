@@ -37,7 +37,7 @@
                         <h2>プレミアムプラン</h2>
                         <p>・相談回数無制限</p>
                         <p>・すべての相談の記録</p>
-                        <p>・過去の相談を踏まえた、継続的な応答</p>
+                        <p>・過去の相談を踏まえた回答</p>
                         <p class="plan-price"><strong>580円/<span class="plan-price-period">月</span></strong></p>
                         @if (auth()->check() && auth()->user()->stripe_subscription_id === null && auth()->user()->plan === \App\Models\User::PLAN_FREE && config('services.stripe.secret') && config('services.stripe.prices.premium'))
                             <form method="POST" action="{{ route('billing.checkout') }}">
@@ -56,7 +56,7 @@
                         <h2>ライトプラン</h2>
                         <p>・1日10回（最大50回まで引継ぎ）</p>
                         <p>・過去3か月の相談の記録</p>
-                        <p class="plan-price"><strong>180円/<span class="plan-price-period">月</span></strong></p>
+                        <p class="plan-price"><strong>220円/<span class="plan-price-period">月</span></strong></p>
                         @if (auth()->check() && auth()->user()->stripe_subscription_id === null && auth()->user()->plan === \App\Models\User::PLAN_FREE && config('services.stripe.secret') && config('services.stripe.prices.lite'))
                             <form method="POST" action="{{ route('billing.checkout') }}">
                                 @csrf
@@ -71,8 +71,9 @@
                     </section>
                     <section class="plan-card">
                         <h2>無料会員</h2>
-                        <p>・1日3回（回数引継ぎなし）</p>
-                        <p>・50件までの相談の記録</p>
+                        <p>・1日1回（回数引継ぎなし）</p>
+                        <p>・過去3か月（最大50件）までの相談の記録</p>
+                        <p>・未ログインでの無料体験は1回まで</p>
                         @if (auth()->guest())
                             <p><a class="primary-action" href="{{ route('register') }}">→ 新規登録</a></p>
                         @endif

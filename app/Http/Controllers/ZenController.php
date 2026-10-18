@@ -130,7 +130,7 @@ class ZenController extends Controller
             }
 
             if (! $guestTrialCreditService->consume($guestDeviceToken)) {
-                return redirect()->route('zen')->with('credit_exhausted', '無料体験を使い切りました。会員登録すると毎日3回相談できます。');
+                return redirect()->route('zen')->with('credit_exhausted', '無料体験を使い切りました。会員登録すると毎日1回相談できます。');
             }
         }
 
