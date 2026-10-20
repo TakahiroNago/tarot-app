@@ -1,6 +1,7 @@
 <footer class="site-footer">
     <span>YOUR MOMENT, YOUR MEANING</span>
-    <nav class="site-footer-links" aria-label="{{ __('法的情報') }}">
+    <nav class="site-footer-links" aria-label="{{ __('サイト情報') }}">
+        <a href="{{ route('about') }}">{{ __('心の庵について') }}</a>
         <a href="{{ route('legal.terms') }}">{{ __('利用規約') }}</a>
         <a href="{{ route('legal.privacy') }}">{{ __('プライバシーポリシー') }}</a>
         <a href="{{ route('contact.create') }}">{{ __('お問い合わせ') }}</a>

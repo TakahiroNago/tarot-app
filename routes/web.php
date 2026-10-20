@@ -54,6 +54,7 @@ Route::prefix('{locale}')
             ->name('consultations.share');
 
         Route::view('/plans', 'plans')->name('plans');
+        Route::view('/about', 'about')->name('about');
 
         Route::view('/terms', 'legal.terms')->name('legal.terms');
         Route::view('/privacy', 'legal.privacy')->name('legal.privacy');
