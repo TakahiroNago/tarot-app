@@ -9,7 +9,6 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -117,9 +116,8 @@ class UserController extends Controller
         });
 
         if ($accountWasChanged && is_string($notificationEmail)) {
-            Notification::route('mail', $notificationEmail)
-                ->notify((new AccountActivityNotification('管理者によるアカウント情報の変更', $ipAddress))
-                    ->locale($user->preferredLocale()));
+            (new AccountActivityNotification('管理者によるアカウント情報の変更', $ipAddress))
+                ->sendToEmail($user, $notificationEmail);
         }
 
         return redirect()->route('admin.users.show', $user)->with('status', __('ユーザー情報を更新しました。'));
@@ -163,9 +161,8 @@ class UserController extends Controller
         });
 
         if ($accountWasSuspended && is_string($notificationEmail)) {
-            Notification::route('mail', $notificationEmail)
-                ->notify((new AccountActivityNotification('アカウントの利用停止', $ipAddress))
-                    ->locale($user->preferredLocale()));
+            (new AccountActivityNotification('アカウントの利用停止', $ipAddress))
+                ->sendToEmail($user, $notificationEmail);
         }
 
         return back()->with('status', __('ユーザーを利用停止にしました。'));

@@ -65,6 +65,72 @@ test('users can update their account name independently', function () {
         ->and($user->fresh()->email_verified_at)->not->toBeNull();
 });
 
+test('users can control security notifications globally and by activity type', function () {
+    Notification::fake();
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ])->fresh();
+
+    expect($user->security_notifications_enabled)->toBeTrue()
+        ->and($user->security_notification_types)->toBeNull()
+        ->and($user->receivesSecurityNotification('login'))->toBeTrue()
+        ->and($user->receivesSecurityNotification('name_changed'))->toBeTrue();
+
+    $this->actingAs($user)
+        ->get(route('account.settings.edit'))
+        ->assertOk()
+        ->assertSee('セキュリティ通知')
+        ->assertSee('name="enabled"', false)
+        ->assertSee('name="types[]"', false)
+        ->assertDontSee('<fieldset disabled', false);
+
+    $this->actingAs($user)
+        ->put(route('account.settings.security-notifications.update'), [
+            'enabled' => '1',
+            'types' => ['login'],
+        ])
+        ->assertRedirect(route('account.settings.edit'))
+        ->assertSessionHas('status', 'セキュリティ通知の設定を更新しました。');
+
+    $user = $user->fresh();
+    expect($user->receivesSecurityNotification('login'))->toBeTrue()
+        ->and($user->receivesSecurityNotification('name_changed'))->toBeFalse();
+
+    expect((new AccountActivityNotification('ログイン', null))->via($user))->toBe(['mail'])
+        ->and((new AccountActivityNotification('お名前の変更', null))->via($user))->toBe([]);
+
+    (new AccountActivityNotification('お名前の変更', null))->sendToEmail($user, $user->email);
+    Notification::assertNothingSent();
+
+    (new AccountActivityNotification('ログイン', null))->sendToEmail($user, $user->email);
+    Notification::assertSentOnDemand(AccountActivityNotification::class, function (
+        AccountActivityNotification $notification,
+        array $channels,
+        $notifiable,
+    ) use ($user): bool {
+        return $notification->activity === 'ログイン'
+            && $channels === ['mail']
+            && $notifiable->routeNotificationFor('mail') === $user->email;
+    });
+
+    $this->actingAs($user)
+        ->put(route('account.settings.security-notifications.update'), [
+        ])
+        ->assertRedirect(route('account.settings.edit'));
+
+    $user = $user->fresh();
+    expect($user->security_notifications_enabled)->toBeFalse()
+        ->and($user->security_notification_types)->toBe(['login'])
+        ->and($user->receivesSecurityNotification('login'))->toBeFalse();
+
+    $this->actingAs($user)
+        ->get(route('account.settings.edit'))
+        ->assertOk()
+        ->assertSee('<fieldset data-security-notification-types disabled>', false)
+        ->assertSee('data-security-notifications-enabled', false)
+        ->assertSee('securityNotificationTypes.disabled = !securityNotificationsToggle.checked;', false);
+});
+
 test('email changes are not saved until the new address is confirmed', function () {
     Notification::fake();
     $user = User::factory()->create([

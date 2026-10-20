@@ -125,6 +125,7 @@ Route::prefix('{locale}')
         Route::middleware(['auth', 'active', 'verified'])->prefix('account')->name('account.')->group(function () {
             Route::get('/settings', [AccountSettingsController::class, 'edit'])->name('settings.edit');
             Route::put('/settings', [AccountSettingsController::class, 'update'])->name('settings.update');
+            Route::put('/settings/security-notifications', [AccountSettingsController::class, 'updateSecurityNotifications'])->name('settings.security-notifications.update');
             Route::put('/settings/email', [AccountSettingsController::class, 'requestEmailChange'])->name('settings.email.update');
             Route::delete('/settings', [AccountSettingsController::class, 'destroy'])->name('settings.destroy');
         });

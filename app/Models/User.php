@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Notifications\AccountActivityNotification;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Contracts\Translation\HasLocalePreference;
@@ -45,6 +46,8 @@ class User extends Authenticatable implements HasLocalePreference, MustVerifyEma
         return [
             'email_verified_at' => 'datetime',
             'is_active' => 'boolean',
+            'security_notifications_enabled' => 'boolean',
+            'security_notification_types' => 'array',
             'daily_credits_refreshed_at' => 'date',
             'stripe_current_period_end' => 'datetime',
             'stripe_subscription_event_created_at' => 'datetime',
@@ -64,6 +67,19 @@ class User extends Authenticatable implements HasLocalePreference, MustVerifyEma
         return in_array($this->preferred_locale, ['en', 'ja'], true)
             ? $this->preferred_locale
             : 'en';
+    }
+
+    public function receivesSecurityNotification(string $type): bool
+    {
+        if ($this->security_notifications_enabled === false) {
+            return false;
+        }
+
+        $enabledTypes = $this->security_notification_types ?? array_keys(
+            AccountActivityNotification::activityTypes(),
+        );
+
+        return in_array($type, $enabledTypes, true);
     }
 
     /** @return HasMany<ZenConsultation, $this> */

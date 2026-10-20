@@ -55,6 +55,36 @@
                 </section>
 
                 <section class="account-settings-section">
+                    <h2>{{ __('セキュリティ通知') }}</h2>
+                    <p class="settings-note">{{ __('アカウントに関するセキュリティ通知をメールで受け取るか、通知の種類ごとに設定できます。') }}</p>
+                    <form class="question-form" method="POST" action="{{ route('account.settings.security-notifications.update') }}">
+                        @csrf
+                        @method('PUT')
+                        @php($selectedNotificationTypes = (array) old('types', $user->security_notification_types ?? array_keys($notificationTypes)))
+                        @php($securityNotificationsEnabled = old('enabled', $user->security_notifications_enabled ?? true))
+                        <label class="remember-option">
+                            <input name="enabled" type="checkbox" value="1" data-security-notifications-enabled @checked($securityNotificationsEnabled)>
+                            {{ __('セキュリティ通知を受け取る') }}
+                        </label>
+                        @error('enabled')<p class="form-error" role="alert">{{ __($message) }}</p>@enderror
+
+                        <fieldset data-security-notification-types @disabled(! $securityNotificationsEnabled)>
+                            <legend class="question-label">{{ __('通知の種類') }}</legend>
+                            @foreach ($notificationTypes as $type => $label)
+                                <label class="remember-option">
+                                    <input name="types[]" type="checkbox" value="{{ $type }}" @checked(in_array($type, $selectedNotificationTypes, true))>
+                                    {{ __($label) }}
+                                </label>
+                            @endforeach
+                        </fieldset>
+                        @error('types')<p class="form-error" role="alert">{{ __($message) }}</p>@enderror
+                        @error('types.*')<p class="form-error" role="alert">{{ __($message) }}</p>@enderror
+
+                        <button class="primary-action" type="submit">{{ __('通知設定を保存') }}</button>
+                    </form>
+                </section>
+
+                <section class="account-settings-section">
                     <h2>{{ __('契約・お支払い') }}</h2>
                     <p class="form-notice" role="status">
                         {{ __('現在のプラン') }}{{ app()->isLocale('ja') ? '：' : ': ' }}{{ $user->plan === \App\Models\User::PLAN_PREMIUM ? __('プレミアム') : ($user->plan === \App\Models\User::PLAN_LITE ? __('ライト') : __('無料')) }}
@@ -121,5 +151,13 @@
         </main>
         @include('partials.site-footer')
     </div>
+    <script>
+        const securityNotificationsToggle = document.querySelector('[data-security-notifications-enabled]');
+        const securityNotificationTypes = document.querySelector('[data-security-notification-types]');
+
+        securityNotificationsToggle.addEventListener('change', () => {
+            securityNotificationTypes.disabled = !securityNotificationsToggle.checked;
+        });
+    </script>
 </body>
 </html>

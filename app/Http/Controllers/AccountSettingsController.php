@@ -24,8 +24,9 @@ class AccountSettingsController extends Controller
     {
         $user = $request->user();
         abort_unless($user instanceof User, 403);
+        $notificationTypes = AccountActivityNotification::activityTypes();
 
-        return view('account.settings', compact('user'));
+        return view('account.settings', compact('notificationTypes', 'user'));
     }
 
     public function update(Request $request): RedirectResponse
@@ -43,6 +44,30 @@ class AccountSettingsController extends Controller
         }
 
         return to_route('account.settings.edit')->with('status', __('お名前を更新しました。'));
+    }
+
+    public function updateSecurityNotifications(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        abort_unless($user instanceof User, 403);
+
+        $validated = $request->validate([
+            'enabled' => ['sometimes', 'boolean'],
+            'types' => ['sometimes', 'array'],
+            'types.*' => ['string', Rule::in(array_keys(AccountActivityNotification::activityTypes()))],
+        ]);
+
+        $notificationPreferences = [
+            'security_notifications_enabled' => $request->boolean('enabled'),
+        ];
+
+        if ($request->boolean('enabled')) {
+            $notificationPreferences['security_notification_types'] = $validated['types'] ?? [];
+        }
+
+        $user->forceFill($notificationPreferences)->save();
+
+        return to_route('account.settings.edit')->with('status', __('セキュリティ通知の設定を更新しました。'));
     }
 
     public function requestEmailChange(Request $request): RedirectResponse
@@ -86,8 +111,8 @@ class AccountSettingsController extends Controller
         ])->save();
 
         event(new Verified($user));
-        Notification::route('mail', $oldEmail)
-            ->notify(new AccountActivityNotification('メールアドレスの変更', $request->ip()));
+        (new AccountActivityNotification('メールアドレスの変更', $request->ip()))
+            ->sendToEmail($user, $oldEmail);
 
         return to_route('account.settings.edit')->with('status', __('メールアドレスを変更しました。'));
     }
@@ -139,8 +164,8 @@ class AccountSettingsController extends Controller
         Auth::guard('web')->logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
-        Notification::route('mail', $email)
-            ->notify(new AccountActivityNotification('アカウントの削除', $ipAddress));
+        (new AccountActivityNotification('アカウントの削除', $ipAddress))
+            ->sendToEmail($user, $email);
 
         return to_route('login')->with('status', __('アカウントを削除しました。ご利用ありがとうございました。'));
     }
