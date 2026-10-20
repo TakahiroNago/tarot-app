@@ -52,7 +52,11 @@ test('a user can delete a consultation and its share link', function () {
     $user = User::factory()->create();
     $consultation = savedConsultation($user);
 
-    $page = $this->actingAs($user)->get(route('consultations.show', $consultation->id))->assertOk();
+    $page = $this->actingAs($user)
+        ->get(route('consultations.show', $consultation->id))
+        ->assertOk()
+        ->assertSee('onsubmit="return confirm(this.dataset.confirm)"', false)
+        ->assertSee('data-confirm="この相談の記録を削除しますか？公開用URLも無効になります。"', false);
     $shareUrl = $page->viewData('shareUrl');
     $this->get($shareUrl)->assertOk();
 
@@ -79,6 +83,12 @@ test('a user can delete all of their consultations only', function () {
     savedConsultation($user);
     savedConsultation($user);
     $other = savedConsultation(User::factory()->create());
+
+    $this->actingAs($user)
+        ->get(route('consultations.index'))
+        ->assertOk()
+        ->assertSee('onsubmit="return confirm(this.dataset.confirm)"', false)
+        ->assertSee('data-confirm="すべての相談の記録を削除しますか？公開用URLも無効になり、元に戻せません。"', false);
 
     $this->actingAs($user)
         ->delete(route('consultations.destroy-all'))

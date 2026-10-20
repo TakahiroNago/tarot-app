@@ -78,7 +78,7 @@
                 @endif
 
                 @if ($sessionConsultations->isNotEmpty() || $databaseConsultations?->isNotEmpty())
-                    <form method="POST" action="{{ route('consultations.destroy-all') }}" onsubmit="return confirm(@json(__('すべての相談の記録を削除しますか？公開用URLも無効になり、元に戻せません。')))">
+                    <form method="POST" action="{{ route('consultations.destroy-all') }}" onsubmit="return confirm(this.dataset.confirm)" data-confirm="{{ __('すべての相談の記録を削除しますか？公開用URLも無効になり、元に戻せません。') }}">
                         @csrf
                         @method('DELETE')
                         <button class="text-link" type="submit">{{ __('すべての記録を削除する') }}</button>

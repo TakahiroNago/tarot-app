@@ -43,7 +43,7 @@
                         <p class="consultation-share-status" role="status" aria-live="polite" data-consultation-share-status></p>
                     </section>
                     <div class="history-actions">
-                        <form method="POST" action="{{ route('consultations.destroy', $consultationId) }}" onsubmit="return confirm(@json(__('この相談の記録を削除しますか？公開用URLも無効になります。')))">
+                        <form method="POST" action="{{ route('consultations.destroy', $consultationId) }}" onsubmit="return confirm(this.dataset.confirm)" data-confirm="{{ __('この相談の記録を削除しますか？公開用URLも無効になります。') }}">
                             @csrf
                             @method('DELETE')
                             <button class="text-link" type="submit">{{ __('この記録を削除する') }}</button>
