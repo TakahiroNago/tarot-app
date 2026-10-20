@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Notifications\AccountActivityNotification;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -60,7 +62,17 @@ class UserController extends Controller
             'role' => ['required', Rule::in([User::ROLE_USER, User::ROLE_ADMIN])],
         ]);
 
-        DB::transaction(function () use ($administrator, $user, $validated): void {
+        $notificationEmail = null;
+        $accountWasChanged = false;
+        $ipAddress = $request->ip();
+
+        DB::transaction(function () use (
+            $administrator,
+            $user,
+            $validated,
+            &$notificationEmail,
+            &$accountWasChanged,
+        ): void {
             $activeAdmins = User::query()
                 ->where('role', User::ROLE_ADMIN)
                 ->where('is_active', true)
@@ -86,6 +98,13 @@ class UserController extends Controller
                 ]);
             }
 
+            $accountWasChanged = $managedUser->name !== $validated['name']
+                || $managedUser->email !== $validated['email']
+                || $managedUser->role !== $validated['role'];
+            if ($accountWasChanged) {
+                $notificationEmail = $managedUser->email;
+            }
+
             if ($managedUser->email !== $validated['email']) {
                 $managedUser->email_verified_at = null;
             }
@@ -96,6 +115,11 @@ class UserController extends Controller
                 'role' => $validated['role'],
             ])->save();
         });
+
+        if ($accountWasChanged && is_string($notificationEmail)) {
+            Notification::route('mail', $notificationEmail)
+                ->notify(new AccountActivityNotification('管理者によるアカウント情報の変更', $ipAddress));
+        }
 
         return redirect()->route('admin.users.show', $user)->with('status', 'ユーザー情報を更新しました。');
     }
@@ -108,7 +132,10 @@ class UserController extends Controller
             return back()->withErrors(['user' => '自分自身を停止することはできません。']);
         }
 
-        DB::transaction(function () use ($user): void {
+        $notificationEmail = null;
+        $accountWasSuspended = false;
+        $ipAddress = $request->ip();
+        DB::transaction(function () use ($user, &$notificationEmail, &$accountWasSuspended): void {
             $activeAdmins = User::query()
                 ->where('role', User::ROLE_ADMIN)
                 ->where('is_active', true)
@@ -127,8 +154,17 @@ class UserController extends Controller
                 ]);
             }
 
+            $accountWasSuspended = $managedUser->is_active;
+            if ($accountWasSuspended) {
+                $notificationEmail = $managedUser->email;
+            }
             $managedUser->forceFill(['is_active' => false])->save();
         });
+
+        if ($accountWasSuspended && is_string($notificationEmail)) {
+            Notification::route('mail', $notificationEmail)
+                ->notify(new AccountActivityNotification('アカウントの利用停止', $ipAddress));
+        }
 
         return back()->with('status', 'ユーザーを利用停止にしました。');
     }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Notifications\AccountActivityNotification;
 use App\Notifications\AccountEmailChangeVerification;
 use App\Services\StripeBillingService;
 use Illuminate\Auth\Events\Verified;
@@ -35,7 +36,10 @@ class AccountSettingsController extends Controller
             'name' => ['required', 'string', 'max:255'],
         ]);
 
-        $user->fill($validated)->save();
+        if ($user->name !== $validated['name']) {
+            $user->fill($validated)->save();
+            $user->notify(new AccountActivityNotification('お名前の変更', $request->ip()));
+        }
 
         return to_route('account.settings.edit')->with('status', 'お名前を更新しました。');
     }
@@ -74,12 +78,15 @@ class AccountSettingsController extends Controller
             'email' => ['required', 'email:rfc', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
         ]);
 
+        $oldEmail = $user->email;
         $user->forceFill([
             'email' => $validated['email'],
             'email_verified_at' => now(),
         ])->save();
 
         event(new Verified($user));
+        Notification::route('mail', $oldEmail)
+            ->notify(new AccountActivityNotification('メールアドレスの変更', $request->ip()));
 
         return to_route('account.settings.edit')->with('status', 'メールアドレスを変更しました。');
     }
@@ -92,6 +99,8 @@ class AccountSettingsController extends Controller
 
         $user = $request->user();
         abort_unless($user instanceof User, 403);
+        $email = $user->email;
+        $ipAddress = $request->ip();
 
         DB::transaction(function () use ($billingService, $user): void {
             $activeAdmins = User::query()
@@ -123,6 +132,8 @@ class AccountSettingsController extends Controller
         Auth::guard('web')->logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
+        Notification::route('mail', $email)
+            ->notify(new AccountActivityNotification('アカウントの削除', $ipAddress));
 
         return to_route('login')->with('status', 'アカウントを削除しました。ご利用ありがとうございました。');
     }

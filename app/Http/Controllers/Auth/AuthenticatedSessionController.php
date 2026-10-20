@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Notifications\AccountActivityNotification;
 use App\Services\SessionConsultationPersister;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -37,6 +38,7 @@ class AuthenticatedSessionController extends Controller
         $request->session()->regenerate();
         $user = $request->user();
         abort_unless($user instanceof User, 403);
+        $user->notify(new AccountActivityNotification('ログイン', $request->ip()));
 
         if (! $user->hasVerifiedEmail()) {
             return redirect()->route('verification.notice');

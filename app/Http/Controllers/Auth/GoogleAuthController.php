@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Notifications\AccountActivityNotification;
 use App\Services\SessionConsultationPersister;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
@@ -68,10 +69,12 @@ class GoogleAuthController extends Controller
         } elseif ($user->google_id === null) {
             $user->google_id = $googleId;
             $user->save();
+            $user->notify(new AccountActivityNotification('Googleアカウントの連携', $request->ip()));
         }
 
         Auth::login($user);
         $request->session()->regenerate();
+        $user->notify(new AccountActivityNotification('Googleログイン', $request->ip()));
         $sessionConsultationPersister->persist($user, $request);
 
         return redirect()->intended(route('home'));

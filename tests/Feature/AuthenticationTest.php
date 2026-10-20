@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Notifications\AccountActivityNotification;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -167,6 +168,36 @@ test('a registered user can log in', function () {
     $this->assertAuthenticatedAs($user);
 });
 
+test('successful password logins send a security notification', function () {
+    Notification::fake();
+    $user = User::factory()->create([
+        'email' => 'login-notice@example.com',
+        'password' => Hash::make('A-strong-password-2026'),
+    ]);
+
+    $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'A-strong-password-2026',
+    ])->assertRedirect(route('home'));
+
+    Notification::assertSentTo($user, AccountActivityNotification::class, function (
+        AccountActivityNotification $notification,
+        array $channels,
+    ): bool {
+        return $notification->activity === 'ログイン'
+            && $notification->ipAddress === '127.0.0.1'
+            && $channels === ['mail'];
+    });
+
+    $this->post(route('logout'))->assertRedirect(route('home'));
+    $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'incorrect-password',
+    ])->assertSessionHasErrors('email');
+
+    expect(Notification::sent($user, AccountActivityNotification::class))->toHaveCount(1);
+});
+
 test('a guest who starts login from the plans page returns to the plans page', function () {
     $user = User::factory()->create([
         'email' => 'plans-reader@example.com',
@@ -287,6 +318,7 @@ test('a guest can start Google login', function () {
 });
 
 test('Google login creates and authenticates a verified Google account', function () {
+    Notification::fake();
     $provider = Mockery::mock(Provider::class);
     $provider->shouldReceive('user')->once()->andReturn(GoogleUser::fake([
         'id' => 'google-user-123',
@@ -314,6 +346,11 @@ test('Google login creates and authenticates a verified Google account', functio
         'is_active' => true,
     ]);
     expect($user->email_verified_at)->not->toBeNull();
+    Notification::assertSentTo($user, AccountActivityNotification::class, function (
+        AccountActivityNotification $notification,
+    ): bool {
+        return $notification->activity === 'Googleログイン';
+    });
     $this->assertDatabaseHas('zen_consultations', [
         'user_id' => $user->id,
         'concern' => 'Before Google login?',
@@ -322,6 +359,7 @@ test('Google login creates and authenticates a verified Google account', functio
 });
 
 test('Google login links a verified existing email to its account', function () {
+    Notification::fake();
     $user = User::factory()->create([
         'email' => 'existing-reader@example.com',
         'google_id' => null,
@@ -342,6 +380,11 @@ test('Google login links a verified existing email to its account', function () 
         'id' => $user->id,
         'google_id' => 'google-existing-123',
     ]);
+
+    expect(Notification::sent($user, AccountActivityNotification::class)
+        ->pluck('activity')
+        ->all())
+        ->toBe(['Googleアカウントの連携', 'Googleログイン']);
 });
 
 test('Google login rejects an unverified email', function () {
@@ -452,6 +495,11 @@ test('a user can reset their password from the email notification', function () 
     ])->assertRedirect(route('login'));
 
     expect(Hash::check('A-new-strong-password-2026', $user->fresh()->password))->toBeTrue();
+    Notification::assertSentTo($user, AccountActivityNotification::class, function (
+        AccountActivityNotification $activityNotification,
+    ): bool {
+        return $activityNotification->activity === 'パスワードの再設定';
+    });
 });
 
 test('password reset and email verification notifications are written in Japanese', function () {

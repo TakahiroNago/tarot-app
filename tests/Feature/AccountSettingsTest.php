@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Notifications\AccountActivityNotification;
 use App\Notifications\AccountEmailChangeVerification;
 use App\Services\StripeBillingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -24,6 +25,7 @@ test('guests cannot access account settings', function () {
 });
 
 test('users can update their account name independently', function () {
+    Notification::fake();
     $user = User::factory()->create([
         'email_verified_at' => now(),
     ]);
@@ -43,6 +45,20 @@ test('users can update their account name independently', function () {
         ])
         ->assertRedirect(route('account.settings.edit'))
         ->assertSessionHas('status');
+
+    Notification::assertSentTo($user, AccountActivityNotification::class, function (
+        AccountActivityNotification $notification,
+    ): bool {
+        return $notification->activity === 'お名前の変更';
+    });
+
+    $this->actingAs($user)
+        ->put(route('account.settings.update'), [
+            'name' => 'Updated Name',
+        ])
+        ->assertRedirect(route('account.settings.edit'));
+
+    expect(Notification::sent($user, AccountActivityNotification::class))->toHaveCount(1);
 
     expect($user->fresh()->name)->toBe('Updated Name')
         ->and($user->fresh()->email)->toBe($user->email)
@@ -78,6 +94,7 @@ test('email changes are not saved until the new address is confirmed', function 
 });
 
 test('users can confirm their new email address using the signed link', function () {
+    Notification::fake();
     $user = User::factory()->create([
         'email_verified_at' => now(),
     ]);
@@ -95,6 +112,16 @@ test('users can confirm their new email address using the signed link', function
 
     expect($user->fresh()->email)->toBe($newEmail)
         ->and($user->fresh()->email_verified_at)->not->toBeNull();
+
+    Notification::assertSentOnDemand(AccountActivityNotification::class, function (
+        AccountActivityNotification $notification,
+        array $channels,
+        $notifiable,
+    ) use ($user): bool {
+        return $notification->activity === 'メールアドレスの変更'
+            && $channels === ['mail']
+            && $notifiable->routeNotificationFor('mail') === $user->email;
+    });
 });
 
 test('email confirmation does not save an address that has since been registered', function () {
@@ -268,6 +295,7 @@ test('billing portal returns users to account settings', function () {
 });
 
 test('users can permanently delete their account and associated records after confirming their password', function () {
+    Notification::fake();
     $user = User::factory()->create([
         'password' => Hash::make('A-strong-password-2026'),
     ]);
@@ -301,6 +329,15 @@ test('users can permanently delete their account and associated records after co
     $this->assertDatabaseMissing('zen_consultations', ['id' => $reading->id]);
     $this->assertDatabaseMissing('sessions', ['id' => 'account-session']);
     $this->assertDatabaseMissing('password_reset_tokens', ['email' => $user->email]);
+    Notification::assertSentOnDemand(AccountActivityNotification::class, function (
+        AccountActivityNotification $notification,
+        array $channels,
+        $notifiable,
+    ) use ($user): bool {
+        return $notification->activity === 'アカウントの削除'
+            && $channels === ['mail']
+            && $notifiable->routeNotificationFor('mail') === $user->email;
+    });
 });
 
 test('an incorrect password prevents account deletion', function () {

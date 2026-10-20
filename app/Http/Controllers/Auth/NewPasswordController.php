@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Notifications\AccountActivityNotification;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -32,13 +33,14 @@ class NewPasswordController extends Controller
 
         $status = Password::reset(
             $validated,
-            function (User $user, string $password): void {
+            function (User $user, string $password) use ($request): void {
                 $user->forceFill([
                     'password' => Hash::make($password),
                     'remember_token' => Str::random(60),
                 ])->save();
 
                 event(new PasswordReset($user));
+                $user->notify(new AccountActivityNotification('パスワードの再設定', $request->ip()));
             },
         );
 

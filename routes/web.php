@@ -1,4 +1,3 @@
-<!-- routes/web.php -->
 
 <?php
 

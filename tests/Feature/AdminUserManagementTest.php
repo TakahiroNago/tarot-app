@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnsureActiveUser;
 use App\Http\Middleware\EnsureAdmin;
 use App\Models\User;
+use App\Notifications\AccountActivityNotification;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
@@ -56,10 +57,12 @@ test('admins can search users and open their details', function () {
 });
 
 test('admins can edit user details and role without changing the password', function () {
+    Notification::fake();
     $admin = User::factory()->admin()->create();
     $user = User::factory()->create([
         'password' => Hash::make('Original-password-2026'),
     ]);
+    $originalEmail = $user->email;
 
     $this->actingAs($admin)
         ->put(route('admin.users.update', $user), [
@@ -73,9 +76,20 @@ test('admins can edit user details and role without changing the password', func
     expect($user->name)->toBe('Updated Reader')
         ->and($user->role)->toBe(User::ROLE_ADMIN)
         ->and(Hash::check('Original-password-2026', $user->password))->toBeTrue();
+
+    Notification::assertSentOnDemand(AccountActivityNotification::class, function (
+        AccountActivityNotification $notification,
+        array $channels,
+        $notifiable,
+    ) use ($originalEmail): bool {
+        return $notification->activity === '管理者によるアカウント情報の変更'
+            && $channels === ['mail']
+            && $notifiable->routeNotificationFor('mail') === $originalEmail;
+    });
 });
 
 test('admins can suspend another user and suspended users cannot log in', function () {
+    Notification::fake();
     $admin = User::factory()->admin()->create();
     $user = User::factory()->create([
         'email' => 'suspended@example.com',
@@ -90,6 +104,15 @@ test('admins can suspend another user and suspended users cannot log in', functi
         'id' => $user->id,
         'is_active' => false,
     ]);
+    Notification::assertSentOnDemand(AccountActivityNotification::class, function (
+        AccountActivityNotification $notification,
+        array $channels,
+        $notifiable,
+    ) use ($user): bool {
+        return $notification->activity === 'アカウントの利用停止'
+            && $channels === ['mail']
+            && $notifiable->routeNotificationFor('mail') === $user->email;
+    });
 
     Auth::logout();
 
