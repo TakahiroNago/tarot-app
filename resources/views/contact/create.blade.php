@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>お問い合わせ | 心の庵 禅のことば</title>
+    <title>お問い合わせ | 心の庵 ZEN REFLECTIONS</title>
     @vite(['resources/css/app.css'])
 </head>
 <body>

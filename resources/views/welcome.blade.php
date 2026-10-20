@@ -5,7 +5,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>禅師に相談 | 心の庵 禅のことば</title>
+    <title>心の庵 ZEN REFLECTIONS</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body>
@@ -26,7 +26,7 @@
                     </a>
                 </div>
                 <div class="art-stage">
-                    <img class="welcome-logo" src="{{ asset('images/logo.png') }}" alt="心の庵 禅のことば">
+                    <img class="welcome-logo" src="{{ asset('images/logo.png') }}" alt="心の庵 ZEN REFLECTIONS">
                 </div>
             </section>
         </main>
