@@ -71,6 +71,8 @@ Route::prefix('{locale}')
             Route::delete('/billing/plan', [BillingController::class, 'cancelPlanChange'])->middleware(['auth', 'verified'])->name('billing.plan.cancel');
             Route::get('/consultations', [ConsultationHistoryController::class, 'index'])->name('consultations.index');
             Route::get('/consultations/{consultation}', [ConsultationHistoryController::class, 'show'])->name('consultations.show');
+            Route::delete('/consultations', [ConsultationHistoryController::class, 'destroyAll'])->name('consultations.destroy-all');
+            Route::delete('/consultations/{consultation}', [ConsultationHistoryController::class, 'destroy'])->name('consultations.destroy');
         });
 
         Route::middleware(['auth', 'active'])->group(function () {

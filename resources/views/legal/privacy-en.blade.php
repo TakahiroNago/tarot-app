@@ -10,6 +10,8 @@
         <li><strong>Payment and subscription information:</strong> Your plan, payment dates and amounts, and subscription status. Card details are generally processed by Stripe, Inc. or another payment provider and are not directly stored on our servers.</li>
         <li><strong>Logs and cookies:</strong> IP address, cookies, device and browser information, access times, pages viewed, and other usage data.</li>
     </ul>
+    <p>Please do not enter personal information such as names, addresses, workplaces, phone numbers, or email addresses, whether yours or other people's, in your consultation. When we detect such information, we ask you to confirm before sending and offer to send a version with names, company names, addresses, and similar details masked. If you send a consultation containing detected personal information, the consultation text is not shown on its public link page. Detection has limits, and we cannot guarantee that all personal information will be detected.</p>
+    <p>Please do not enter information that requires special care, such as medical history, beliefs, or criminal records, beyond what is necessary for your consultation.</p>
 </section>
 
 <section class="legal-section">
@@ -34,14 +36,17 @@
     <ul>
         <li><strong>Google:</strong> If Google sign-in is offered, we may obtain information from Google that is necessary for authentication. See <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer"><strong>Google’s Privacy Policy</strong></a>.</li>
         <li><strong>Stripe:</strong> We use Stripe to process payments. Information needed for payment processing is provided to Stripe. Information we receive through Stripe may include payment status, subscription details, and payment dates. See <a href="https://stripe.com/privacy" target="_blank" rel="noopener noreferrer"><strong>Stripe’s Privacy Policy</strong></a>.</li>
-        <li><strong>OpenAI:</strong> We use the OpenAI API to provide AI consultations. We may send your consultation message and other information necessary to generate a response to OpenAI. See <a href="https://openai.com/policies/privacy-policy/" target="_blank" rel="noopener noreferrer"><strong>OpenAI’s Privacy Policy</strong></a>.</li>
+        <li><strong>OpenAI:</strong> We use the OpenAI API to provide AI consultations. We may send your consultation message and other information necessary to generate a response (including summaries of past consultations for Premium members) to OpenAI. OpenAI is located outside Japan, including in the United States, so information may be transferred abroad. See <a href="https://openai.com/policies/privacy-policy/" target="_blank" rel="noopener noreferrer"><strong>OpenAI’s Privacy Policy</strong></a>.</li>
         <li><strong>Other providers:</strong> We may use external providers for hosting, databases, email delivery, analytics, and other operational needs. We will add details to this Policy as appropriate.</li>
     </ul>
 </section>
 
 <section class="legal-section">
     <h2>4. Retention and Security</h2>
-    <p>We retain information for as long as necessary to provide the Service. If you delete your account, we will delete or appropriately anonymize information as necessary, except for information that must be retained by law or for a reasonable period to prevent misuse.</p>
+    <p>We retain information for as long as necessary to provide the Service.</p>
+    <p>Among saved consultations, AI responses, and summaries, consultations detected as containing personal information are deleted automatically 365 days after they are saved. Consultations without personal information are kept until you delete them or delete your account. You can delete your consultation records individually or all at once from the history page at any time. Deleting a consultation also deactivates its public link.</p>
+    <p>Public links expire automatically 30 days after they are issued. Public link pages are configured not to be indexed by search engines, but anyone who knows a link can view its contents.</p>
+    <p>If you delete your account, we will delete or appropriately anonymize information as necessary, except for information that must be retained by law or for a reasonable period to prevent misuse.</p>
     <p>We implement necessary and appropriate security measures, including access controls, authentication, and encrypted communications, to prevent unauthorized access, disclosure, loss, or damage to user information.</p>
     <p>When using external providers, we select providers that handle information within the scope necessary to provide the Service and manage them appropriately.</p>
 </section>

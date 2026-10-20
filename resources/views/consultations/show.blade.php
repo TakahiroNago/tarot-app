@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow, noarchive">
     <title>{{ __('相談の記録') }} | {{ __('心の庵') }} ZEN REFLECTIONS</title>
     @vite(['resources/css/app.css'])
 </head>
@@ -42,6 +43,11 @@
                         <p class="consultation-share-status" role="status" aria-live="polite" data-consultation-share-status></p>
                     </section>
                     <div class="history-actions">
+                        <form method="POST" action="{{ route('consultations.destroy', $consultationId) }}" onsubmit="return confirm(@json(__('この相談の記録を削除しますか？公開用URLも無効になります。')))">
+                            @csrf
+                            @method('DELETE')
+                            <button class="text-link" type="submit">{{ __('この記録を削除する') }}</button>
+                        </form>
                         <a class="text-link" href="{{ route('consultations.index') }}">{{ __('履歴一覧へ戻る') }}</a>
                         <a class="text-link" href="{{ route('zen') }}">{{ __('もう一度相談する') }}</a>
                     </div>

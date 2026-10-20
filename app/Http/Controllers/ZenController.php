@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Models\ZenConsultation;
 use App\Services\ConsultationCreditService;
 use App\Services\GuestTrialCreditService;
+use App\Services\PersonalInfoDetector;
 use App\Services\PublicConsultationShareService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
@@ -47,6 +48,7 @@ class ZenController extends Controller
         ConsultationCreditService $creditService,
         GuestTrialCreditService $guestTrialCreditService,
         PublicConsultationShareService $shareService,
+        PersonalInfoDetector $personalInfoDetector,
     ): View|RedirectResponse {
         $validated = $request->validate([
             'concern' => [
@@ -54,8 +56,21 @@ class ZenController extends Controller
                 'string',
                 'max:200',
             ],
+            'confirm_personal_info' => ['nullable', 'boolean'],
         ]);
         $concern = $validated['concern'];
+        $containsPersonalInfo = $personalInfoDetector->detect($concern) !== [];
+        if ($containsPersonalInfo && ! $request->boolean('confirm_personal_info')) {
+            $anonymizedConcern = $personalInfoDetector->redact($concern);
+
+            return redirect()->route('zen')
+                ->withInput()
+                ->with('personal_info_detected', true)
+                ->with('anonymized_concern', $personalInfoDetector->detect($anonymizedConcern) === [] && mb_strlen($anonymizedConcern) <= 200 ? $anonymizedConcern : null)
+                ->withErrors([
+                    'concern' => __('メールアドレス・電話番号・住所などの個人情報と思われる内容が含まれています。削除してから送信してください。このまま送信する場合は、下のチェックを入れてください。'),
+                ]);
+        }
         $user = $request->user();
         $guestDeviceToken = $user instanceof User ? null : $this->guestDeviceToken($request);
         $lockIdentity = $user instanceof User
@@ -79,6 +94,7 @@ class ZenController extends Controller
                 $creditService,
                 $guestTrialCreditService,
                 $shareService,
+                $containsPersonalInfo,
             );
         } finally {
             $lock->release();
@@ -93,6 +109,7 @@ class ZenController extends Controller
         ConsultationCreditService $creditService,
         GuestTrialCreditService $guestTrialCreditService,
         PublicConsultationShareService $shareService,
+        bool $containsPersonalInfo,
     ): View|RedirectResponse {
         $creditBucket = null;
 
@@ -184,12 +201,16 @@ class ZenController extends Controller
                 'response' => $answer,
                 ...$metadata,
             ];
-            $shareToken = $shareService->create($consultation);
+            $shareToken = $shareService->create($consultation, $containsPersonalInfo);
 
             if ($user instanceof User) {
                 $creditSummary = $creditService->balance($user);
                 $creditsRemaining = $creditSummary['total'];
-                $user->zenConsultations()->create($consultation);
+                $user->zenConsultations()->create([
+                    ...$consultation,
+                    'share_token_hash' => $shareService->tokenHash($shareToken),
+                    'contains_personal_info' => $containsPersonalInfo,
+                ]);
             } else {
                 $creditsRemaining = $guestTrialCreditService->remaining($guestDeviceToken);
                 $sessionConsultations = $request->session()->get('zen_consultations', []);

@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow, noarchive">
     <title>{{ __('相談の記録') }} | {{ __('心の庵') }} ZEN REFLECTIONS</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
@@ -12,6 +13,12 @@
         <main class="page-content history-content">
             <section class="history-panel">
                 <p class="eyebrow">ZEN JOURNAL</p>
+                @if (session('status'))
+                    <p class="form-notice" data-auto-dismiss role="status">{{ session('status') }}</p>
+                @endif
+                @if ($databaseConsultations?->isNotEmpty())
+                    <p class="page-description">{{ __('個人情報を含む相談は :days 日を過ぎると自動的に削除されます。それ以外の相談は、削除するまで保存されます。', ['days' => config('zen.consultation_retention_days')]) }}</p>
+                @endif
                 <div class="history-heading">
                     <h1>{{ __('ご相談の記録') }}</h1>
                     <form class="history-filter" method="GET" action="{{ route('consultations.index') }}">
@@ -68,6 +75,14 @@
                         <p class="history-empty">{{ __('まだ相談の記録がありません。') }}</p>
                         <a class="primary-action" href="{{ route('zen') }}">{{ __('禅師に相談する') }} <span class="action-arrow" aria-hidden="true">→</span></a>
                     @endif
+                @endif
+
+                @if ($sessionConsultations->isNotEmpty() || $databaseConsultations?->isNotEmpty())
+                    <form method="POST" action="{{ route('consultations.destroy-all') }}" onsubmit="return confirm(@json(__('すべての相談の記録を削除しますか？公開用URLも無効になり、元に戻せません。')))">
+                        @csrf
+                        @method('DELETE')
+                        <button class="text-link" type="submit">{{ __('すべての記録を削除する') }}</button>
+                    </form>
                 @endif
             </section>
         </main>

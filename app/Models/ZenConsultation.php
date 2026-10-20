@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['user_id', 'concern', 'response', 'topic', 'summary', 'daily_consultation_date'])]
+#[Fillable(['user_id', 'concern', 'response', 'topic', 'summary', 'daily_consultation_date', 'share_token_hash', 'contains_personal_info'])]
 class ZenConsultation extends Model
 {
     public const TOPICS = ['仕事', '恋愛', 'お金', '家族', '人間関係', '健康', '将来', '自分自身', 'その他'];
@@ -17,6 +17,7 @@ class ZenConsultation extends Model
     {
         return [
             'daily_consultation_date' => 'date',
+            'contains_personal_info' => 'boolean',
         ];
     }
 

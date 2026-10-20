@@ -62,16 +62,35 @@
                         maxlength="200"
                         required
                     >
+                    <p class="page-description">{{ __('氏名・住所・勤務先・電話番号・メールアドレスなどの個人情報は、ご自身や他の方のものも含めて書かないでください。') }}</p>
                     @error('concern')
                         <p class="form-error" role="alert">{{ $message }}</p>
                     @enderror
+                    @if (session('personal_info_detected') || old('confirm_personal_info'))
+                        <label class="form-notice">
+                            <input type="checkbox" name="confirm_personal_info" value="1" @checked(old('confirm_personal_info'))>
+                            {{ __('個人情報が含まれていることを理解したうえで、このまま送信する（共有URLでは相談文が非表示になります）') }}
+                        </label>
+                    @endif
                     <button class="primary-action" type="submit" @disabled(auth()->check() ? (! $creditSummary['unlimited'] && $creditSummary['total'] === 0) : $guestCredits === 0)>
                         <span class="loading-spinner" aria-hidden="true"></span>
                         <span class="submit-label">{{ __('相談する') }}</span>
                         <span class="action-arrow" aria-hidden="true">→</span>
                     </button>
                 </form>
-            </section>
+                @if (session('anonymized_concern'))
+                    <form class="question-form" method="POST" action="{{ route('zen.respond') }}" data-loading-label="{{ __('お悩みを読み解いています...') }}">
+                        @csrf
+                        <p class="form-notice">{{ __('個人情報と思われる部分を伏せた内容で相談できます。内容をご確認ください。') }}</p>
+                        <p class="question-quote">{{ session('anonymized_concern') }}</p>
+                        <input type="hidden" name="concern" value="{{ session('anonymized_concern') }}">
+                        <button class="primary-action" type="submit">
+                            <span class="loading-spinner" aria-hidden="true"></span>
+                            <span class="submit-label">{{ __('この内容で相談する') }}</span>
+                            <span class="action-arrow" aria-hidden="true">→</span>
+                        </button>
+                    </form>
+                @endif
         </main>
 
         @include('partials.site-footer')

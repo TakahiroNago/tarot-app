@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Notifications\AccountActivityNotification;
 use App\Notifications\AccountEmailChangeVerification;
+use App\Services\PublicConsultationShareService;
 use App\Services\StripeBillingService;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Contracts\View\View;
@@ -91,7 +92,7 @@ class AccountSettingsController extends Controller
         return to_route('account.settings.edit')->with('status', __('メールアドレスを変更しました。'));
     }
 
-    public function destroy(Request $request, StripeBillingService $billingService): RedirectResponse
+    public function destroy(Request $request, StripeBillingService $billingService, PublicConsultationShareService $shareService): RedirectResponse
     {
         $request->validate([
             'password' => ['required', 'current_password'],
@@ -101,8 +102,9 @@ class AccountSettingsController extends Controller
         abort_unless($user instanceof User, 403);
         $email = $user->email;
         $ipAddress = $request->ip();
+        $shareTokenHashes = [];
 
-        DB::transaction(function () use ($billingService, $user): void {
+        DB::transaction(function () use ($billingService, $user, &$shareTokenHashes): void {
             $activeAdmins = User::query()
                 ->where('role', User::ROLE_ADMIN)
                 ->where('is_active', true)
@@ -126,8 +128,13 @@ class AccountSettingsController extends Controller
                 ->where('email', $account->email)
                 ->delete();
 
+            $shareTokenHashes = $account->zenConsultations()->whereNotNull('share_token_hash')->pluck('share_token_hash')->all();
             $account->delete();
         });
+
+        foreach ($shareTokenHashes as $shareTokenHash) {
+            $shareService->revoke($shareTokenHash);
+        }
 
         Auth::guard('web')->logout();
         $request->session()->invalidate();

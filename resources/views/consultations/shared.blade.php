@@ -24,7 +24,11 @@
                     <h1 class="consultation-detail-title">{{ __('禅師からのことば') }}</h1>
                     <section class="result-section">
                         <h2 class="section-label">{{ __('あなたのお悩み') }}</h2>
-                        <p class="question-quote">{{ $consultation['concern'] }}</p>
+                        @if ($consultation['concern_hidden'])
+                            <p class="question-quote">{{ __('プライバシー保護のため、相談文は表示されません。') }}</p>
+                        @else
+                            <p class="question-quote">{{ $consultation['concern'] }}</p>
+                        @endif
                     </section>
                     <section class="result-section">
                         <h2 class="section-label">{{ __('お答え') }}</h2>

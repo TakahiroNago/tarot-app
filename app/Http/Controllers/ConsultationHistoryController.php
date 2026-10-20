@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\ZenConsultation;
+use App\Services\ConsultationDeletionService;
+use App\Services\PersonalInfoDetector;
 use App\Services\PublicConsultationShareService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -106,6 +108,7 @@ class ConsultationHistoryController extends Controller
         Request $request,
         string $consultation,
         PublicConsultationShareService $shareService,
+        PersonalInfoDetector $personalInfoDetector,
     ): View|RedirectResponse {
         if (preg_match('/^session-(\d+)$/', $consultation, $matches) === 1) {
             $sessionConsultation = $request->session()->get('zen_consultations.'.$matches[1]);
@@ -149,12 +152,49 @@ class ConsultationHistoryController extends Controller
             $consultationData = $savedConsultation->only(['concern', 'response', 'created_at']);
         }
 
-        $shareToken = $shareService->create($consultationData);
+        $shareToken = $shareService->create(
+            $consultationData,
+            $personalInfoDetector->detect($consultationData['concern']) !== [],
+        );
+        if (isset($savedConsultation)) {
+            $shareService->revoke($savedConsultation->share_token_hash);
+            $savedConsultation->forceFill(['share_token_hash' => $shareService->tokenHash($shareToken)])->saveQuietly();
+        }
 
         return view('consultations.show', [
             'consultation' => $consultationData,
+            'consultationId' => $consultation,
             'shareUrl' => route('consultations.share', ['token' => $shareToken]),
         ]);
+    }
+
+    public function destroy(
+        Request $request,
+        string $consultation,
+        ConsultationDeletionService $deletionService,
+    ): RedirectResponse {
+        if (preg_match('/^session-(\d+)$/', $consultation, $matches) === 1) {
+            $request->session()->forget('zen_consultations.'.$matches[1]);
+        } else {
+            $user = $request->user();
+            abort_unless($user instanceof User, 403);
+            abort_unless(ctype_digit($consultation), 404);
+            abort_if($deletionService->delete($user->zenConsultations()->whereKey($consultation)) === 0, 404);
+        }
+
+        return redirect()->route('consultations.index')->with('status', __('相談の記録を削除しました。'));
+    }
+
+    public function destroyAll(Request $request, ConsultationDeletionService $deletionService): RedirectResponse
+    {
+        $request->session()->forget('zen_consultations');
+
+        $user = $request->user();
+        if ($user instanceof User) {
+            $deletionService->delete($user->zenConsultations()->getQuery());
+        }
+
+        return redirect()->route('consultations.index')->with('status', __('すべての相談の記録を削除しました。'));
     }
 
     /** @return Collection<int, array{id: string, concern: string, response: string}> */

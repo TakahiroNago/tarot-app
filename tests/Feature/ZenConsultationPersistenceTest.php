@@ -92,7 +92,7 @@ test('authenticated consultations are stored with their topic and summary', func
     });
 
     expect(Schema::getColumnListing('zen_consultations'))
-        ->toEqualCanonicalizing(['id', 'user_id', 'concern', 'response', 'topic', 'summary', 'daily_consultation_date', 'created_at', 'updated_at']);
+        ->toEqualCanonicalizing(['id', 'user_id', 'concern', 'response', 'topic', 'summary', 'daily_consultation_date', 'share_token_hash', 'contains_personal_info', 'created_at', 'updated_at']);
 });
 
 test('English consultations use English prompts and store an English summary', function () {
