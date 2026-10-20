@@ -31,6 +31,6 @@ class ContactController extends Controller
             inquiryMessage: $validated['message'],
         ));
 
-        return to_route('contact.create')->with('status', 'お問い合わせを送信しました。');
+        return to_route('contact.create')->with('status', __('お問い合わせを送信しました。'));
     }
 }

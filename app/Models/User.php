@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password', 'role', 'is_active', 'google_id'])]
+#[Fillable(['name', 'email', 'password', 'role', 'is_active', 'google_id', 'preferred_locale'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements HasLocalePreference, MustVerifyEmail
 {
@@ -61,7 +61,9 @@ class User extends Authenticatable implements HasLocalePreference, MustVerifyEma
 
     public function preferredLocale(): string
     {
-        return 'ja';
+        return in_array($this->preferred_locale, ['en', 'ja'], true)
+            ? $this->preferred_locale
+            : 'en';
     }
 
     /** @return HasMany<ZenConsultation, $this> */

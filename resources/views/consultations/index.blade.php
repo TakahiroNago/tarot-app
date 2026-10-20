@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>相談の記録 | 心の庵 ZEN REFLECTIONS</title>
+    <title>{{ __('相談の記録') }} | {{ __('心の庵') }} ZEN REFLECTIONS</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body>
@@ -13,31 +13,31 @@
             <section class="history-panel">
                 <p class="eyebrow">ZEN JOURNAL</p>
                 <div class="history-heading">
-                    <h1>ご相談の記録</h1>
+                    <h1>{{ __('ご相談の記録') }}</h1>
                     <form class="history-filter" method="GET" action="{{ route('consultations.index') }}">
-                        <select id="history-topic" name="topic" aria-label="表示するテーマ" data-history-topic-filter>
-                            <option value="">すべて</option>
+                        <select id="history-topic" name="topic" aria-label="{{ __('表示するテーマ') }}" data-history-topic-filter>
+                            <option value="">{{ __('すべて') }}</option>
                             @foreach ($topics as $topic)
-                                <option value="{{ $topic }}" @selected($selectedTopic === $topic)>{{ $topic }}</option>
+                                <option value="{{ $topic }}" @selected($selectedTopic === $topic)>{{ __($topic) }}</option>
                             @endforeach
                         </select>
                     </form>
                 </div>
                 @if ($historyUpgradePrompt)
                     <p class="form-notice credit-notice">
-                        無料会員の履歴表示は直近3か月の50件までです。有料プランで、より多くの履歴を確認できます。
-                        <a href="{{ route('plans') }}">有料プランを見る</a>
+                        {{ __('無料会員の履歴表示は直近3か月の50件までです。有料プランで、より多くの履歴を確認できます。') }}
+                        <a href="{{ route('plans') }}">{{ __('有料プランを見る') }}</a>
                     </p>
                 @endif
 
                 @if ($sessionConsultations->isNotEmpty())
                     <section class="history-group">
-                        <h2>今回のセッション</h2>
+                        <h2>{{ __('今回のセッション') }}</h2>
                         <div class="consultation-list">
                             @foreach ($sessionConsultations as $consultation)
                                 <div class="consultation-row consultation-row-session">
                                     <a class="consultation-question" href="{{ route('consultations.show', $consultation['id']) }}">{{ $consultation['concern'] }}</a>
-                                    <a class="consultation-open" href="{{ route('consultations.show', $consultation['id']) }}">詳細 <span aria-hidden="true">→</span></a>
+                                    <a class="consultation-open" href="{{ route('consultations.show', $consultation['id']) }}">{{ __('詳細') }} <span aria-hidden="true">→</span></a>
                                 </div>
                             @endforeach
                         </div>
@@ -46,13 +46,13 @@
 
                 @if ($databaseConsultations?->isNotEmpty())
                     <section class="history-group">
-                        <h2>これまでの相談</h2>
+                        <h2>{{ __('これまでの相談') }}</h2>
                         <div class="consultation-list">
                             @foreach ($databaseConsultations as $consultation)
                                 <a class="consultation-row" href="{{ route('consultations.show', $consultation->id) }}">
                                     <span class="consultation-question">{{ $consultation->concern }}</span>
                                     <time class="consultation-date" datetime="{{ $consultation->created_at->toISOString() }}" data-local-time>{{ $consultation->created_at->format('Y/m/d H:i') }}</time>
-                                    <span class="consultation-open">詳細 <span aria-hidden="true">→</span></span>
+                                    <span class="consultation-open">{{ __('詳細') }} <span aria-hidden="true">→</span></span>
                                 </a>
                             @endforeach
                         </div>
@@ -62,11 +62,11 @@
 
                 @if ($sessionConsultations->isEmpty() && ! $databaseConsultations?->isNotEmpty())
                     @if ($selectedTopic !== null)
-                        <p class="history-empty">「{{ $selectedTopic }}」テーマの相談記録はありません。</p>
-                        <a class="history-filter-clear" href="{{ route('consultations.index') }}">すべての相談記録を表示</a>
+                        <p class="history-empty">{{ __('「:topic」テーマの相談記録はありません。', ['topic' => __($selectedTopic)]) }}</p>
+                        <a class="history-filter-clear" href="{{ route('consultations.index') }}">{{ __('すべての相談記録を表示') }}</a>
                     @else
-                        <p class="history-empty">まだ相談の記録がありません。</p>
-                        <a class="primary-action" href="{{ route('zen') }}">禅師に相談する <span class="action-arrow" aria-hidden="true">→</span></a>
+                        <p class="history-empty">{{ __('まだ相談の記録がありません。') }}</p>
+                        <a class="primary-action" href="{{ route('zen') }}">{{ __('禅師に相談する') }} <span class="action-arrow" aria-hidden="true">→</span></a>
                     @endif
                 @endif
             </section>

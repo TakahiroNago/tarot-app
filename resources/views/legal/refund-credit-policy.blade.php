@@ -1,9 +1,12 @@
 @extends('layouts.legal')
 
-@section('title', '返金・クレジットポリシー')
+@section('title', __('返金・クレジットポリシー'))
 @section('eyebrow', 'REFUNDS & CREDITS')
 
 @section('legal-content')
+@if (app()->isLocale('en'))
+    @include('legal.refund-credit-policy-en')
+@else
 <p class="page-description">Art Full Stack（以下「当事業者」といいます。）が提供するAI相談応答サービス（以下「本サービス」といいます。）における、クレジットの利用、有料プランの契約、返金およびキャンセルについて、以下のとおり定めます。</p>
 
 <section class="legal-section">
@@ -70,7 +73,7 @@
 
 <section class="legal-section">
     <h2>5. サービス終了等の場合</h2>
-    <p>本サービスを終了する場合、当事業者は、可能な限り事前に本サービス上で告知します。＜/p>
+    <p>本サービスを終了する場合、当事業者は、可能な限り事前に本サービス上で告知します。</p>
     <p>サービス終了時に有料プランの残存期間がある場合の取扱いについては、サービス終了の理由、時期その他の事情を考慮し、必要に応じて別途案内します。</p>
 </section>
 
@@ -93,4 +96,5 @@
     <p>当事業者は、法令の改正、本サービスの変更その他必要に応じて、本ポリシーを変更することがあります。</p>
     <p>重要な変更を行う場合は、本サービス上で適切な方法によりお知らせします。</p>
 </section>
+@endif
 @endsection

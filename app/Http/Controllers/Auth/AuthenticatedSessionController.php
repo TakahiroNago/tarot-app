@@ -31,13 +31,14 @@ class AuthenticatedSessionController extends Controller
 
         if (! Auth::attempt([...$credentials, 'is_active' => true], $request->boolean('remember'))) {
             return back()->withErrors([
-                'email' => 'メールアドレスまたはパスワードを確認してください。',
+                'email' => __('メールアドレスまたはパスワードを確認してください。'),
             ])->onlyInput('email');
         }
 
         $request->session()->regenerate();
         $user = $request->user();
         abort_unless($user instanceof User, 403);
+        $user->update(['preferred_locale' => app()->getLocale()]);
         $user->notify(new AccountActivityNotification('ログイン', $request->ip()));
 
         if (! $user->hasVerifiedEmail()) {

@@ -21,11 +21,11 @@ class BillingController extends Controller
 
         $product = $billingService->products()[$validated['product']];
         if (isset($product['credits'])) {
-            return back()->withErrors(['billing' => 'クレジットは購入できません。有料プランをご利用ください。']);
+            return back()->withErrors(['billing' => __('クレジットは購入できません。有料プランをご利用ください。')]);
         }
 
         if (! is_string($product['price_id']) || $product['price_id'] === '' || ! config('services.stripe.secret')) {
-            return back()->withErrors(['billing' => '決済の準備が完了していません。時間をおいて再度お試しください。']);
+            return back()->withErrors(['billing' => __('決済の準備が完了していません。時間をおいて再度お試しください。')]);
         }
 
         if (isset($product['plan']) && ($user->plan !== User::PLAN_FREE || $user->stripe_subscription_id !== null)) {
@@ -33,7 +33,7 @@ class BillingController extends Controller
                 return redirect()->away($billingService->portalUrl($user));
             }
 
-            return back()->withErrors(['billing' => '現在のプランを変更できません。サポートにお問い合わせください。']);
+            return back()->withErrors(['billing' => __('現在のプランを変更できません。サポートにお問い合わせください。')]);
         }
 
         return redirect()->away($billingService->checkoutUrl($user, $validated['product']));
@@ -45,11 +45,11 @@ class BillingController extends Controller
         abort_unless($user instanceof User, 403);
 
         if ($user->stripe_customer_id === null) {
-            return back()->withErrors(['billing' => 'Stripeのお支払い情報が見つかりません。']);
+            return back()->withErrors(['billing' => __('Stripeのお支払い情報が見つかりません。')]);
         }
 
         if (! config('services.stripe.secret')) {
-            return back()->withErrors(['billing' => '決済の準備が完了していません。時間をおいて再度お試しください。']);
+            return back()->withErrors(['billing' => __('決済の準備が完了していません。時間をおいて再度お試しください。')]);
         }
 
         return redirect()->away($billingService->portalUrl($user));
@@ -64,7 +64,7 @@ class BillingController extends Controller
         abort_unless($user instanceof User, 403);
 
         if (! is_string(config('services.stripe.secret')) || config('services.stripe.secret') === '') {
-            return back()->withErrors(['billing' => '決済の準備が完了していません。時間をおいて再度お試しください。']);
+            return back()->withErrors(['billing' => __('決済の準備が完了していません。時間をおいて再度お試しください。')]);
         }
 
         try {
@@ -72,13 +72,13 @@ class BillingController extends Controller
         } catch (ApiErrorException $exception) {
             report($exception);
 
-            return back()->withErrors(['billing' => 'Stripe上の契約を確認できませんでした。時間をおいて再度お試しください。']);
+            return back()->withErrors(['billing' => __('Stripe上の契約を確認できませんでした。時間をおいて再度お試しください。')]);
         }
 
         $message = match ($result) {
-            'upgraded' => 'プレミアムプランへ切り替えました。日割り分は今回の請求に反映されています。',
-            'upgrade_pending' => 'プレミアムへの変更を受け付けました。決済完了後にプランへ反映されます。',
-            'downgrade_scheduled' => 'ライトプランへの変更を予約しました。現在の契約期間終了後に切り替わります。',
+            'upgraded' => __('プレミアムプランへ切り替えました。日割り分は今回の請求に反映されています。'),
+            'upgrade_pending' => __('プレミアムへの変更を受け付けました。決済完了後にプランへ反映されます。'),
+            'downgrade_scheduled' => __('ライトプランへの変更を予約しました。現在の契約期間終了後に切り替わります。'),
             default => throw new RuntimeException('Unknown subscription plan change result.'),
         };
 
@@ -91,11 +91,11 @@ class BillingController extends Controller
         abort_unless($user instanceof User, 403);
 
         if (! is_string(config('services.stripe.secret')) || config('services.stripe.secret') === '') {
-            return back()->withErrors(['billing' => '決済の準備が完了していません。時間をおいて再度お試しください。']);
+            return back()->withErrors(['billing' => __('決済の準備が完了していません。時間をおいて再度お試しください。')]);
         }
 
         $billingService->cancelScheduledPlanChange($user);
 
-        return to_route('account.settings.edit')->with('status', '予約していたプラン変更を取り消しました。');
+        return to_route('account.settings.edit')->with('status', __('予約していたプラン変更を取り消しました。'));
     }
 }

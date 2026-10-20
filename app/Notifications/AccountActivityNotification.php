@@ -28,16 +28,16 @@ class AccountActivityNotification extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         $mail = (new MailMessage)
-            ->subject('アカウントのセキュリティ通知')
-            ->greeting('アカウントの操作をお知らせします。')
-            ->line('次の操作が行われました：'.$this->activity)
-            ->line('日時：'.now()->format('Y年n月j日 H:i:s'));
+            ->subject(__('アカウントのセキュリティ通知'))
+            ->greeting(__('アカウントの操作をお知らせします。'))
+            ->line(__('次の操作が行われました：').__($this->activity))
+            ->line(__('日時：').now()->format(app()->isLocale('ja') ? 'Y年n月j日 H:i:s' : 'M j, Y H:i:s'));
 
         if ($this->ipAddress !== null) {
-            $mail->line('接続元IPアドレス：'.$this->ipAddress);
+            $mail->line(__('接続元IPアドレス：').$this->ipAddress);
         }
 
         return $mail
-            ->line('この操作にお心当たりがない場合は、パスワードを変更し、お問い合わせください。');
+            ->line(__('この操作にお心当たりがない場合は、パスワードを変更し、お問い合わせください。'));
     }
 }

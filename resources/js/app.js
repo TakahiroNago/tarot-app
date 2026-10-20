@@ -51,6 +51,6 @@ if (questionForm) {
 		questionForm.classList.add('is-submitting');
 		questionForm.setAttribute('aria-busy', 'true');
 		submitButton.disabled = true;
-		submitLabel.textContent = 'お悩みを読み解いています...';
+		submitLabel.textContent = questionForm.dataset.loadingLabel;
 	});
 }

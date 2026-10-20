@@ -23,6 +23,6 @@ class PasswordResetLinkController extends Controller
 
         Password::sendResetLink($request->only('email'));
 
-        return back()->with('status', '登録されている場合、パスワード再設定メールを送信しました。');
+        return back()->with('status', __('登録されている場合、パスワード再設定メールを送信しました。'));
     }
 }

@@ -83,7 +83,7 @@ class UserController extends Controller
 
             if ($managedUser->is($administrator) && $validated['role'] !== $managedUser->role) {
                 throw ValidationException::withMessages([
-                    'role' => '自分自身の権限は変更できません。',
+                    'role' => __('自分自身の権限は変更できません。'),
                 ]);
             }
 
@@ -94,7 +94,7 @@ class UserController extends Controller
                 && $activeAdmins->count() <= 1
             ) {
                 throw ValidationException::withMessages([
-                    'role' => '最後の有効なAdminの権限は変更できません。',
+                    'role' => __('最後の有効なAdminの権限は変更できません。'),
                 ]);
             }
 
@@ -118,10 +118,11 @@ class UserController extends Controller
 
         if ($accountWasChanged && is_string($notificationEmail)) {
             Notification::route('mail', $notificationEmail)
-                ->notify(new AccountActivityNotification('管理者によるアカウント情報の変更', $ipAddress));
+                ->notify((new AccountActivityNotification('管理者によるアカウント情報の変更', $ipAddress))
+                    ->locale($user->preferredLocale()));
         }
 
-        return redirect()->route('admin.users.show', $user)->with('status', 'ユーザー情報を更新しました。');
+        return redirect()->route('admin.users.show', $user)->with('status', __('ユーザー情報を更新しました。'));
     }
 
     public function suspend(Request $request, User $user): RedirectResponse
@@ -129,7 +130,7 @@ class UserController extends Controller
         $administrator = $this->administrator($request);
 
         if ($user->is($administrator)) {
-            return back()->withErrors(['user' => '自分自身を停止することはできません。']);
+            return back()->withErrors(['user' => __('自分自身を停止することはできません。')]);
         }
 
         $notificationEmail = null;
@@ -150,7 +151,7 @@ class UserController extends Controller
                 && $activeAdmins->count() <= 1
             ) {
                 throw ValidationException::withMessages([
-                    'user' => '最後の有効なAdminは停止できません。',
+                    'user' => __('最後の有効なAdminは停止できません。'),
                 ]);
             }
 
@@ -163,10 +164,11 @@ class UserController extends Controller
 
         if ($accountWasSuspended && is_string($notificationEmail)) {
             Notification::route('mail', $notificationEmail)
-                ->notify(new AccountActivityNotification('アカウントの利用停止', $ipAddress));
+                ->notify((new AccountActivityNotification('アカウントの利用停止', $ipAddress))
+                    ->locale($user->preferredLocale()));
         }
 
-        return back()->with('status', 'ユーザーを利用停止にしました。');
+        return back()->with('status', __('ユーザーを利用停止にしました。'));
     }
 
     public function sendPasswordReset(Request $request, User $user): RedirectResponse
@@ -174,7 +176,7 @@ class UserController extends Controller
         $this->administrator($request);
         Password::sendResetLink(['email' => $user->email]);
 
-        return back()->with('status', 'パスワード再設定の案内をメールで送信しました。');
+        return back()->with('status', __('パスワード再設定の案内をメールで送信しました。'));
     }
 
     private function administrator(Request $request): User

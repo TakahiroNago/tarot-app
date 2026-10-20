@@ -45,11 +45,11 @@ class NewPasswordController extends Controller
         );
 
         if ($status === Password::PASSWORD_RESET) {
-            return redirect()->route('login')->with('status', 'パスワードを再設定しました。ログインしてください。');
+            return redirect()->route('login')->with('status', __('パスワードを再設定しました。ログインしてください。'));
         }
 
         return back()->withInput($request->only('email'))->withErrors([
-            'email' => '再設定リンクが無効か、有効期限が切れています。もう一度お試しください。',
+            'email' => __('再設定リンクが無効か、有効期限が切れています。もう一度お試しください。'),
         ]);
     }
 }

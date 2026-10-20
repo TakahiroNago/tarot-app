@@ -1590,6 +1590,15 @@ h2 {
         gap: 6px;
     }
 
+    html[lang^="ja"] .brand-caption,
+    html[lang^="en"] .brand-name {
+        display: none;
+    }
+
+    html[lang^="en"] .credit-balance-unit {
+        display: none;
+    }
+
     .account-navigation {
         width: auto;
         flex-wrap: nowrap;

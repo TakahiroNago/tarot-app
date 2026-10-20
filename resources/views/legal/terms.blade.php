@@ -1,16 +1,19 @@
 @extends('layouts.legal')
 
-@section('title', '利用規約')
+@section('title', __('利用規約'))
 @section('eyebrow', 'TERMS OF SERVICE')
 
 @section('legal-content')
+@if (app()->isLocale('en'))
+    @include('legal.terms-en')
+@else
 <p class="page-description">Art Full Stack（以下「当事業者」といいます。）は、当事業者が提供するAIによる相談応答サービス（以下「本サービス」といいます。）の利用条件を、以下のとおり定めます。</p>
 
 <section class="legal-section">
     <h2>第1条（適用）</h2>
     <p>本規約は、本サービスの利用に関する利用者と当事業者との間の権利義務関係を定めるものです。</p>
     <p>利用者は、本規約の内容を確認し、これに同意したうえで本サービスを利用するものとします。</p>
-    <p>本サービスを利用した時点で、利用者は本規約に同意したものとみなします。。</p>
+    <p>本サービスを利用した時点で、利用者は本規約に同意したものとみなします。</p>
 </section>
 
 <section class="legal-section">
@@ -163,4 +166,5 @@
     <h2>お問い合わせ</h2>
     <p>本規約に関するお問い合わせは、本サービスの<a href="{{ route('contact.create') }}"><strong>お問い合わせフォーム</strong></a>からご連絡ください。</p>
 </section>
+@endif
 @endsection

@@ -24,7 +24,7 @@ class ContactInquiry extends Mailable
     {
         return new Envelope(
             replyTo: [new Address($this->replyEmail, $this->inquiryName)],
-            subject: 'お問い合わせ：'.$this->inquirySubject,
+            subject: __('お問い合わせ：').$this->inquirySubject,
         );
     }
 

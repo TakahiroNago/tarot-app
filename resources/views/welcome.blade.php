@@ -5,7 +5,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>心の庵 ZEN REFLECTIONS</title>
+    <title>{{ __('心の庵') }} ZEN REFLECTIONS</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body>
@@ -15,18 +15,18 @@
             <section class="welcome-panel">
                 <div class="welcome-copy">
                     @if (session('status') === 'email-verified')
-                        <p class="form-notice" data-auto-dismiss role="status">メールアドレスを確認しました。</p>
+                        <p class="form-notice" data-auto-dismiss role="status">{{ __('メールアドレスを確認しました。') }}</p>
                     @endif
-                    <p class="eyebrow">今日のあなたへ</p>
-                    <h1 class="welcome-title">迷いの中に<br>小さな一歩を</h1>
-                    <p class="welcome-description">お悩みを聞かせてください。AIが禅の視点で、心を見つめることばをお届けします。</p>
+                    <p class="eyebrow">{{ __('今日のあなたへ') }}</p>
+                    <h1 class="welcome-title">{{ __('迷いの中に') }}<br>{{ __('小さな一歩を') }}</h1>
+                    <p class="welcome-description">{{ __('お悩みを聞かせてください。AIが禅の視点で、心を見つめることばをお届けします。') }}</p>
                     <a class="primary-action" href="{{ route('zen') }}">
-                        <span>AI禅師に相談する</span>
+                        <span>{{ __('AI禅師に相談する') }}</span>
                         <span class="action-arrow" aria-hidden="true">→</span>
                     </a>
                 </div>
                 <div class="art-stage">
-                    <img class="welcome-logo" src="{{ asset('images/logo.png') }}" alt="心の庵 ZEN REFLECTIONS">
+                    <img class="welcome-logo" src="{{ asset('images/logo.png') }}" alt="{{ __('心の庵') }} ZEN REFLECTIONS">
                 </div>
             </section>
         </main>

@@ -1,9 +1,12 @@
 @extends('layouts.legal')
 
-@section('title', 'プライバシーポリシー')
+@section('title', __('プライバシーポリシー'))
 @section('eyebrow', 'PRIVACY POLICY')
 
 @section('legal-content')
+@if (app()->isLocale('en'))
+    @include('legal.privacy-en')
+@else
 <p class="page-description">Art Full Stack（以下「当事業者」）は、本サービスで取り扱う利用者情報について、以下のとおりプライバシーポリシーを定めます。</p>
 
 <section class="legal-section">
@@ -74,4 +77,5 @@
     <h2>お問い合わせ</h2>
     <p>事業者名：Art Full Stack<br>お問い合わせは<a href="{{ route('contact.create') }}"><strong>お問い合わせフォーム</strong></a>からお送りください。</p>
 </section>
+@endif
 @endsection

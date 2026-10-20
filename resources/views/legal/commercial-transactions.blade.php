@@ -1,9 +1,12 @@
 @extends('layouts.legal')
 
-@section('title', '特定商取引法に基づく表示')
+@section('title', __('特定商取引法に基づく表示'))
 @section('eyebrow', 'COMMERCIAL TRANSACTIONS')
 
 @section('legal-content')
+@if (app()->isLocale('en'))
+    @include('legal.commercial-transactions-en')
+@else
 <p class="page-description">本ページは、通信販売に関する表示事項を編集するためのひな形です。販売内容と適用される表示義務を確認し、公開前に各項目を確定してください。</p>
 
 <section class="legal-section">
@@ -92,4 +95,5 @@
     <p>本サービスの利用条件については、「利用規約」および「プライバシーポリシー」をあわせてご確認ください。</p>
     <p>料金、サービス内容、無料利用枠、月額プランの利用条件その他の内容については、各サービス画面に表示される最新の情報が適用されます。</p>
 </section>
+@endif
 @endsection

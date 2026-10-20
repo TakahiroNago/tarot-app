@@ -66,7 +66,7 @@ class ZenController extends Controller
         if (! $lock->get()) {
             return redirect()->route('zen')->with(
                 'consultation_rate_limited',
-                '別の相談に回答中です。完了後にもう一度お試しください。',
+                __('別の相談に回答中です。完了後にもう一度お試しください。'),
             );
         }
 
@@ -102,7 +102,7 @@ class ZenController extends Controller
                 if (RateLimiter::tooManyAttempts($dailyRateLimitKey, self::PREMIUM_DAILY_LIMIT)) {
                     return redirect()->route('zen')->with(
                         'consultation_rate_limited',
-                        '本日のプレミアムプランの利用上限に達しました。明日以降に再度お試しください。',
+                        __('本日のプレミアムプランの利用上限に達しました。明日以降に再度お試しください。'),
                     );
                 }
 
@@ -112,7 +112,9 @@ class ZenController extends Controller
 
                     return redirect()->route('zen')->with(
                         'consultation_rate_limited',
-                        "プレミアムプランの相談は1分あたり5回までです。{$secondsUntilAvailable}秒後に再度お試しください。",
+                        __('プレミアムプランの相談は1分あたり5回までです。:seconds秒後に再度お試しください。', [
+                            'seconds' => $secondsUntilAvailable,
+                        ]),
                     );
                 }
 
@@ -122,7 +124,7 @@ class ZenController extends Controller
 
             $creditBucket = $creditService->consume($user);
             if ($creditBucket === null) {
-                return redirect()->route('zen')->with('credit_exhausted', '本日利用可能なクレジットを使い切りました。クレジット購入または有料プランをご検討ください。');
+                return redirect()->route('zen')->with('credit_exhausted', __('本日利用可能なクレジットを使い切りました。クレジット購入または有料プランをご検討ください。'));
             }
         } else {
             if (! is_string($guestDeviceToken)) {
@@ -130,7 +132,7 @@ class ZenController extends Controller
             }
 
             if (! $guestTrialCreditService->consume($guestDeviceToken)) {
-                return redirect()->route('zen')->with('credit_exhausted', '無料体験を使い切りました。会員登録すると毎日1回相談できます。');
+                return redirect()->route('zen')->with('credit_exhausted', __('無料体験を使い切りました。会員登録すると毎日1回相談できます。'));
             }
         }
 
@@ -161,7 +163,7 @@ class ZenController extends Controller
                         'role' => 'user',
                         'content' => $isPremiumMember
                             ? $this->premiumConsultationPrompt($concern, $history)
-                            : "相談：{$concern}",
+                            : (app()->isLocale('ja') ? "相談：{$concern}" : "Concern: {$concern}"),
                     ],
                 ],
             ]);
@@ -242,12 +244,18 @@ class ZenController extends Controller
     private function premiumConsultationPrompt(string $concern, Collection $history): string
     {
         $historyContext = $history->isEmpty()
-            ? '該当テーマの過去の相談記録はありません。'
+            ? (app()->isLocale('ja')
+                ? '該当テーマの過去の相談記録はありません。'
+                : 'There are no past consultation records for this topic.')
             : $history
-                ->map(fn (ZenConsultation $consultation): string => "- {$consultation->created_at->format('Y/m/d H:i')}：{$consultation->summary}")
+                ->map(fn (ZenConsultation $consultation): string => app()->isLocale('ja')
+                    ? "- {$consultation->created_at->format('Y/m/d H:i')}：{$consultation->summary}"
+                    : "- {$consultation->created_at->format('M j, Y H:i')}: {$consultation->summary}")
                 ->implode("\n");
 
-        return "過去の同テーマの相談要約と日時：\n{$historyContext}\n\n今回の相談：{$concern}";
+        return app()->isLocale('ja')
+            ? "過去の同テーマの相談要約と日時：\n{$historyContext}\n\n今回の相談：{$concern}"
+            : "Summaries and dates of past consultations on the same topic:\n{$historyContext}\n\nCurrent concern: {$concern}";
     }
 
     private function zenTeacherInstructions(): string
@@ -264,7 +272,9 @@ class ZenController extends Controller
                 ],
                 [
                     'role' => 'user',
-                    'content' => "相談：{$concern}\n回答：{$answer}",
+                    'content' => app()->isLocale('ja')
+                        ? "相談：{$concern}\n回答：{$answer}"
+                        : "Concern: {$concern}\nResponse: {$answer}",
                 ],
             ],
             'response_format' => ['type' => 'json_object'],
@@ -302,7 +312,9 @@ class ZenController extends Controller
                 ],
                 [
                     'role' => 'user',
-                    'content' => "相談：{$concern}\n回答：{$answer}",
+                    'content' => app()->isLocale('ja')
+                        ? "相談：{$concern}\n回答：{$answer}"
+                        : "Concern: {$concern}\nResponse: {$answer}",
                 ],
             ],
             'response_format' => ['type' => 'json_object'],

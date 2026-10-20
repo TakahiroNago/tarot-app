@@ -41,7 +41,7 @@ class AccountSettingsController extends Controller
             $user->notify(new AccountActivityNotification('お名前の変更', $request->ip()));
         }
 
-        return to_route('account.settings.edit')->with('status', 'お名前を更新しました。');
+        return to_route('account.settings.edit')->with('status', __('お名前を更新しました。'));
     }
 
     public function requestEmailChange(Request $request): RedirectResponse
@@ -54,7 +54,7 @@ class AccountSettingsController extends Controller
         ]);
 
         if ($user->email === $validated['email']) {
-            return to_route('account.settings.edit')->with('status', 'このメールアドレスは現在登録されています。');
+            return to_route('account.settings.edit')->with('status', __('このメールアドレスは現在登録されています。'));
         }
 
         $verificationUrl = URL::temporarySignedRoute(
@@ -66,7 +66,7 @@ class AccountSettingsController extends Controller
         Notification::route('mail', $validated['email'])
             ->notify(new AccountEmailChangeVerification($verificationUrl));
 
-        return to_route('account.settings.edit')->with('status', '確認用メールを送信しました。メール内のリンクを開くと変更が完了します。');
+        return to_route('account.settings.edit')->with('status', __('確認用メールを送信しました。メール内のリンクを開くと変更が完了します。'));
     }
 
     public function confirmEmailChange(Request $request, User $user): RedirectResponse
@@ -88,7 +88,7 @@ class AccountSettingsController extends Controller
         Notification::route('mail', $oldEmail)
             ->notify(new AccountActivityNotification('メールアドレスの変更', $request->ip()));
 
-        return to_route('account.settings.edit')->with('status', 'メールアドレスを変更しました。');
+        return to_route('account.settings.edit')->with('status', __('メールアドレスを変更しました。'));
     }
 
     public function destroy(Request $request, StripeBillingService $billingService): RedirectResponse
@@ -113,7 +113,7 @@ class AccountSettingsController extends Controller
 
             if ($account->is_active && $account->isAdmin() && $activeAdmins->count() <= 1) {
                 throw ValidationException::withMessages([
-                    'account' => '最後の有効なAdminアカウントは削除できません。',
+                    'account' => __('最後の有効なAdminアカウントは削除できません。'),
                 ]);
             }
 
@@ -135,6 +135,6 @@ class AccountSettingsController extends Controller
         Notification::route('mail', $email)
             ->notify(new AccountActivityNotification('アカウントの削除', $ipAddress));
 
-        return to_route('login')->with('status', 'アカウントを削除しました。ご利用ありがとうございました。');
+        return to_route('login')->with('status', __('アカウントを削除しました。ご利用ありがとうございました。'));
     }
 }

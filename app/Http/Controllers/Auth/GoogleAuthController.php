@@ -9,7 +9,9 @@ use App\Services\SessionConsultationPersister;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 
@@ -22,6 +24,15 @@ class GoogleAuthController extends Controller
 
     public function callback(Request $request, SessionConsultationPersister $sessionConsultationPersister): RedirectResponse
     {
+        $locale = $request->session()->get('locale');
+
+        if (! in_array($locale, ['en', 'ja'], true)) {
+            $locale = $request->getPreferredLanguage(['en', 'ja']);
+        }
+
+        App::setLocale($locale);
+        URL::defaults(['locale' => $locale]);
+
         $googleUser = Socialite::driver('google')->user();
         $email = $googleUser->getEmail();
         $googleId = $googleUser->getId();
@@ -35,7 +46,7 @@ class GoogleAuthController extends Controller
             || ($googleProfile['email_verified'] ?? false) !== true
         ) {
             return redirect()->route('login')->withErrors([
-                'email' => 'Googleアカウントのメールアドレスを確認できませんでした。',
+                'email' => __('Googleアカウントのメールアドレスを確認できませんでした。'),
             ]);
         }
 
@@ -44,13 +55,13 @@ class GoogleAuthController extends Controller
 
         if ($user?->is_active === false) {
             return redirect()->route('login')->withErrors([
-                'email' => 'このアカウントは現在ご利用いただけません。',
+                'email' => __('このアカウントは現在ご利用いただけません。'),
             ]);
         }
 
         if ($user !== null && $user->google_id !== null && $user->google_id !== $googleId) {
             return redirect()->route('login')->withErrors([
-                'email' => 'このメールアドレスは別のGoogleアカウントに連携されています。',
+                'email' => __('このメールアドレスは別のGoogleアカウントに連携されています。'),
             ]);
         }
 
@@ -62,6 +73,7 @@ class GoogleAuthController extends Controller
                 'role' => User::ROLE_USER,
                 'is_active' => true,
                 'google_id' => $googleId,
+                'preferred_locale' => $locale,
             ]);
             $user->forceFill(['email_verified_at' => now()])->save();
 
@@ -72,11 +84,15 @@ class GoogleAuthController extends Controller
             $user->notify(new AccountActivityNotification('Googleアカウントの連携', $request->ip()));
         }
 
+        if ($user->preferred_locale !== $locale) {
+            $user->update(['preferred_locale' => $locale]);
+        }
+
         Auth::login($user);
         $request->session()->regenerate();
         $user->notify(new AccountActivityNotification('Googleログイン', $request->ip()));
         $sessionConsultationPersister->persist($user, $request);
 
-        return redirect()->intended(route('home'));
+        return redirect()->intended(route('home', ['locale' => $user->preferredLocale()]));
     }
 }

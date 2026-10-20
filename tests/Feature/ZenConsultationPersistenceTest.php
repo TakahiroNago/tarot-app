@@ -85,7 +85,7 @@ test('authenticated consultations are stored with their topic and summary', func
             && str_contains($parameters['messages'][0]['content'], '仏教の禅師')
             && str_contains($parameters['messages'][0]['content'], '相談者の悩みや人生の迷い')
             && str_contains($parameters['messages'][0]['content'], '最も適切なものを一つだけ')
-            && str_contains($parameters['messages'][0]['content'], '「『○○』という言葉があります。これは××という意味です。」')
+            && str_contains($parameters['messages'][0]['content'], '「『○○』という禅の言葉があります。これは××という意味です。」')
             && str_contains($parameters['messages'][0]['content'], '今回の相談に結びつけ')
             && str_contains($parameters['messages'][0]['content'], '作ったりせず')
             && $parameters['messages'][1]['content'] === '相談：What should I focus on?';
@@ -93,6 +93,40 @@ test('authenticated consultations are stored with their topic and summary', func
 
     expect(Schema::getColumnListing('zen_consultations'))
         ->toEqualCanonicalizing(['id', 'user_id', 'concern', 'response', 'topic', 'summary', 'daily_consultation_date', 'created_at', 'updated_at']);
+});
+
+test('English consultations use English prompts and store an English summary', function () {
+    $openAiFake = OpenAI::fake([
+        CreateResponse::fake([
+            'choices' => [['message' => ['content' => 'Take one thoughtful step at a time.']]],
+        ]),
+        CreateResponse::fake([
+            'choices' => [['message' => ['content' => '{"topic":"仕事","summary":"A practical reflection on career growth."}']]],
+        ]),
+    ]);
+    $user = User::factory()->create(['preferred_locale' => 'ja']);
+
+    $this->actingAs($user)
+        ->post(route('zen.respond', ['locale' => 'en']), ['concern' => 'How can I grow in my career?'])
+        ->assertOk()
+        ->assertSee('Words from your Zen guide')
+        ->assertSee('Your concern')
+        ->assertSee('Response')
+        ->assertSee('Take one thoughtful step at a time.');
+
+    expect($user->fresh()->preferred_locale)->toBe('en')
+        ->and($user->zenConsultations()->sole()->summary)->toBe('A practical reflection on career growth.');
+
+    $openAiFake->assertSent(Chat::class, function (string $method, array $parameters): bool {
+        return $method === 'create'
+            && str_contains($parameters['messages'][0]['content'], 'Respond in English.')
+            && $parameters['messages'][1]['content'] === 'Concern: How can I grow in my career?';
+    });
+    $openAiFake->assertSent(Chat::class, function (string $method, array $parameters): bool {
+        return $method === 'create'
+            && str_contains($parameters['messages'][0]['content'], 'Write summary in English')
+            && $parameters['messages'][1]['content'] === "Concern: How can I grow in my career?\nResponse: Take one thoughtful step at a time.";
+    });
 });
 
 test('premium consultations use the three latest summaries from the concern topic', function () {

@@ -32,6 +32,7 @@ class RegisteredUserController extends Controller
             'password' => $validated['password'],
             'role' => User::ROLE_USER,
             'is_active' => true,
+            'preferred_locale' => app()->getLocale(),
         ]);
 
         event(new Registered($user));
