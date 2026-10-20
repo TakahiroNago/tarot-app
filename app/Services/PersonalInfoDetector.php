@@ -103,7 +103,7 @@ class PersonalInfoDetector
                 'validator' => 'isPhoneNumber',
             ],
             self::NAME => [
-                'regex' => "/(?<![{$han}])([{$han}]{2,4})(?:さん|様|氏|君|くん|ちゃん)/u",
+                'regex' => "/(?<![{$han}])([{$han}]{2,4})(?:代表取締役|執行役員|副社長|本部長|支店長|工場長|理事長|取締役|さん|様|氏|君|くん|ちゃん|社長|会長|専務|常務|部長|課長|係長|主任|所長|店長)/u",
                 'label' => '氏名',
                 'validator' => 'isPersonName',
             ],
