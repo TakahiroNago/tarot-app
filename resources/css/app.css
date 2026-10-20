@@ -712,6 +712,7 @@ h2 {
     border: 1px solid var(--color-line);
     border-radius: 4px;
     color: var(--color-forest-dark);
+    cursor: pointer;
     font-size: 12px;
 }
 

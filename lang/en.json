@@ -56,6 +56,7 @@
     "公開用URLをコピーしました。共有先に貼り付けてください。": "Share link copied. Paste it wherever you would like to share it.",
     "URLを選択しました。コピーして共有先に貼り付けてください。": "The URL is selected. Copy and paste it wherever you would like to share it.",
     "共有できませんでした。上記URLを手動でコピーしてください。": "Unable to share. Please copy the URL above manually.",
+    "コピーできませんでした。上記URLを手動でコピーしてください。": "Unable to copy. Please copy the URL above manually.",
     "決済を受け付けました。反映まで少し時間がかかる場合があります。": "Payment received. It may take a little while for your plan to be updated.",
     "決済は完了していません。必要であれば、いつでも再度お申し込みいただけます。": "Payment was not completed. You can try again whenever you are ready.",
     "現在のプラン": "Current plan",

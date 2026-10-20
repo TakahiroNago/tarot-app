@@ -56,16 +56,31 @@
 
         async function copyConsultationUrl() {
             if (navigator.clipboard && window.isSecureContext) {
-                await navigator.clipboard.writeText(shareUrlInput.value);
-                shareStatus.textContent = @json(__('公開用URLをコピーしました。'));
-                return true;
+                try {
+                    await navigator.clipboard.writeText(shareUrlInput.value);
+                    shareStatus.textContent = @json(__('公開用URLをコピーしました。'));
+                    return true;
+                } catch {
+                }
             }
 
             shareUrlInput.focus();
             shareUrlInput.select();
-            shareStatus.textContent = @json(__('URLを選択しました。コピーしてご利用ください。'));
-            return false;
+            const copied = document.execCommand('copy');
+            shareStatus.textContent = copied
+                ? @json(__('公開用URLをコピーしました。'))
+                : @json(__('URLを選択しました。コピーしてご利用ください。'));
+
+            return copied;
         }
+
+        shareUrlInput.addEventListener('click', async () => {
+            try {
+                await copyConsultationUrl();
+            } catch (error) {
+                shareStatus.textContent = @json(__('コピーできませんでした。上記URLを手動でコピーしてください。'));
+            }
+        });
 
         document.querySelector('[data-share-link]').addEventListener('click', async () => {
             try {
