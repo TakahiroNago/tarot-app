@@ -9,10 +9,12 @@ use App\Services\PublicConsultationShareService;
 use App\Services\StripeBillingService;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\Rule;
@@ -43,7 +45,7 @@ class AccountSettingsController extends Controller
         ]);
     }
 
-    public function update(Request $request): RedirectResponse
+    public function update(Request $request): JsonResponse|RedirectResponse
     {
         $user = $request->user();
         abort_unless($user instanceof User, 403);
@@ -57,10 +59,16 @@ class AccountSettingsController extends Controller
             $user->notify(new AccountActivityNotification('お名前の変更', $request->ip()));
         }
 
-        return to_route('account.settings.edit')->with('status', __('お名前を更新しました。'));
+        $message = __('お名前を更新しました。');
+
+        if ($request->expectsJson()) {
+            return response()->json(['message' => $message]);
+        }
+
+        return to_route('account.settings.edit')->with('status', $message);
     }
 
-    public function updateSecurityNotifications(Request $request): RedirectResponse
+    public function updateSecurityNotifications(Request $request): JsonResponse|RedirectResponse
     {
         $user = $request->user();
         abort_unless($user instanceof User, 403);
@@ -94,10 +102,16 @@ class AccountSettingsController extends Controller
             return to_route('home')->with('status', __('セキュリティ通知の設定を保存しました。'));
         }
 
-        return to_route('account.settings.edit')->with('status', __('セキュリティ通知の設定を更新しました。'));
+        $message = __('セキュリティ通知の設定を更新しました。');
+
+        if ($request->expectsJson()) {
+            return response()->json(['message' => $message]);
+        }
+
+        return to_route('account.settings.edit')->with('status', $message);
     }
 
-    public function requestEmailChange(Request $request): RedirectResponse
+    public function requestEmailChange(Request $request): JsonResponse|RedirectResponse
     {
         $user = $request->user();
         abort_unless($user instanceof User, 403);
@@ -107,7 +121,13 @@ class AccountSettingsController extends Controller
         ]);
 
         if ($user->email === $validated['email']) {
-            return to_route('account.settings.edit')->with('status', __('このメールアドレスは現在登録されています。'));
+            $message = __('このメールアドレスは現在登録されています。');
+
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $message]);
+            }
+
+            return to_route('account.settings.edit')->with('status', $message);
         }
 
         $verificationUrl = URL::temporarySignedRoute(
@@ -119,7 +139,13 @@ class AccountSettingsController extends Controller
         Notification::route('mail', $validated['email'])
             ->notify(new AccountEmailChangeVerification($verificationUrl));
 
-        return to_route('account.settings.edit')->with('status', __('確認用メールを送信しました。メール内のリンクを開くと変更が完了します。'));
+        $message = __('確認用メールを送信しました。メール内のリンクを開くと変更が完了します。');
+
+        if ($request->expectsJson()) {
+            return response()->json(['message' => $message]);
+        }
+
+        return to_route('account.settings.edit')->with('status', $message);
     }
 
     public function confirmEmailChange(Request $request, User $user): RedirectResponse
@@ -142,6 +168,22 @@ class AccountSettingsController extends Controller
             ->sendToEmail($user, $oldEmail);
 
         return to_route('account.settings.edit')->with('status', __('メールアドレスを変更しました。'));
+    }
+
+    public function verifyPassword(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user instanceof User, 403);
+
+        $validated = $request->validate([
+            'password' => ['required', 'string'],
+        ]);
+
+        if (! Hash::check($validated['password'], (string) $user->password)) {
+            return response()->json(['message' => __('パスワードが違います。')], 422);
+        }
+
+        return response()->json(['message' => 'ok']);
     }
 
     public function destroy(Request $request, StripeBillingService $billingService, PublicConsultationShareService $shareService): RedirectResponse

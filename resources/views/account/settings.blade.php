@@ -7,7 +7,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ __('アカウント設定') }} | {{ __('心の庵') }} ZEN REFLECTIONS</title>
-    @vite(['resources/css/app.css'])
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body>
     <div class="page-frame">
@@ -18,8 +18,9 @@
                 <h1>{{ __('アカウント設定') }}</h1>
 
                 @if (session('status'))
-                    <p class="form-notice" role="status">{{ __(session('status')) }}</p>
+                    <p class="form-notice" data-auto-dismiss role="status">{{ __(session('status')) }}</p>
                 @endif
+                <div class="toast-region" data-account-settings-notice data-error-message="{{ __('更新に失敗しました。時間をおいて再度お試しください。') }}" aria-live="polite"></div>
                 @if ($errors->has('account'))
                     <p class="form-error" role="alert">{{ __($errors->first('account')) }}</p>
                 @endif
@@ -29,7 +30,7 @@
 
                 <section class="account-settings-section">
                     <h2>{{ __('登録情報') }}</h2>
-                    <form class="question-form" method="POST" action="{{ route('account.settings.update') }}">
+                    <form class="question-form" method="POST" action="{{ route('account.settings.update') }}" data-account-settings-form>
                         @csrf
                         @method('PUT')
                         <label class="question-label" for="name">{{ __('お名前') }}</label>
@@ -39,7 +40,7 @@
                         <button class="primary-action" type="submit">{{ __('お名前を変更') }}</button>
                     </form>
 
-                    <form class="question-form" method="POST" action="{{ route('account.settings.email.update') }}">
+                    <form class="question-form" method="POST" action="{{ route('account.settings.email.update') }}" data-account-settings-form>
                         @csrf
                         @method('PUT')
                         <label class="question-label" for="email">{{ __('メールアドレス') }}</label>
@@ -57,7 +58,7 @@
                 <section class="account-settings-section">
                     <h2>{{ __('セキュリティ通知') }}</h2>
                     <p class="settings-note">{{ __('アカウントに関するセキュリティ通知をメールで受け取るか、通知の種類ごとに設定できます。') }}</p>
-                    <form class="question-form" method="POST" action="{{ route('account.settings.security-notifications.update') }}">
+                    <form class="question-form" method="POST" action="{{ route('account.settings.security-notifications.update') }}" data-account-settings-form>
                         @csrf
                         @method('PUT')
                         @php($selectedNotificationTypes = (array) old('types', $user->security_notification_types ?? array_keys(\App\Notifications\AccountActivityNotification::configurableActivityTypes())))
@@ -140,7 +141,7 @@
                     @if ($user->google_id !== null)
                         <p class="settings-note">{{ __('削除には現在のパスワードが必要です。Googleログインのみをご利用の場合は、一度ログアウトし、ログイン画面の「パスワードをお忘れですか？」からパスワードを設定して、再度ログインしてください。') }}</p>
                     @endif
-                    <form class="question-form" method="POST" action="{{ route('account.settings.destroy') }}" onsubmit="return confirm(@json(__('アカウントと関連データを削除します。この操作は取り消せません。削除しますか？')));">
+                    <form class="question-form" method="POST" action="{{ route('account.settings.destroy') }}" data-delete-account-form data-verify-url="{{ route('account.settings.verify-password') }}">
                         @csrf
                         @method('DELETE')
                         <label class="question-label" for="delete-password">{{ __('現在のパスワード') }}</label>
@@ -154,6 +155,14 @@
         </main>
         @include('partials.site-footer')
     </div>
+    <dialog class="confirm-dialog" data-delete-account-dialog aria-labelledby="delete-account-dialog-title">
+        <h2 id="delete-account-dialog-title">{{ __('アカウントを削除する') }}</h2>
+        <p>{{ __('アカウントと関連データを削除します。この操作は取り消せません。削除しますか？') }}</p>
+        <div class="confirm-dialog-actions">
+            <button class="secondary-action" type="button" data-delete-account-cancel>{{ __('キャンセル') }}</button>
+            <button class="danger-action" type="button" data-delete-account-confirm>{{ __('アカウントを削除する') }}</button>
+        </div>
+    </dialog>
     <script>
         const securityNotificationsToggle = document.querySelector('[data-security-notifications-enabled]');
         const securityNotificationTypes = document.querySelector('[data-security-notification-types]');

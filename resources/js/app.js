@@ -1,4 +1,4 @@
-const questionForm = document.querySelector('.question-form');
+const questionForm = document.querySelector('.question-form:not([data-account-settings-form], [data-delete-account-form])');
 const historyTopicFilter = document.querySelector('[data-history-topic-filter]');
 const plansPanel = document.querySelector('.plans-panel');
 const accountMenu = document.querySelector('.account-menu');
@@ -36,12 +36,127 @@ if (plansPanel && accountMenu && accountPopover && accountMenu.classList.contain
 	window.addEventListener('scroll', dismissAccountPopover, { passive: true });
 }
 
-document.querySelectorAll('[data-auto-dismiss]').forEach((notice) => {
+const scheduleAutoDismiss = (notice) => {
 	window.setTimeout(() => {
 		notice.classList.add('is-dismissing');
 		window.setTimeout(() => notice.remove(), 250);
 	}, 5000);
-});
+};
+
+document.querySelectorAll('[data-auto-dismiss]').forEach(scheduleAutoDismiss);
+
+const accountSettingsNotice = document.querySelector('[data-account-settings-notice]');
+
+if (accountSettingsNotice) {
+	const showNotice = (message, isError = false) => {
+		const toast = document.createElement('p');
+		toast.className = isError ? 'toast is-error' : 'toast';
+		toast.setAttribute('role', isError ? 'alert' : 'status');
+		toast.textContent = message;
+		scheduleAutoDismiss(toast);
+
+		accountSettingsNotice.append(toast);
+	};
+
+	document.querySelectorAll('[data-account-settings-form]').forEach((form) => {
+		form.addEventListener('submit', async (event) => {
+			event.preventDefault();
+
+			const submitButton = form.querySelector('button[type="submit"]');
+			submitButton.disabled = true;
+			form.setAttribute('aria-busy', 'true');
+
+			try {
+				const response = await fetch(form.action, {
+					method: 'POST',
+					body: new FormData(form),
+					headers: {
+						Accept: 'application/json',
+						'X-Requested-With': 'XMLHttpRequest',
+					},
+					credentials: 'same-origin',
+				});
+				let data;
+
+				try {
+					data = await response.json();
+				} catch {
+					throw new Error(accountSettingsNotice.dataset.errorMessage);
+				}
+
+				if (!response.ok) {
+					const firstValidationError = Object.values(data.errors ?? {}).flat()[0];
+					throw new Error(firstValidationError ?? data.message ?? accountSettingsNotice.dataset.errorMessage);
+				}
+
+				showNotice(data.message);
+			} catch (error) {
+				showNotice(
+					error instanceof Error ? error.message : accountSettingsNotice.dataset.errorMessage,
+					true,
+				);
+			} finally {
+				submitButton.disabled = false;
+				form.removeAttribute('aria-busy');
+			}
+		});
+	});
+
+	const deleteAccountForm = document.querySelector('[data-delete-account-form]');
+	const deleteAccountDialog = document.querySelector('[data-delete-account-dialog]');
+
+	if (deleteAccountForm && deleteAccountDialog) {
+		deleteAccountForm.addEventListener('submit', async (event) => {
+			event.preventDefault();
+
+			const submitButton = deleteAccountForm.querySelector('button[type="submit"]');
+			submitButton.disabled = true;
+
+			const verificationData = new FormData(deleteAccountForm);
+			verificationData.delete('_method');
+
+			try {
+				const response = await fetch(deleteAccountForm.dataset.verifyUrl, {
+					method: 'POST',
+					body: verificationData,
+					headers: {
+						Accept: 'application/json',
+						'X-Requested-With': 'XMLHttpRequest',
+					},
+					credentials: 'same-origin',
+				});
+
+				if (response.ok) {
+					deleteAccountDialog.showModal();
+					return;
+				}
+
+				let message = accountSettingsNotice.dataset.errorMessage;
+
+				try {
+					const data = await response.json();
+					message = Object.values(data.errors ?? {}).flat()[0] ?? data.message ?? message;
+				} catch {
+					// Keep the generic message when the response is not JSON.
+				}
+
+				showNotice(message, true);
+			} catch {
+				showNotice(accountSettingsNotice.dataset.errorMessage, true);
+			} finally {
+				submitButton.disabled = false;
+			}
+		});
+
+		deleteAccountDialog.querySelector('[data-delete-account-cancel]').addEventListener('click', () => {
+			deleteAccountDialog.close();
+		});
+
+		deleteAccountDialog.querySelector('[data-delete-account-confirm]').addEventListener('click', () => {
+			deleteAccountForm.submit();
+		});
+	}
+}
 
 if (questionForm) {
 	const submitButton = questionForm.querySelector('button[type="submit"]');

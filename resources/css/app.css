@@ -533,6 +533,49 @@ h2 {
     transition: opacity 250ms ease, transform 250ms ease;
 }
 
+.toast-region {
+    position: fixed;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    display: grid;
+    gap: 8px;
+    width: min(360px, calc(100vw - 32px));
+    pointer-events: none;
+}
+
+.toast {
+    margin: 0;
+    padding: 12px 14px;
+    border-left: 3px solid var(--color-forest);
+    background: #f4f8f1;
+    color: var(--color-forest-dark);
+    font-size: 14px;
+    line-height: 1.6;
+    box-shadow: 0 8px 24px rgb(0 0 0 / 14%);
+    animation: toast-in 200ms ease;
+}
+
+.toast.is-error {
+    border-left-color: #a74439;
+    background: #fbf0ee;
+    color: #a74439;
+}
+
+.toast.is-dismissing {
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 250ms ease, transform 250ms ease;
+}
+
+@keyframes toast-in {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+}
+
 .contact-privacy-note {
     margin: 4px 0 0;
     color: var(--color-muted);
@@ -626,6 +669,15 @@ h2 {
 .question-form .primary-action:disabled {
     cursor: wait;
     opacity: 0.82;
+}
+
+.question-form .primary-action[data-security-notifications-save]:disabled {
+    border-color: #c4c8c3;
+    background: #c4c8c3;
+    color: #f4f5f3;
+    cursor: not-allowed;
+    opacity: 1;
+    transform: none;
 }
 
 .login-divider {
@@ -1357,6 +1409,38 @@ h2 {
 .danger-action {
     border-color: #b95e4e;
     color: #963f32;
+}
+
+.confirm-dialog {
+    width: min(420px, calc(100vw - 32px));
+    padding: 24px;
+    border: 1px solid var(--color-line);
+    border-radius: 4px;
+    background: var(--color-panel);
+    color: var(--color-forest-dark);
+    box-shadow: 0 16px 40px rgb(0 0 0 / 22%);
+}
+
+.confirm-dialog::backdrop {
+    background: rgb(0 0 0 / 45%);
+}
+
+.confirm-dialog h2 {
+    margin: 0 0 12px;
+    font-size: 18px;
+}
+
+.confirm-dialog p {
+    margin: 0 0 20px;
+    font-size: 14px;
+    line-height: 1.7;
+}
+
+.confirm-dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 16px;
 }
 
 .admin-table-wrap {

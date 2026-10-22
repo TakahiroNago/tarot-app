@@ -159,6 +159,7 @@
     "アカウントと関連データを削除します。この操作は取り消せません。削除しますか？": "Your account and related data will be permanently deleted. This action cannot be undone. Continue?",
     "現在のパスワード": "Current password",
     "アカウントを削除する": "Delete account",
+    "パスワードが違います。": "The password is incorrect.",
     "メールアドレス変更の確認": "Verify your email change",
     "Googleアカウントの連携": "Google account linked",
     "Googleログイン": "Google sign-in",

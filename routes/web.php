@@ -137,6 +137,9 @@ Route::prefix('{locale}')
             Route::put('/settings/security-notifications', [AccountSettingsController::class, 'updateSecurityNotifications'])->name('settings.security-notifications.update');
             Route::put('/settings/email', [AccountSettingsController::class, 'requestEmailChange'])->name('settings.email.update');
             Route::delete('/settings', [AccountSettingsController::class, 'destroy'])->name('settings.destroy');
+            Route::post('/settings/verify-password', [AccountSettingsController::class, 'verifyPassword'])
+                ->middleware('throttle:6,1')
+                ->name('settings.verify-password');
         });
 
         Route::prefix('admin')->name('admin.')->middleware(['auth', 'active', 'verified', 'admin'])->group(function () {

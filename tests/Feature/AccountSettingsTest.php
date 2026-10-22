@@ -65,6 +65,45 @@ test('users can update their account name independently', function () {
         ->and($user->fresh()->email_verified_at)->not->toBeNull();
 });
 
+test('account settings updates return JSON for in-place feedback', function () {
+    Notification::fake();
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $this->actingAs($user)
+        ->putJson(route('account.settings.update'), [
+            'name' => '',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('name');
+
+    $this->actingAs($user)
+        ->putJson(route('account.settings.update'), [
+            'name' => 'Updated Name',
+        ])
+        ->assertOk()
+        ->assertExactJson(['message' => 'お名前を更新しました。']);
+
+    $this->actingAs($user)
+        ->putJson(route('account.settings.security-notifications.update'), [
+            'enabled' => '1',
+            'types' => ['login_group'],
+        ])
+        ->assertOk()
+        ->assertExactJson(['message' => 'セキュリティ通知の設定を更新しました。']);
+
+    $this->actingAs($user)
+        ->putJson(route('account.settings.email.update'), [
+            'email' => 'updated@example.com',
+        ])
+        ->assertOk()
+        ->assertExactJson(['message' => '確認用メールを送信しました。メール内のリンクを開くと変更が完了します。']);
+
+    expect($user->fresh()->name)->toBe('Updated Name')
+        ->and($user->fresh()->email)->toBe($user->email);
+});
+
 test('users can control security notifications globally and by activity type', function () {
     Notification::fake();
     $user = User::factory()->create([
@@ -445,6 +484,24 @@ test('an incorrect password prevents account deletion', function () {
 
     $this->assertDatabaseHas('users', ['id' => $user->id]);
     $this->assertAuthenticatedAs($user);
+});
+
+test('the password can be verified before the deletion confirmation opens', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'password' => Hash::make('A-strong-password-2026'),
+    ]);
+
+    $this->actingAs($user)
+        ->postJson(route('account.settings.verify-password'), ['password' => 'incorrect-password'])
+        ->assertUnprocessable()
+        ->assertJson(['message' => 'パスワードが違います。']);
+
+    $this->actingAs($user)
+        ->postJson(route('account.settings.verify-password'), ['password' => 'A-strong-password-2026'])
+        ->assertOk();
+
+    $this->assertDatabaseHas('users', ['id' => $user->id]);
 });
 
 test('the last active administrator cannot delete their account', function () {
