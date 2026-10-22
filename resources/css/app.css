@@ -557,6 +557,64 @@ h2 {
     accent-color: var(--color-forest);
 }
 
+.security-notification-switch {
+    gap: 12px;
+    margin-block: 4px;
+}
+
+.security-notification-switch input[type="checkbox"] {
+    position: relative;
+    flex: 0 0 44px;
+    width: 44px;
+    height: 24px;
+    margin: 0;
+    appearance: none;
+    border: 1px solid #9aa69f;
+    border-radius: 999px;
+    background: #dce2de;
+    cursor: pointer;
+    transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+.security-notification-switch input[type="checkbox"]::before {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 22%);
+    content: "";
+    transition: transform 160ms ease;
+}
+
+.security-notification-switch input[type="checkbox"]:checked {
+    border-color: var(--color-forest);
+    background: var(--color-forest);
+}
+
+.security-notification-switch input[type="checkbox"]:checked::before {
+    transform: translateX(20px);
+}
+
+.security-notification-switch input[type="checkbox"]:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--color-forest) 35%, transparent);
+    outline-offset: 2px;
+}
+
+.security-notification-switch input[type="checkbox"]:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .security-notification-switch input[type="checkbox"],
+    .security-notification-switch input[type="checkbox"]::before {
+        transition: none;
+    }
+}
+
 .question-form .primary-action {
     width: fit-content;
     min-width: 220px;

@@ -31,6 +31,7 @@ class User extends Authenticatable implements HasLocalePreference, MustVerifyEma
         'plan' => self::PLAN_FREE,
         'daily_credits' => 0,
         'purchased_credits' => 0,
+        'security_notifications_configured' => true,
     ];
 
     /** @use HasFactory<UserFactory> */
@@ -48,6 +49,7 @@ class User extends Authenticatable implements HasLocalePreference, MustVerifyEma
             'is_active' => 'boolean',
             'security_notifications_enabled' => 'boolean',
             'security_notification_types' => 'array',
+            'security_notifications_configured' => 'boolean',
             'daily_credits_refreshed_at' => 'date',
             'stripe_current_period_end' => 'datetime',
             'stripe_subscription_event_created_at' => 'datetime',
@@ -71,6 +73,10 @@ class User extends Authenticatable implements HasLocalePreference, MustVerifyEma
 
     public function receivesSecurityNotification(string $type): bool
     {
+        if (in_array($type, AccountActivityNotification::ALWAYS_SENT_TYPES, true)) {
+            return true;
+        }
+
         if ($this->security_notifications_enabled === false) {
             return false;
         }

@@ -88,6 +88,10 @@ Route::prefix('{locale}')
             Route::get('/email/verify/{id}/{hash}', function (EmailVerificationRequest $request) {
                 $request->fulfill();
 
+                if (! $request->user()->security_notifications_configured) {
+                    return redirect()->route('account.security-notifications.setup');
+                }
+
                 return redirect()->route('home')->with('status', 'email-verified');
             })->middleware(['signed', 'throttle:6,1'])->name('verification.verify');
 
@@ -124,6 +128,10 @@ Route::prefix('{locale}')
         });
 
         Route::middleware(['auth', 'active', 'verified'])->prefix('account')->name('account.')->group(function () {
+            Route::get('/security-notifications/setup', [AccountSettingsController::class, 'setupSecurityNotifications'])
+                ->name('security-notifications.setup');
+            Route::put('/security-notifications/setup', [AccountSettingsController::class, 'updateSecurityNotifications'])
+                ->name('security-notifications.setup.update');
             Route::get('/settings', [AccountSettingsController::class, 'edit'])->name('settings.edit');
             Route::put('/settings', [AccountSettingsController::class, 'update'])->name('settings.update');
             Route::put('/settings/security-notifications', [AccountSettingsController::class, 'updateSecurityNotifications'])->name('settings.security-notifications.update');

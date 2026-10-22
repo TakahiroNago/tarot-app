@@ -34,6 +34,10 @@ class RegisteredUserController extends Controller
             'is_active' => true,
             'preferred_locale' => app()->getLocale(),
         ]);
+        $user->forceFill([
+            'security_notifications_enabled' => false,
+            'security_notifications_configured' => false,
+        ])->save();
 
         event(new Registered($user));
         Auth::login($user);

@@ -34,6 +34,8 @@ test('a visitor can register and is assigned the user role', function () {
         'role' => User::ROLE_USER,
         'is_active' => true,
         'email_verified_at' => null,
+        'security_notifications_enabled' => false,
+        'security_notifications_configured' => false,
     ]);
     Notification::assertSentTo(User::where('email', 'new-user@example.com')->sole(), VerifyEmail::class);
 });
@@ -255,7 +257,10 @@ test('an unverified user can request a verification email and cannot access read
 });
 
 test('a user can verify their email using the signed verification link', function () {
-    $user = User::factory()->unverified()->create();
+    $user = User::factory()->unverified()->create([
+        'security_notifications_enabled' => false,
+        'security_notifications_configured' => false,
+    ]);
     $verificationUrl = URL::temporarySignedRoute(
         'verification.verify',
         now()->addMinutes(60),
@@ -264,10 +269,72 @@ test('a user can verify their email using the signed verification link', functio
 
     $this->actingAs($user)
         ->get($verificationUrl)
-        ->assertRedirect(route('home'))
-        ->assertSessionHas('status', 'email-verified');
+        ->assertRedirect(route('account.security-notifications.setup'));
 
-    expect($user->fresh()->hasVerifiedEmail())->toBeTrue();
+    $user = $user->fresh();
+    expect($user->hasVerifiedEmail())->toBeTrue()
+        ->and($user->security_notifications_enabled)->toBeFalse()
+        ->and($user->security_notifications_configured)->toBeFalse();
+
+    $this->actingAs($user)
+        ->get(route('home'))
+        ->assertRedirect(route('account.security-notifications.setup'));
+
+    $this->actingAs($user)
+        ->get(route('account.security-notifications.setup'))
+        ->assertOk()
+        ->assertSee('セキュリティ通知の初期設定')
+        ->assertSee('remember-option security-notification-switch', false)
+        ->assertSee('value="login_group"', false)
+        ->assertSee('value="account_status_group"', false);
+
+    $this->actingAs($user)
+        ->put(route('account.security-notifications.setup.update'), [
+            'enabled' => '1',
+            'types' => ['login_group', 'account_status_group'],
+        ])
+        ->assertRedirect(route('home'))
+        ->assertSessionHas('status', 'セキュリティ通知の設定を保存しました。');
+
+    $user = $user->fresh();
+    expect($user->security_notifications_configured)->toBeTrue()
+        ->and($user->security_notifications_enabled)->toBeTrue()
+        ->and($user->security_notification_types)->toBe([
+            'login',
+            'google_login',
+            'account_suspended',
+            'account_deleted',
+        ]);
+
+    $this->actingAs($user)
+        ->get(route('home'))
+        ->assertOk();
+});
+
+test('a new user can complete initial security notification setup with notifications disabled', function () {
+    $user = User::factory()->unverified()->create([
+        'security_notifications_enabled' => false,
+        'security_notifications_configured' => false,
+    ]);
+    $verificationUrl = URL::temporarySignedRoute(
+        'verification.verify',
+        now()->addMinutes(60),
+        ['id' => $user->id, 'hash' => sha1($user->email)],
+    );
+
+    $this->actingAs($user)
+        ->get($verificationUrl)
+        ->assertRedirect(route('account.security-notifications.setup'));
+
+    $this->actingAs($user)
+        ->put(route('account.security-notifications.setup.update'), [])
+        ->assertRedirect(route('home'));
+
+    $user = $user->fresh();
+    expect($user->security_notifications_configured)->toBeTrue()
+        ->and($user->security_notifications_enabled)->toBeFalse()
+        ->and($user->receivesSecurityNotification('login'))->toBeFalse()
+        ->and($user->receivesSecurityNotification('admin_account_changed'))->toBeTrue();
 });
 
 test('a verification link for a different email address is rejected', function () {

@@ -60,9 +60,10 @@
                     <form class="question-form" method="POST" action="{{ route('account.settings.security-notifications.update') }}">
                         @csrf
                         @method('PUT')
-                        @php($selectedNotificationTypes = (array) old('types', $user->security_notification_types ?? array_keys($notificationTypes)))
+                        @php($selectedNotificationTypes = (array) old('types', $user->security_notification_types ?? array_keys(\App\Notifications\AccountActivityNotification::configurableActivityTypes())))
+                        @php($selectedNotificationTypes = collect($selectedNotificationTypes)->flatMap(fn (string $type): array => $notificationTypeGroups[$type]['types'] ?? [$type])->all())
                         @php($securityNotificationsEnabled = old('enabled', $user->security_notifications_enabled ?? true))
-                        <label class="remember-option">
+                        <label class="remember-option security-notification-switch">
                             <input name="enabled" type="checkbox" value="1" data-security-notifications-enabled @checked($securityNotificationsEnabled)>
                             {{ __('セキュリティ通知を受け取る') }}
                         </label>
@@ -70,17 +71,19 @@
 
                         <fieldset data-security-notification-types @disabled(! $securityNotificationsEnabled)>
                             <legend class="question-label">{{ __('通知の種類') }}</legend>
-                            @foreach ($notificationTypes as $type => $label)
-                                <label class="remember-option">
-                                    <input name="types[]" type="checkbox" value="{{ $type }}" @checked(in_array($type, $selectedNotificationTypes, true))>
-                                    {{ __($label) }}
+                            @foreach ($notificationTypeGroups as $group => $notificationTypeGroup)
+                                @php($types = $notificationTypeGroup['types'])
+                                @php($groupEnabled = count(array_intersect($types, $selectedNotificationTypes)) > 0)
+                                <label class="remember-option security-notification-switch">
+                                    <input name="types[]" type="checkbox" value="{{ $group }}" @checked($groupEnabled)>
+                                    {{ __($notificationTypeGroup['label']) }}
                                 </label>
                             @endforeach
                         </fieldset>
                         @error('types')<p class="form-error" role="alert">{{ __($message) }}</p>@enderror
                         @error('types.*')<p class="form-error" role="alert">{{ __($message) }}</p>@enderror
 
-                        <button class="primary-action" type="submit">{{ __('通知設定を保存') }}</button>
+                        <button class="primary-action" type="submit" data-security-notifications-save disabled>{{ __('通知設定を保存') }}</button>
                     </form>
                 </section>
 
@@ -154,9 +157,19 @@
     <script>
         const securityNotificationsToggle = document.querySelector('[data-security-notifications-enabled]');
         const securityNotificationTypes = document.querySelector('[data-security-notification-types]');
+        const securityNotificationSwitches = document.querySelectorAll(
+            'input[name="enabled"], input[name="types[]"]',
+        );
+        const securityNotificationsSaveButton = document.querySelector('[data-security-notifications-save]');
 
         securityNotificationsToggle.addEventListener('change', () => {
             securityNotificationTypes.disabled = !securityNotificationsToggle.checked;
+        });
+
+        securityNotificationSwitches.forEach((securityNotificationSwitch) => {
+            securityNotificationSwitch.addEventListener('change', () => {
+                securityNotificationsSaveButton.disabled = false;
+            });
         });
     </script>
 </body>

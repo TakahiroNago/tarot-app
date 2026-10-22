@@ -81,22 +81,36 @@ test('users can control security notifications globally and by activity type', f
         ->assertOk()
         ->assertSee('セキュリティ通知')
         ->assertSee('name="enabled"', false)
-        ->assertSee('name="types[]"', false)
+        ->assertSee('remember-option security-notification-switch', false)
+        ->assertSee('data-security-notifications-save disabled', false)
+        ->assertSee('value="login_group"', false)
+        ->assertSee('value="account_status_group"', false)
+        ->assertDontSee('value="admin_account_changed"', false)
+        ->assertDontSee('管理者によるアカウント情報の変更')
+        ->assertSee('ログイン')
+        ->assertSee('アカウントの利用停止・削除')
         ->assertDontSee('<fieldset disabled', false);
 
     $this->actingAs($user)
         ->put(route('account.settings.security-notifications.update'), [
             'enabled' => '1',
-            'types' => ['login'],
+            'types' => ['login_group', 'account_status_group'],
         ])
         ->assertRedirect(route('account.settings.edit'))
         ->assertSessionHas('status', 'セキュリティ通知の設定を更新しました。');
 
     $user = $user->fresh();
     expect($user->receivesSecurityNotification('login'))->toBeTrue()
+        ->and($user->receivesSecurityNotification('google_login'))->toBeTrue()
+        ->and($user->receivesSecurityNotification('account_suspended'))->toBeTrue()
+        ->and($user->receivesSecurityNotification('account_deleted'))->toBeTrue()
         ->and($user->receivesSecurityNotification('name_changed'))->toBeFalse();
 
     expect((new AccountActivityNotification('ログイン', null))->via($user))->toBe(['mail'])
+        ->and((new AccountActivityNotification('Googleログイン', null))->via($user))->toBe(['mail'])
+        ->and((new AccountActivityNotification('アカウントの利用停止', null))->via($user))->toBe(['mail'])
+        ->and((new AccountActivityNotification('アカウントの削除', null))->via($user))->toBe(['mail'])
+        ->and((new AccountActivityNotification('管理者によるアカウント情報の変更', null))->via($user))->toBe(['mail'])
         ->and((new AccountActivityNotification('お名前の変更', null))->via($user))->toBe([]);
 
     (new AccountActivityNotification('お名前の変更', null))->sendToEmail($user, $user->email);
@@ -113,6 +127,17 @@ test('users can control security notifications globally and by activity type', f
             && $notifiable->routeNotificationFor('mail') === $user->email;
     });
 
+    (new AccountActivityNotification('管理者によるアカウント情報の変更', null))->sendToEmail($user, $user->email);
+    Notification::assertSentOnDemand(AccountActivityNotification::class, function (
+        AccountActivityNotification $notification,
+        array $channels,
+        $notifiable,
+    ) use ($user): bool {
+        return $notification->activity === '管理者によるアカウント情報の変更'
+            && $channels === ['mail']
+            && $notifiable->routeNotificationFor('mail') === $user->email;
+    });
+
     $this->actingAs($user)
         ->put(route('account.settings.security-notifications.update'), [
         ])
@@ -120,14 +145,17 @@ test('users can control security notifications globally and by activity type', f
 
     $user = $user->fresh();
     expect($user->security_notifications_enabled)->toBeFalse()
-        ->and($user->security_notification_types)->toBe(['login'])
+        ->and($user->security_notification_types)->toBe(['login', 'google_login', 'account_suspended', 'account_deleted'])
         ->and($user->receivesSecurityNotification('login'))->toBeFalse();
+
+    expect($user->receivesSecurityNotification('admin_account_changed'))->toBeTrue();
 
     $this->actingAs($user)
         ->get(route('account.settings.edit'))
         ->assertOk()
         ->assertSee('<fieldset data-security-notification-types disabled>', false)
         ->assertSee('data-security-notifications-enabled', false)
+        ->assertSee('securityNotificationsSaveButton.disabled = false;', false)
         ->assertSee('securityNotificationTypes.disabled = !securityNotificationsToggle.checked;', false);
 });
 

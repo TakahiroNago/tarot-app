@@ -24,9 +24,23 @@ class AccountSettingsController extends Controller
     {
         $user = $request->user();
         abort_unless($user instanceof User, 403);
-        $notificationTypes = AccountActivityNotification::activityTypes();
+        $notificationTypeGroups = AccountActivityNotification::configurableActivityTypeGroups();
 
-        return view('account.settings', compact('notificationTypes', 'user'));
+        return view('account.settings', compact('notificationTypeGroups', 'user'));
+    }
+
+    public function setupSecurityNotifications(Request $request): View|RedirectResponse
+    {
+        $user = $request->user();
+        abort_unless($user instanceof User, 403);
+
+        if ($user->security_notifications_configured) {
+            return to_route('account.settings.edit');
+        }
+
+        return view('account.security-notifications-setup', [
+            'notificationTypeGroups' => AccountActivityNotification::configurableActivityTypeGroups(),
+        ]);
     }
 
     public function update(Request $request): RedirectResponse
@@ -51,10 +65,11 @@ class AccountSettingsController extends Controller
         $user = $request->user();
         abort_unless($user instanceof User, 403);
 
+        $notificationTypeGroups = AccountActivityNotification::configurableActivityTypeGroups();
         $validated = $request->validate([
             'enabled' => ['sometimes', 'boolean'],
             'types' => ['sometimes', 'array'],
-            'types.*' => ['string', Rule::in(array_keys(AccountActivityNotification::activityTypes()))],
+            'types.*' => ['string', Rule::in(array_keys($notificationTypeGroups))],
         ]);
 
         $notificationPreferences = [
@@ -62,10 +77,22 @@ class AccountSettingsController extends Controller
         ];
 
         if ($request->boolean('enabled')) {
-            $notificationPreferences['security_notification_types'] = $validated['types'] ?? [];
+            $selectedTypes = $validated['types'] ?? [];
+            $notificationPreferences['security_notification_types'] = collect($selectedTypes)
+                ->flatMap(fn (string $group): array => $notificationTypeGroups[$group]['types'])
+                ->values()
+                ->all();
+        }
+
+        if ($request->routeIs('account.security-notifications.setup.update')) {
+            $notificationPreferences['security_notifications_configured'] = true;
         }
 
         $user->forceFill($notificationPreferences)->save();
+
+        if ($request->routeIs('account.security-notifications.setup.update')) {
+            return to_route('home')->with('status', __('セキュリティ通知の設定を保存しました。'));
+        }
 
         return to_route('account.settings.edit')->with('status', __('セキュリティ通知の設定を更新しました。'));
     }

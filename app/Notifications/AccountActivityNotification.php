@@ -10,6 +10,10 @@ use InvalidArgumentException;
 
 class AccountActivityNotification extends Notification
 {
+    public const ALWAYS_SENT_TYPES = [
+        'admin_account_changed',
+    ];
+
     public const ACTIVITY_TYPES = [
         'login' => 'ログイン',
         'google_login' => 'Googleログイン',
@@ -43,6 +47,34 @@ class AccountActivityNotification extends Notification
     public static function activityTypes(): array
     {
         return self::ACTIVITY_TYPES;
+    }
+
+    /**
+     * @return array<string, array{label: string, types: array<int, string>}>
+     */
+    public static function configurableActivityTypeGroups(): array
+    {
+        $types = self::ACTIVITY_TYPES;
+
+        return [
+            'login_group' => ['label' => 'ログイン', 'types' => ['login', 'google_login']],
+            'password_reset' => ['label' => $types['password_reset'], 'types' => ['password_reset']],
+            'name_changed' => ['label' => $types['name_changed'], 'types' => ['name_changed']],
+            'email_changed' => ['label' => $types['email_changed'], 'types' => ['email_changed']],
+            'google_linked' => ['label' => $types['google_linked'], 'types' => ['google_linked']],
+            'account_status_group' => [
+                'label' => 'アカウントの利用停止・削除',
+                'types' => ['account_suspended', 'account_deleted'],
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function configurableActivityTypes(): array
+    {
+        return array_diff_key(self::ACTIVITY_TYPES, array_flip(self::ALWAYS_SENT_TYPES));
     }
 
     /**
