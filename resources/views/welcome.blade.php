@@ -6,7 +6,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ __('心の庵') }} ZEN REFLECTIONS</title>
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @vite(['resources/css/app.css'])
 </head>
 <body>
     <div class="page-frame">
@@ -15,7 +15,7 @@
             <section class="welcome-panel">
                 <div class="welcome-copy">
                     @if (session('status') === 'email-verified')
-                        <p class="form-notice" data-auto-dismiss role="status">{{ __('メールアドレスを確認しました。') }}</p>
+                        @include('partials.toast', ['message' => __('メールアドレスを確認しました。')])
                     @endif
                     <p class="eyebrow">{{ __('今日のあなたへ') }}</p>
                     <h1 class="welcome-title">{{ __('迷いの中に') }}<br>{{ __('小さな一歩を') }}</h1>

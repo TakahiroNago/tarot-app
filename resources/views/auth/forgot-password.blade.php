@@ -13,7 +13,7 @@
             <section class="form-panel">
                 <p class="eyebrow">PASSWORD RESET</p>
                 <h1>{{ __('パスワード再設定') }}</h1>
-                @if (session('status'))<p class="form-notice" role="status">{{ __(session('status')) }}</p>@endif
+                @if (session('status'))@include('partials.toast', ['message' => __(session('status'))])@endif
                 <form class="question-form" method="POST" action="{{ route('password.email') }}">
                     @csrf
                     <label class="question-label" for="email">{{ __('登録メールアドレス') }}</label>

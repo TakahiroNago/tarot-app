@@ -7,7 +7,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ __('アカウント設定') }} | {{ __('心の庵') }} ZEN REFLECTIONS</title>
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @vite(['resources/css/app.css'])
 </head>
 <body>
     <div class="page-frame">
@@ -18,15 +18,15 @@
                 <h1>{{ __('アカウント設定') }}</h1>
 
                 @if (session('status'))
-                    <p class="form-notice" data-auto-dismiss role="status">{{ __(session('status')) }}</p>
+                    @include('partials.toast', ['message' => __(session('status'))])
                 @endif
-                <div class="toast-region" data-account-settings-notice data-error-message="{{ __('更新に失敗しました。時間をおいて再度お試しください。') }}" aria-live="polite"></div>
                 @if ($errors->has('account'))
-                    <p class="form-error" role="alert">{{ __($errors->first('account')) }}</p>
+                    @include('partials.toast', ['message' => __($errors->first('account')), 'type' => 'error'])
                 @endif
                 @if ($errors->has('billing'))
-                    <p class="form-error" role="alert">{{ __($errors->first('billing')) }}</p>
+                    @include('partials.toast', ['message' => __($errors->first('billing')), 'type' => 'error'])
                 @endif
+                <div class="toast-region" data-toast-region data-account-settings-notice data-error-message="{{ __('更新に失敗しました。時間をおいて再度お試しください。') }}" aria-live="polite"></div>
 
                 <section class="account-settings-section">
                     <h2>{{ __('登録情報') }}</h2>

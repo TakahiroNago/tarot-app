@@ -6,7 +6,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ __('心の庵') }} ZEN REFLECTIONS</title>
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @vite(['resources/css/app.css'])
 </head>
 <body>
     <div class="page-frame">
@@ -15,10 +15,10 @@
         <main class="page-content">
             <section class="form-panel">
                 @if (session('status') === 'email-verified')
-                    <p class="form-notice" data-auto-dismiss role="status">{{ __('メールアドレスを確認しました。') }}</p>
+                    @include('partials.toast', ['message' => __('メールアドレスを確認しました。')])
                 @endif
                 @if (session('consultation_rate_limited'))
-                    <p class="form-notice credit-notice" role="alert">{{ session('consultation_rate_limited') }}</p>
+                    @include('partials.toast', ['message' => session('consultation_rate_limited'), 'type' => 'error'])
                 @endif
                 <p class="eyebrow">A MOMENT FOR YOU</p>
                 <h1>{{ __('心にある悩みを') }}<br>{{ __('聞かせてください') }}</h1>
@@ -62,7 +62,7 @@
                         maxlength="200"
                         required
                     >
-                    <p class="page-description">{{ __('氏名・住所・勤務先・電話番号・メールアドレスなどの個人情報は、ご自身や他の方のものも含めて書かないでください。') }}</p>
+                    <p class="page-description question-privacy-note">{{ __('氏名・住所・勤務先・電話番号・メールアドレスなどの個人情報は、ご自身や他の方のものも含めて書かないでください。') }}</p>
                     @error('concern')
                         <p class="form-error" role="alert">{{ $message }}</p>
                     @enderror

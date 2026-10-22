@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ __('料金・プラン') }} | {{ __('心の庵') }} ZEN REFLECTIONS</title>
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @vite(['resources/css/app.css'])
 </head>
 <body>
     <div class="page-frame">
@@ -15,12 +15,12 @@
                 <h1>{{ __('料金・プラン') }}</h1>
 
                 @if ($errors->has('billing'))
-                    <p class="form-notice credit-notice" role="alert">{{ __($errors->first('billing')) }}</p>
+                    @include('partials.toast', ['message' => __($errors->first('billing')), 'type' => 'error'])
                 @endif
                 @if (request('checkout') === 'success')
-                    <p class="form-notice credit-notice" role="status">{{ __('決済を受け付けました。反映まで少し時間がかかる場合があります。') }}</p>
+                    @include('partials.toast', ['message' => __('決済を受け付けました。反映まで少し時間がかかる場合があります。')])
                 @elseif (request('checkout') === 'cancelled')
-                    <p class="form-notice credit-notice" role="status">{{ __('決済は完了していません。必要であれば、いつでも再度お申し込みいただけます。') }}</p>
+                    @include('partials.toast', ['message' => __('決済は完了していません。必要であれば、いつでも再度お申し込みいただけます。')])
                 @endif
 
                 @auth

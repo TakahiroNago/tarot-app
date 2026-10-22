@@ -472,6 +472,11 @@ h2 {
     margin-bottom: 38px;
 }
 
+.page-description.question-privacy-note {
+    font-size: 12px;
+    line-height: 1.7;
+}
+
 .question-form {
     display: grid;
     gap: 12px;
@@ -799,8 +804,7 @@ h2 {
     border-top: 1px solid var(--color-line);
 }
 
-.consultation-share-note,
-.consultation-share-status {
+.consultation-share-note {
     margin: 8px 0 0;
     color: var(--color-muted);
     font-size: 12px;
@@ -1529,11 +1533,6 @@ h2 {
 
 .admin-form-panel {
     max-width: 760px;
-}
-
-.admin-errors p {
-    margin-bottom: 8px;
-    color: #963f32;
 }
 
 .sr-only {

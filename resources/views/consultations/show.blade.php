@@ -40,7 +40,6 @@
                                 aria-label="{{ __('公開用相談URL') }}"
                             >
                         </div>
-                        <p class="consultation-share-status" role="status" aria-live="polite" data-consultation-share-status></p>
                     </section>
                     <div class="history-actions">
                         <form method="POST" action="{{ route('consultations.destroy', $consultationId) }}" onsubmit="return confirm(this.dataset.confirm)" data-confirm="{{ __('この相談の記録を削除しますか？公開用URLも無効になります。') }}">
@@ -58,13 +57,13 @@
     </div>
     <script>
         const shareUrlInput = document.querySelector('#consultation-share-url');
-        const shareStatus = document.querySelector('[data-consultation-share-status]');
+        const showShareStatus = (message, isError = false) => window.showToast(message, isError);
 
         async function copyConsultationUrl() {
             if (navigator.clipboard && window.isSecureContext) {
                 try {
                     await navigator.clipboard.writeText(shareUrlInput.value);
-                    shareStatus.textContent = @json(__('公開用URLをコピーしました。'));
+                    showShareStatus(@json(__('公開用URLをコピーしました。')));
                     return true;
                 } catch {
                 }
@@ -73,9 +72,9 @@
             shareUrlInput.focus();
             shareUrlInput.select();
             const copied = document.execCommand('copy');
-            shareStatus.textContent = copied
+            showShareStatus(copied
                 ? @json(__('公開用URLをコピーしました。'))
-                : @json(__('URLを選択しました。コピーしてご利用ください。'));
+                : @json(__('URLを選択しました。コピーしてご利用ください。')));
 
             return copied;
         }
@@ -84,7 +83,7 @@
             try {
                 await copyConsultationUrl();
             } catch (error) {
-                shareStatus.textContent = @json(__('コピーできませんでした。上記URLを手動でコピーしてください。'));
+                showShareStatus(@json(__('コピーできませんでした。上記URLを手動でコピーしてください。')), true);
             }
         });
 
@@ -96,15 +95,15 @@
                 }
 
                 const copied = await copyConsultationUrl();
-                shareStatus.textContent = copied
+                showShareStatus(copied
                     ? @json(__('公開用URLをコピーしました。共有先に貼り付けてください。'))
-                    : @json(__('URLを選択しました。コピーして共有先に貼り付けてください。'));
+                    : @json(__('URLを選択しました。コピーして共有先に貼り付けてください。')));
             } catch (error) {
                 if (error instanceof DOMException && error.name === 'AbortError') {
                     return;
                 }
 
-                shareStatus.textContent = @json(__('共有できませんでした。上記URLを手動でコピーしてください。'));
+                showShareStatus(@json(__('共有できませんでした。上記URLを手動でコピーしてください。')), true);
             }
         });
     </script>

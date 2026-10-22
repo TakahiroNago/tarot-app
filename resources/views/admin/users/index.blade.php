@@ -13,7 +13,7 @@
             <section class="admin-panel">
                 <p class="eyebrow">ADMINISTRATION</p>
                 <h1>{{ __('ユーザー管理') }}</h1>
-                @if (session('status'))<p class="form-notice" role="status">{{ __(session('status')) }}</p>@endif
+                @if (session('status'))@include('partials.toast', ['message' => __(session('status'))])@endif
                 <form class="user-search" method="GET" action="{{ route('admin.users.index') }}">
                     <label class="sr-only" for="search">{{ __('名前またはメールアドレスで検索') }}</label>
                     <input class="question-input" id="search" name="search" type="search" value="{{ $search }}" placeholder="{{ __('名前・メールアドレス') }}">

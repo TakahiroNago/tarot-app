@@ -352,13 +352,14 @@ test('a verification link for a different email address is rejected', function (
     expect($user->fresh()->hasVerifiedEmail())->toBeFalse();
 });
 
-test('the email verification confirmation is marked to auto-dismiss on the welcome and Zen pages', function () {
+test('the email verification confirmation is shown as an auto-dismissing toast on the welcome and Zen pages', function () {
     $user = User::factory()->create();
 
     $this->actingAs($user)
         ->withSession(['status' => 'email-verified'])
         ->get(route('home'))
         ->assertOk()
+        ->assertSee('class="toast"', false)
         ->assertSee('data-auto-dismiss', false)
         ->assertSee('メールアドレスを確認しました。');
 
@@ -366,6 +367,7 @@ test('the email verification confirmation is marked to auto-dismiss on the welco
         ->withSession(['status' => 'email-verified'])
         ->get(route('zen'))
         ->assertOk()
+        ->assertSee('class="toast"', false)
         ->assertSee('data-auto-dismiss', false)
         ->assertSee('メールアドレスを確認しました。');
 });

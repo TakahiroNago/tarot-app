@@ -9,3 +9,4 @@
         <a href="{{ route('legal.refund-credit-policy') }}">{{ __('返金・クレジットポリシー') }}</a>
     </nav>
 </footer>
+@vite(['resources/js/app.js'])

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex, nofollow, noarchive">
     <title>{{ __('相談の記録') }} | {{ __('心の庵') }} ZEN REFLECTIONS</title>
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @vite(['resources/css/app.css'])
 </head>
 <body>
     <div class="page-frame">
@@ -14,7 +14,7 @@
             <section class="history-panel">
                 <p class="eyebrow">ZEN JOURNAL</p>
                 @if (session('status'))
-                    <p class="form-notice" data-auto-dismiss role="status">{{ session('status') }}</p>
+                    @include('partials.toast', ['message' => session('status')])
                 @endif
                 @if ($databaseConsultations?->isNotEmpty())
                     <p class="page-description">{{ __('個人情報を含む相談は :days 日を過ぎると自動的に削除されます。それ以外の相談は、削除するまで保存されます。', ['days' => config('zen.consultation_retention_days')]) }}</p>

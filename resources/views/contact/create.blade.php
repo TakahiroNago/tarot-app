@@ -16,7 +16,7 @@
                 <p class="page-description">{{ __('ご質問やご相談はこちらのフォームからお送りください。内容を確認のうえ、必要に応じてご入力いただいたメールアドレス宛に返信します。') }}</p>
 
                 @if (session('status'))
-                    <p class="form-notice" role="status">{{ __(session('status')) }}</p>
+                    @include('partials.toast', ['message' => __(session('status'))])
                 @endif
 
                 <form class="question-form" method="POST" action="{{ route('contact.store') }}">

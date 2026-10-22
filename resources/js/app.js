@@ -43,19 +43,43 @@ const scheduleAutoDismiss = (notice) => {
 	}, 5000);
 };
 
+const toastRegions = [...document.querySelectorAll('[data-toast-region]')];
+const toastRegion = toastRegions.find((region) => region.hasAttribute('data-account-settings-notice'))
+	?? toastRegions[0]
+	?? document.createElement('div');
+
+if (toastRegions.length === 0) {
+	toastRegion.className = 'toast-region';
+	toastRegion.setAttribute('data-toast-region', '');
+	toastRegion.setAttribute('aria-live', 'polite');
+	document.body.append(toastRegion);
+} else {
+	toastRegions.filter((region) => region !== toastRegion).forEach((region) => {
+		while (region.firstChild) {
+			toastRegion.append(region.firstChild);
+		}
+
+		region.remove();
+	});
+}
+
+window.showToast = (message, isError = false) => {
+	const toast = document.createElement('p');
+	toast.className = isError ? 'toast is-error' : 'toast';
+	toast.setAttribute('data-auto-dismiss', '');
+	toast.setAttribute('role', isError ? 'alert' : 'status');
+	toast.textContent = message;
+	toastRegion.append(toast);
+	scheduleAutoDismiss(toast);
+};
+
 document.querySelectorAll('[data-auto-dismiss]').forEach(scheduleAutoDismiss);
 
 const accountSettingsNotice = document.querySelector('[data-account-settings-notice]');
 
 if (accountSettingsNotice) {
 	const showNotice = (message, isError = false) => {
-		const toast = document.createElement('p');
-		toast.className = isError ? 'toast is-error' : 'toast';
-		toast.setAttribute('role', isError ? 'alert' : 'status');
-		toast.textContent = message;
-		scheduleAutoDismiss(toast);
-
-		accountSettingsNotice.append(toast);
+		window.showToast(message, isError);
 	};
 
 	document.querySelectorAll('[data-account-settings-form]').forEach((form) => {

@@ -13,8 +13,12 @@
             <section class="admin-panel admin-detail">
                 <p class="eyebrow">USER DETAILS</p>
                 <h1>{{ $user->name }}</h1>
-                @if (session('status'))<p class="form-notice" role="status">{{ __(session('status')) }}</p>@endif
-                @if ($errors->any())<div class="admin-errors" role="alert">@foreach ($errors->all() as $error)<p>{{ __($error) }}</p>@endforeach</div>@endif
+                @if (session('status'))@include('partials.toast', ['message' => __(session('status'))])@endif
+                @if ($errors->any())
+                    @foreach ($errors->all() as $error)
+                        @include('partials.toast', ['message' => __($error), 'type' => 'error'])
+                    @endforeach
+                @endif
                 <dl class="user-details">
                     <div><dt>{{ __('メールアドレス') }}</dt><dd>{{ $user->email }}</dd></div>
                     <div><dt>{{ __('権限') }}</dt><dd>{{ $user->isAdmin() ? 'Admin' : 'User' }}</dd></div>

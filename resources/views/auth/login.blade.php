@@ -13,7 +13,7 @@
             <section class="form-panel">
                 <p class="eyebrow">WELCOME BACK</p>
                 <h1>{{ __('ログイン') }}</h1>
-                @if (session('status'))<p class="form-notice" role="status">{{ __(session('status')) }}</p>@endif
+                @if (session('status'))@include('partials.toast', ['message' => __(session('status'))])@endif
                 <form class="question-form" method="POST" action="{{ route('login.store') }}">
                     @csrf
                     <label class="question-label" for="email">{{ __('メールアドレス') }}</label>

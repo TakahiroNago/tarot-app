@@ -15,7 +15,7 @@
                 <h1>{{ __('メールアドレスの確認') }}</h1>
                 <p class="page-description">{{ __('登録を完了するため、メールに記載された確認リンクを開いてください。') }}</p>
                 @if (session('status') === 'verification-link-sent')
-                    <p class="form-notice" role="status">{{ __('確認メールを再送しました。受信トレイをご確認ください。') }}</p>
+                    @include('partials.toast', ['message' => __('確認メールを再送しました。受信トレイをご確認ください。')])
                 @endif
                 <form class="question-form" method="POST" action="{{ route('verification.send') }}">
                     @csrf
