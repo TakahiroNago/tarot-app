@@ -1225,6 +1225,16 @@ h2 {
     font-family: var(--font-sans-ja);
 }
 
+.site-footer-branding {
+    display: grid;
+    gap: 6px;
+}
+
+.site-footer-copyright {
+    color: var(--color-muted);
+    font-size: 12px;
+}
+
 .site-footer-links {
     display: flex;
     flex-wrap: wrap;
