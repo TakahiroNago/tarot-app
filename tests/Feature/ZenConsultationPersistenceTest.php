@@ -88,6 +88,11 @@ test('authenticated consultations are stored with their topic and summary', func
             && str_contains($parameters['messages'][0]['content'], '「『○○』という禅の言葉があります。これは××という意味です。」')
             && str_contains($parameters['messages'][0]['content'], '今回の相談に結びつけ')
             && str_contains($parameters['messages'][0]['content'], '作ったりせず')
+            && str_contains($parameters['messages'][0]['content'], '最も大切だと思われる一つの気づき')
+            && str_contains($parameters['messages'][0]['content'], '## 回答の形式と情報量')
+            && str_contains($parameters['messages'][0]['content'], '番号付きリストや箇条書き')
+            && str_contains($parameters['messages'][0]['content'], '## ZENが目指す対話')
+            && str_contains($parameters['messages'][0]['content'], '行動できない事情を理解すること')
             && $parameters['messages'][1]['content'] === '相談：What should I focus on?';
     });
 
@@ -120,6 +125,11 @@ test('English consultations use English prompts and store an English summary', f
     $openAiFake->assertSent(Chat::class, function (string $method, array $parameters): bool {
         return $method === 'create'
             && str_contains($parameters['messages'][0]['content'], 'Respond in English.')
+            && str_contains($parameters['messages'][0]['content'], 'Focus on the single insight')
+            && str_contains($parameters['messages'][0]['content'], '## Response format and amount of information')
+            && str_contains($parameters['messages'][0]['content'], 'Use numbered or bulleted lists only')
+            && str_contains($parameters['messages'][0]['content'], '## The kind of dialogue ZEN aims for')
+            && str_contains($parameters['messages'][0]['content'], 'Understanding what makes action difficult')
             && $parameters['messages'][1]['content'] === 'Concern: How can I grow in my career?';
     });
     $openAiFake->assertSent(Chat::class, function (string $method, array $parameters): bool {
