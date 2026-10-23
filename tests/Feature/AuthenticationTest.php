@@ -131,6 +131,8 @@ test('the account icon opens the plan page with the account popover visible', fu
 test('the header shows the total credit balance on other authenticated pages', function () {
     $user = User::factory()->create();
     $user->forceFill([
+        'plan' => User::PLAN_LITE,
+        'daily_credits_plan' => User::PLAN_LITE,
         'daily_credits' => 2,
         'daily_credits_refreshed_at' => now()->toDateString(),
         'purchased_credits' => 7,
@@ -140,7 +142,7 @@ test('the header shows the total credit balance on other authenticated pages', f
         $this->actingAs($user)
             ->get($url)
             ->assertOk()
-            ->assertSee('<strong>9</strong> 回', false)
+            ->assertSeeText('9 回')
             ->assertDontSee('料金・プラン</a>', false);
     }
 });

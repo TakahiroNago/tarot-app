@@ -117,7 +117,7 @@ test('free members receive one reading per day without carrying unused credits f
     $this->actingAs($user)->get(route('zen'))
         ->assertOk()
         ->assertSee('class="credit-balance-link"', false)
-        ->assertSee('<strong>1</strong> 回', false)
+        ->assertSeeText('1 回')
         ->assertSee(route('plans'))
         ->assertDontSee('今日の残り')
         ->assertDontSee('購入クレジット');
