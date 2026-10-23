@@ -1,58 +1,128 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# ZEN — AI禅相談アプリ
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+AIを活用し、日常の悩みや迷いについて、禅の考え方を参考にしながら自分自身を見つめ直すためのWebアプリケーションです。
 
-## About Laravel
+## 概要
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+**ZEN — 心の庵 ZEN REFLECTIONS** は、ユーザーが抱える悩みを言葉にし、落ち着いて自分の気持ちや状況を見つめ直すきっかけを提供する個人開発プロジェクトです。
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+AIによる対話を通じて、単に行動を指示したり、正解を押しつけたりするのではなく、ユーザーの気持ちに寄り添い、内省につながる言葉を届けることを目指しています。
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+企画・設計・実装から、本番環境へのデプロイまで、一貫して開発しています。
 
-## Learning Laravel
+## 公開デモ
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+**Webアプリ：** [https://zen.art-full-stack.com/ja](https://zen.art-full-stack.com/ja)
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## スクリーンショット
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+### トップページ
 
-## Agentic Development
+![ZEN トップページ](docs/screenshots/home.png)
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+### AI相談画面
 
-```bash
-composer require laravel/boost --dev
+![ZEN AI相談画面](docs/screenshots/consultation.png)
 
-php artisan boost:install
-```
+## 主な機能
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+- **AIによる悩み相談：** OpenAI APIを活用し、禅の視点から悩みや迷いを見つめ直すための対話機能
+- **ユーザー認証：** ユーザー登録・ログイン機能
+- **相談データ管理：** 相談に関するデータの保存・管理
+- **多言語対応：** 日本語・英語に対応したインターフェース
+- **本番環境への公開：** VPS環境へのデプロイと公開運用
 
-## Contributing
+## 使用技術
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+| 分類 | 技術 |
+| --- | --- |
+| バックエンド | PHP、Laravel 13 |
+| フロントエンド | Blade、Tailwind CSS 4、Vite |
+| データベース | MySQL |
+| AI連携 | OpenAI API |
+| 認証 | Laravel Socialite |
+| 決済連携 | Stripe PHP SDK |
+| インフラ | ConoHa VPS、Ubuntu、Nginx |
+| バージョン管理 | Git、GitHub |
+| 自動テスト | Pest |
 
-## Code of Conduct
+## 技術的な取り組み
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+- Laravelを用いたWebアプリケーションの設計・実装
+- OpenAI APIとの連携と、AIの応答方針を制御するプロンプト設計
+- ユーザーの悩みに対して、行動指示に偏らず内省を促す対話設計
+- 日本語・英語に対応した画面設計
+- 環境変数を利用した設定情報・秘密情報の管理
+- データベースマイグレーションによるスキーマ管理
+- VPSへのデプロイ、Webサーバー設定、本番環境の運用
+- Gitを用いたソースコード管理
 
-## Security Vulnerabilities
+## ローカル開発環境
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+### 必要な環境
 
-## License
+- PHP 8.3+（PHP 8.x）
+- Composer
+- Node.js / npm
+- MySQL または SQLite
+- OpenAI API key
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+### セットアップ手順
+
+1. リポジトリをクローンします。
+
+   ```bash
+   git clone https://github.com/TakahiroNago/zen-app.git
+   cd zen-app
+   ```
+
+2. PHPの依存関係をインストールします。
+
+   ```bash
+   composer install
+   ```
+
+3. 環境設定ファイルを作成します。
+
+   ```bash
+   cp .env.example .env
+   php artisan key:generate
+   ```
+
+4. `.env` にデータベース接続情報や、必要なAPIキーなどを設定します。
+
+5. データベースのマイグレーションを実行します。
+
+   ```bash
+   php artisan migrate
+   ```
+
+6. フロントエンドの依存関係をインストールし、アセットをビルドします。
+
+   ```bash
+   npm install
+   npm run build
+   ```
+
+7. 開発サーバーを起動します。
+
+   ```bash
+   php artisan serve
+   ```
+
+   詳細な設定は、`.env.example` および各種設定ファイルを参照してください。
+
+## セキュリティ
+
+- APIキー、データベース認証情報などの秘密情報は環境変数で管理します。
+- `.env` などの機密情報を公開リポジトリにコミットしないようにします。
+- 本アプリケーションはAIによる内省支援を目的としており、医療・法律・金融などの専門的判断を代替するものではありません。
+
+## 開発者
+
+**Takahiro Nago**
+
+個人開発プロジェクト
+
+- Webサイト：[Art Full Stack](https://art-full-stack.com)
+- GitHub：[TakahiroNago](https://github.com/TakahiroNago)
