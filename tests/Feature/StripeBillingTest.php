@@ -28,6 +28,103 @@ test('free members see their current plan even when they have a Stripe customer'
         ->assertDontSee('契約・お支払いを管理');
 });
 
+test('free members can check out lite and premium plans and receive the plan after Stripe confirms the subscription', function () {
+    config([
+        'services.stripe.secret' => 'sk_test',
+        'services.stripe.webhook_secret' => 'whsec_test',
+        'services.stripe.prices.lite' => 'price_lite',
+        'services.stripe.prices.premium' => 'price_premium',
+    ]);
+    $httpClient = new class implements ClientInterface
+    {
+        public function request($method, $absUrl, $headers, $params, $hasFile, $apiMode = 'v1', $maxNetworkRetries = null)
+        {
+            if (str_ends_with($absUrl, '/v1/customers') && $method === 'post') {
+                $userId = $params['metadata']['user_id'];
+                $response = [
+                    'id' => 'cus_'.$userId,
+                    'object' => 'customer',
+                ];
+            } elseif (str_ends_with($absUrl, '/v1/checkout/sessions') && $method === 'post') {
+                $productKey = $params['metadata']['product_key'];
+                $response = [
+                    'id' => 'cs_'.$productKey,
+                    'object' => 'checkout.session',
+                    'url' => 'https://checkout.stripe.test/cs_'.$productKey,
+                    'status' => 'open',
+                ];
+            } else {
+                throw new RuntimeException("Unexpected Stripe request: {$method} {$absUrl}");
+            }
+
+            return [json_encode($response, JSON_THROW_ON_ERROR), 200, ['Content-Type' => 'application/json']];
+        }
+    };
+    ApiRequestor::setHttpClient($httpClient);
+
+    try {
+        foreach ([
+            ['lite', User::PLAN_LITE, 'price_lite'],
+            ['premium', User::PLAN_PREMIUM, 'price_premium'],
+        ] as [$product, $expectedPlan, $priceId]) {
+            $user = User::factory()->create();
+
+            $this->actingAs($user)
+                ->post(route('billing.checkout'), ['product' => $product])
+                ->assertRedirect('https://checkout.stripe.test/cs_'.$product);
+
+            expect($user->fresh()->plan)->toBe(User::PLAN_FREE)
+                ->and($user->fresh()->stripe_pending_subscription_product)->toBe($product);
+
+            $eventCreatedAt = now()->timestamp;
+            $payload = json_encode([
+                'id' => 'evt_subscription_'.$product,
+                'object' => 'event',
+                'api_version' => '2025-02-24.acacia',
+                'created' => $eventCreatedAt,
+                'data' => [
+                    'object' => [
+                        'id' => 'sub_'.$product,
+                        'object' => 'subscription',
+                        'customer' => 'cus_'.$user->id,
+                        'status' => 'active',
+                        'cancel_at_period_end' => false,
+                        'current_period_end' => $eventCreatedAt + 86400,
+                        'items' => [
+                            'object' => 'list',
+                            'data' => [[
+                                'id' => 'si_'.$product,
+                                'object' => 'subscription_item',
+                                'price' => ['id' => $priceId, 'object' => 'price'],
+                            ]],
+                        ],
+                    ],
+                ],
+                'livemode' => false,
+                'pending_webhooks' => 1,
+                'type' => 'customer.subscription.created',
+            ], JSON_THROW_ON_ERROR);
+
+            $this->call(
+                'POST',
+                route('stripe.webhook'),
+                server: [
+                    'HTTP_STRIPE_SIGNATURE' => WebhookSignature::generateSignatureHeader($payload, 'whsec_test'),
+                    'CONTENT_TYPE' => 'application/json',
+                ],
+                content: $payload,
+            )->assertOk();
+
+            expect($user->fresh()->plan)->toBe($expectedPlan)
+                ->and($user->fresh()->stripe_subscription_id)->toBe('sub_'.$product)
+                ->and($user->fresh()->stripe_pending_subscription_checkout_id)->toBeNull()
+                ->and($user->fresh()->stripe_pending_subscription_product)->toBeNull();
+        }
+    } finally {
+        ApiRequestor::setHttpClient(new CurlClient);
+    }
+});
+
 test('paid members do not see the checkout button for their current plan', function () {
     config([
         'services.stripe.secret' => 'sk_test',
@@ -480,6 +577,76 @@ test('subscription webhooks activate paid plans and preserve period-end cancella
         ->and($user->fresh()->stripe_cancel_at_period_end)->toBeTrue()
         ->and($user->fresh()->stripe_current_period_end->timestamp)->toBe($eventCreatedAt + 86400)
         ->and($user->fresh()->stripe_pending_subscription_checkout_id)->toBeNull();
+});
+
+test('subscription webhooks preserve lite credits when a member returns from premium', function () {
+    config([
+        'services.stripe.webhook_secret' => 'whsec_test',
+        'services.stripe.prices.lite' => 'price_lite',
+        'services.stripe.prices.premium' => 'price_premium',
+    ]);
+    $user = User::factory()->create();
+    $user->forceFill([
+        'stripe_customer_id' => 'cus_test',
+        'stripe_subscription_id' => 'sub_test',
+        'plan' => User::PLAN_LITE,
+        'daily_credits_plan' => User::PLAN_LITE,
+        'daily_credits' => 17,
+        'daily_credits_refreshed_at' => now()->toDateString(),
+    ])->save();
+    $sendPlanEvent = function (string $eventId, int $createdAt, string $priceId) {
+        $payload = json_encode([
+            'id' => $eventId,
+            'object' => 'event',
+            'api_version' => '2025-02-24.acacia',
+            'created' => $createdAt,
+            'data' => [
+                'object' => [
+                    'id' => 'sub_test',
+                    'object' => 'subscription',
+                    'customer' => 'cus_test',
+                    'status' => 'active',
+                    'cancel_at_period_end' => false,
+                    'current_period_end' => $createdAt + 86400,
+                    'items' => [
+                        'object' => 'list',
+                        'data' => [[
+                            'id' => 'si_test',
+                            'object' => 'subscription_item',
+                            'current_period_end' => $createdAt + 86400,
+                            'price' => ['id' => $priceId, 'object' => 'price'],
+                        ]],
+                        'has_more' => false,
+                        'url' => '/v1/subscription_items',
+                    ],
+                ],
+            ],
+            'livemode' => false,
+            'pending_webhooks' => 1,
+            'type' => 'customer.subscription.updated',
+        ], JSON_THROW_ON_ERROR);
+
+        return $this->call(
+            'POST',
+            route('stripe.webhook'),
+            server: [
+                'HTTP_STRIPE_SIGNATURE' => WebhookSignature::generateSignatureHeader($payload, 'whsec_test'),
+                'CONTENT_TYPE' => 'application/json',
+            ],
+            content: $payload,
+        );
+    };
+
+    $eventCreatedAt = now()->timestamp;
+    $sendPlanEvent('evt_subscription_premium', $eventCreatedAt, 'price_premium')->assertOk();
+    expect($user->fresh()->plan)->toBe(User::PLAN_PREMIUM)
+        ->and($user->fresh()->daily_credits)->toBe(0)
+        ->and($user->fresh()->lite_daily_credits)->toBe(17);
+
+    $sendPlanEvent('evt_subscription_lite', $eventCreatedAt + 1, 'price_lite')->assertOk();
+
+    expect($user->fresh()->plan)->toBe(User::PLAN_LITE)
+        ->and($user->fresh()->daily_credits)->toBe(17);
 });
 
 test('expired subscription checkout webhooks release the pending plan selection', function () {

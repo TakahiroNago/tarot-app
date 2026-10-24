@@ -16,6 +16,8 @@ use Stripe\StripeClient;
 
 class StripeBillingService
 {
+    public function __construct(private readonly ConsultationCreditService $creditService) {}
+
     /** @return array<string, array{price_id: ?string, amount: int, credits?: int, plan?: string}> */
     public function products(): array
     {
@@ -641,6 +643,8 @@ class StripeBillingService
             ?? $subscription->items->data[0]->current_period_end
             ?? null;
 
+        $this->creditService->changePlan($user, $isEntitled ? $plan : User::PLAN_FREE);
+        $user->refresh();
         $user->stripe_subscription_id = $eventType === 'customer.subscription.deleted' ? null : $subscriptionId;
         $user->stripe_pending_subscription_checkout_id = null;
         $user->stripe_pending_subscription_product = null;
@@ -648,7 +652,6 @@ class StripeBillingService
         $user->stripe_current_period_end = is_numeric($periodEnd) ? date('Y-m-d H:i:s', (int) $periodEnd) : null;
         $user->stripe_subscription_event_created_at = date('Y-m-d H:i:s', $eventCreatedAt);
         $user->stripe_cancel_at_period_end = (bool) ($subscription->cancel_at_period_end ?? false);
-        $user->plan = $isEntitled ? $plan : User::PLAN_FREE;
         if (
             $eventType === 'customer.subscription.deleted'
             || ($user->stripe_scheduled_plan !== null && $user->stripe_scheduled_plan === $plan)

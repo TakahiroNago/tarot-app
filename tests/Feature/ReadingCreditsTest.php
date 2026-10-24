@@ -250,7 +250,7 @@ test('upgrading to lite grants ten daily credits and upgrading to premium enable
             'daily_credits' => 0,
             'daily_credits_refreshed_at' => now()->toDateString(),
         ])->save();
-        $user->forceFill(['plan' => $newPlan])->save();
+        $creditService->changePlan($user, $newPlan);
 
         $balance = $creditService->balance($user);
         expect($balance['daily'])->toBe($expectedCredits)
@@ -259,6 +259,72 @@ test('upgrading to lite grants ten daily credits and upgrading to premium enable
             ->and($user->fresh()->daily_credits_plan)->toBe($newPlan)
             ->and($user->fresh()->daily_credits_refreshed_at->toDateString())->toBe(now()->toDateString());
     }
+});
+
+test('upgrading from free to lite adds the remaining free reading', function () {
+    $user = User::factory()->create();
+    $user->forceFill([
+        'plan' => User::PLAN_FREE,
+        'daily_credits_plan' => User::PLAN_FREE,
+        'daily_credits' => 1,
+        'daily_credits_refreshed_at' => now()->toDateString(),
+    ])->save();
+
+    app(ConsultationCreditService::class)->changePlan($user, User::PLAN_LITE);
+
+    expect(app(ConsultationCreditService::class)->balance($user)['daily'])->toBe(11);
+});
+
+test('returning to lite preserves the previous lite balance when it exceeds ten', function () {
+    $user = User::factory()->create();
+    $user->forceFill([
+        'plan' => User::PLAN_LITE,
+        'daily_credits_plan' => User::PLAN_LITE,
+        'daily_credits' => 17,
+        'daily_credits_refreshed_at' => now()->toDateString(),
+    ])->save();
+    $creditService = app(ConsultationCreditService::class);
+
+    $creditService->changePlan($user, User::PLAN_PREMIUM);
+    expect($user->fresh()->daily_credits)->toBe(0);
+
+    $creditService->changePlan($user, User::PLAN_LITE);
+
+    expect($creditService->balance($user)['daily'])->toBe(17);
+});
+
+test('returning to lite from free adds the last free reading to the previous lite balance', function () {
+    $user = User::factory()->create();
+    $user->forceFill([
+        'plan' => User::PLAN_LITE,
+        'daily_credits_plan' => User::PLAN_LITE,
+        'daily_credits' => 17,
+        'daily_credits_refreshed_at' => now()->toDateString(),
+    ])->save();
+    $creditService = app(ConsultationCreditService::class);
+
+    $creditService->changePlan($user, User::PLAN_FREE);
+    expect($user->fresh()->daily_credits)->toBe(1);
+
+    $creditService->changePlan($user, User::PLAN_LITE);
+
+    expect($creditService->balance($user)['daily'])->toBe(18);
+});
+
+test('returning to lite caps the restored balance and free reading at fifty', function () {
+    $user = User::factory()->create();
+    $user->forceFill([
+        'plan' => User::PLAN_LITE,
+        'daily_credits_plan' => User::PLAN_LITE,
+        'daily_credits' => 50,
+        'daily_credits_refreshed_at' => now()->toDateString(),
+    ])->save();
+    $creditService = app(ConsultationCreditService::class);
+
+    $creditService->changePlan($user, User::PLAN_FREE);
+    $creditService->changePlan($user, User::PLAN_LITE);
+
+    expect($creditService->balance($user)['daily'])->toBe(50);
 });
 
 test('plan upgrades do not grant paid daily credits for days before the upgrade', function () {

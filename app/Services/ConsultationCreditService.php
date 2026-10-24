@@ -78,6 +78,39 @@ class ConsultationCreditService
         });
     }
 
+    public function changePlan(User $user, string $targetPlan): void
+    {
+        if (! in_array($targetPlan, [User::PLAN_FREE, User::PLAN_LITE, User::PLAN_PREMIUM], true)) {
+            throw new \InvalidArgumentException('Unknown consultation credit plan.');
+        }
+
+        DB::transaction(function () use ($user, $targetPlan): void {
+            $lockedUser = User::query()->lockForUpdate()->findOrFail($user->id);
+            $currentPlan = $lockedUser->plan ?? User::PLAN_FREE;
+            $this->refreshLockedUser($lockedUser);
+
+            if ($currentPlan === $targetPlan) {
+                return;
+            }
+
+            if ($currentPlan === User::PLAN_LITE) {
+                $lockedUser->lite_daily_credits = min(50, $lockedUser->daily_credits);
+            }
+
+            $lockedUser->daily_credits = match ($targetPlan) {
+                User::PLAN_LITE => min(50, $currentPlan === User::PLAN_FREE
+                    ? max(10, $lockedUser->lite_daily_credits) + $lockedUser->daily_credits
+                    : max(10, $lockedUser->lite_daily_credits)),
+                User::PLAN_PREMIUM => 0,
+                default => 1,
+            };
+            $lockedUser->plan = $targetPlan;
+            $lockedUser->daily_credits_plan = $targetPlan;
+            $lockedUser->daily_credits_refreshed_at = CarbonImmutable::today();
+            $lockedUser->save();
+        });
+    }
+
     private function refreshDailyCredits(User $user): void
     {
         DB::transaction(function () use ($user): void {
@@ -98,15 +131,18 @@ class ConsultationCreditService
         $refreshedAt = $user->daily_credits_refreshed_at;
 
         if ($user->daily_credits_plan !== $plan) {
-            $maximumBalance = match ($plan) {
-                User::PLAN_LITE => 50,
+            $previousPlan = $user->daily_credits_plan ?? User::PLAN_FREE;
+            if ($previousPlan === User::PLAN_LITE) {
+                $user->lite_daily_credits = min(50, $user->daily_credits);
+            }
+
+            $user->daily_credits = match ($plan) {
+                User::PLAN_LITE => min(50, $previousPlan === User::PLAN_FREE
+                    ? max($this->dailyCreditLimit($plan), $user->lite_daily_credits) + $user->daily_credits
+                    : max($this->dailyCreditLimit($plan), $user->lite_daily_credits)),
                 User::PLAN_PREMIUM => 0,
-                default => 1,
+                default => $this->dailyCreditLimit($plan),
             };
-            $user->daily_credits = min(
-                $maximumBalance,
-                max($user->daily_credits, $this->dailyCreditLimit($plan)),
-            );
             $user->daily_credits_plan = $plan;
             $user->daily_credits_refreshed_at = $today;
             $user->save();
