@@ -11,7 +11,7 @@
         @include('partials.site-header')
         <main class="page-content admin-content">
             <section class="admin-panel admin-detail">
-                <p class="eyebrow">USER DETAILS</p>
+                <p class="eyebrow">{{ __('USER DETAILS') }}</p>
                 <h1>{{ $user->name }}</h1>
                 @if (session('status'))@include('partials.toast', ['message' => __(session('status'))])@endif
                 @if ($errors->any())

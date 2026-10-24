@@ -1,7 +1,7 @@
 @extends('layouts.legal')
 
 @section('title', __('特定商取引法に基づく表示'))
-@section('eyebrow', 'COMMERCIAL TRANSACTIONS')
+@section('eyebrow', __('COMMERCIAL TRANSACTIONS'))
 
 @section('legal-content')
 @if (app()->isLocale('en'))

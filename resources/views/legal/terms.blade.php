@@ -1,7 +1,7 @@
 @extends('layouts.legal')
 
 @section('title', __('利用規約'))
-@section('eyebrow', 'TERMS OF SERVICE')
+@section('eyebrow', __('TERMS OF SERVICE'))
 
 @section('legal-content')
 @if (app()->isLocale('en'))

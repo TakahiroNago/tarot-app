@@ -341,7 +341,9 @@ test('account settings offer immediate upgrades and end-of-period downgrades', f
     $this->actingAs($liteMember)
         ->get(route('account.settings.edit'))
         ->assertOk()
-        ->assertSee('プレミアムへ変更')
+        ->assertSee('プレミアムプランへ変更')
+        ->assertSee('data-plan-change-form', false)
+        ->assertSee('data-plan-change-dialog', false)
         ->assertSee('日割り計算で今回の請求に充当されます。');
 
     $premiumMember = User::factory()->create([
@@ -353,7 +355,9 @@ test('account settings offer immediate upgrades and end-of-period downgrades', f
     $this->actingAs($premiumMember)
         ->get(route('account.settings.edit'))
         ->assertOk()
-        ->assertSee('ライトへ変更')
+        ->assertSeeInOrder(['ライトプランへ変更', '契約・お支払いを管理'])
+        ->assertSee('data-plan-change-form', false)
+        ->assertSee('data-plan-change-dialog', false)
         ->assertSee('現在のプレミアム期間終了後に適用されます。');
 });
 

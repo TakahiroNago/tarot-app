@@ -11,7 +11,7 @@
         @include('partials.site-header')
         <main class="page-content">
             <section class="form-panel">
-                <p class="eyebrow">SECURITY NOTIFICATIONS</p>
+                <p class="eyebrow">{{ __('SECURITY NOTIFICATIONS') }}</p>
                 <h1>{{ __('セキュリティ通知の初期設定') }}</h1>
                 <p class="page-description">{{ __('アカウントに関するセキュリティ通知をメールで受け取るか、通知の種類ごとに設定できます。設定はアカウント設定からいつでも変更できます。') }}</p>
 

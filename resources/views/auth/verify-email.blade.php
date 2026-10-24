@@ -11,7 +11,7 @@
         @include('partials.site-header')
         <main class="page-content">
             <section class="form-panel">
-                <p class="eyebrow">VERIFY YOUR EMAIL</p>
+                <p class="eyebrow">{{ __('VERIFY YOUR EMAIL') }}</p>
                 <h1>{{ __('メールアドレスの確認') }}</h1>
                 <p class="page-description">{{ __('登録を完了するため、メールに記載された確認リンクを開いてください。') }}</p>
                 @if (session('status') === 'verification-link-sent')

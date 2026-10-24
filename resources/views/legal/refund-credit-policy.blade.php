@@ -1,7 +1,7 @@
 @extends('layouts.legal')
 
 @section('title', __('返金・クレジットポリシー'))
-@section('eyebrow', 'REFUNDS & CREDITS')
+@section('eyebrow', __('REFUNDS & CREDITS'))
 
 @section('legal-content')
 @if (app()->isLocale('en'))

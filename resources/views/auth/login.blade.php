@@ -11,7 +11,7 @@
         @include('partials.site-header')
         <main class="page-content">
             <section class="form-panel">
-                <p class="eyebrow">WELCOME BACK</p>
+                <p class="eyebrow">{{ __('WELCOME BACK') }}</p>
                 <h1>{{ __('ログイン') }}</h1>
                 @if (session('status'))@include('partials.toast', ['message' => __(session('status'))])@endif
                 <form class="question-form" method="POST" action="{{ route('login.store') }}">

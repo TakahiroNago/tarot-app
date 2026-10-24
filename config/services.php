@@ -42,7 +42,7 @@ return [
     ],
 
     'contact' => [
-        'email' => env('CONTACT_EMAIL', 'takahiro.nago.art@gmail.com'),
+        'email' => env('CONTACT_EMAIL', 'artfullstack@gmail.com'),
     ],
 
     'stripe' => [

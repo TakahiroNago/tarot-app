@@ -11,7 +11,7 @@
         @include('partials.site-header')
         <main class="page-content admin-content">
             <section class="admin-panel">
-                <p class="eyebrow">ADMINISTRATION</p>
+                <p class="eyebrow">{{ __('ADMINISTRATION') }}</p>
                 <h1>{{ __('ユーザー管理') }}</h1>
                 @if (session('status'))@include('partials.toast', ['message' => __(session('status'))])@endif
                 <form class="user-search" method="GET" action="{{ route('admin.users.index') }}">

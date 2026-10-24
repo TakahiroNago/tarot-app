@@ -20,7 +20,7 @@
                 @if (session('consultation_rate_limited'))
                     @include('partials.toast', ['message' => session('consultation_rate_limited'), 'type' => 'error'])
                 @endif
-                <p class="eyebrow">A MOMENT FOR YOU</p>
+                <p class="eyebrow">{{ __('A MOMENT FOR YOU') }}</p>
                 <h1>{{ __('心にある悩みを') }}<br>{{ __('聞かせてください') }}</h1>
                 <p class="page-description">{{ __('禅の考え方を基にして、AIがあなたの悩みに向き合います。') }}</p>
 

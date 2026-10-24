@@ -11,7 +11,7 @@
         @include('partials.site-header')
         <main class="page-content history-content">
             <section class="history-panel plans-panel">
-                <p class="eyebrow">MEMBERSHIP</p>
+                <p class="eyebrow">{{ __('MEMBERSHIP') }}</p>
                 <h1>{{ __('料金・プラン') }}</h1>
 
                 @if ($errors->has('billing'))
@@ -40,7 +40,7 @@
                         <p>&bull; {{ __('過去の相談を踏まえた回答') }}</p>
                         <p class="plan-price"><strong>{{ app()->isLocale('ja') ? '580円' : '¥580' }}/<span class="plan-price-period">{{ __('月') }}</span></strong></p>
                         @if (auth()->check() && auth()->user()->stripe_subscription_id !== null && auth()->user()->plan === \App\Models\User::PLAN_LITE && ! auth()->user()->stripe_cancel_at_period_end && auth()->user()->stripe_scheduled_plan === null && config('services.stripe.secret') && config('services.stripe.prices.premium'))
-                            <form method="POST" action="{{ route('billing.plan.change') }}">
+                            <form method="POST" action="{{ route('billing.plan.change') }}" data-plan-change-form data-confirmation-note="{{ __('プレミアムへの変更は即時適用され、現在の期間の未使用分は日割り計算で今回の請求に充当されます。') }}">
                                 @csrf
                                 <input type="hidden" name="plan" value="premium">
                                 <button class="primary-action" type="submit">{{ __('プレミアムに申し込む') }}</button>
@@ -95,5 +95,8 @@
         </main>
         @include('partials.site-footer')
     </div>
+    @auth
+        @include('partials.plan-change-dialog')
+    @endauth
 </body>
 </html>

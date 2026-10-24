@@ -40,6 +40,29 @@ test('a visitor can register and is assigned the user role', function () {
     Notification::assertSentTo(User::where('email', 'new-user@example.com')->sole(), VerifyEmail::class);
 });
 
+test('registration shows a Japanese message when the email address is already registered', function () {
+    User::factory()->create(['email' => 'existing-user@example.com']);
+
+    $registrationUrl = route('register', ['locale' => 'ja']);
+
+    $this->get($registrationUrl)
+        ->assertOk()
+        ->assertSee('新規登録')
+        ->assertDontSee('CREATE ACCOUNT');
+
+    $this->from($registrationUrl)
+        ->post(route('register.store', ['locale' => 'ja']), [
+            'name' => 'New User',
+            'email' => 'existing-user@example.com',
+            'password' => 'A-strong-password-2026',
+            'password_confirmation' => 'A-strong-password-2026',
+        ])
+        ->assertRedirect($registrationUrl)
+        ->assertSessionHasErrors([
+            'email' => 'メールアドレスは既に登録されています。',
+        ]);
+});
+
 test('registration saves the current session readings to the new account', function () {
     $this->withSession([
         'zen_consultations' => [[

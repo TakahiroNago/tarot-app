@@ -1,7 +1,7 @@
 @extends('layouts.legal')
 
 @section('title', __('プライバシーポリシー'))
-@section('eyebrow', 'PRIVACY POLICY')
+@section('eyebrow', __('PRIVACY POLICY'))
 
 @section('legal-content')
 @if (app()->isLocale('en'))

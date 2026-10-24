@@ -48,6 +48,46 @@ const toastRegion = toastRegions.find((region) => region.hasAttribute('data-acco
 	?? toastRegions[0]
 	?? document.createElement('div');
 
+const planChangeDialog = document.querySelector('[data-plan-change-dialog]');
+
+if (planChangeDialog) {
+	const planChangeNote = planChangeDialog.querySelector('[data-plan-change-note]');
+	const planChangeCancel = planChangeDialog.querySelector('[data-plan-change-cancel]');
+	const planChangeConfirm = planChangeDialog.querySelector('[data-plan-change-confirm]');
+	let pendingPlanChangeForm = null;
+
+	document.querySelectorAll('[data-plan-change-form]').forEach((form) => {
+		form.addEventListener('submit', (event) => {
+			if (form.dataset.confirmed === 'true') {
+				delete form.dataset.confirmed;
+				return;
+			}
+
+			event.preventDefault();
+			pendingPlanChangeForm = form;
+			planChangeNote.textContent = form.dataset.confirmationNote;
+			planChangeDialog.showModal();
+		});
+	});
+
+	planChangeCancel.addEventListener('click', () => {
+		pendingPlanChangeForm = null;
+		planChangeDialog.close();
+	});
+
+	planChangeConfirm.addEventListener('click', () => {
+		if (!pendingPlanChangeForm) {
+			return;
+		}
+
+		const form = pendingPlanChangeForm;
+		pendingPlanChangeForm = null;
+		form.dataset.confirmed = 'true';
+		planChangeDialog.close();
+		form.requestSubmit();
+	});
+}
+
 if (toastRegions.length === 0) {
 	toastRegion.className = 'toast-region';
 	toastRegion.setAttribute('data-toast-region', '');

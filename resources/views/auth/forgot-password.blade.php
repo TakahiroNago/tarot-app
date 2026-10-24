@@ -11,7 +11,7 @@
         @include('partials.site-header')
         <main class="page-content">
             <section class="form-panel">
-                <p class="eyebrow">PASSWORD RESET</p>
+                <p class="eyebrow">{{ __('PASSWORD RESET') }}</p>
                 <h1>{{ __('パスワード再設定') }}</h1>
                 @if (session('status'))@include('partials.toast', ['message' => __(session('status'))])@endif
                 <form class="question-form" method="POST" action="{{ route('password.email') }}">

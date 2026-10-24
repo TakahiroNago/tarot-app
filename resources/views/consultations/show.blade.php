@@ -28,7 +28,7 @@
                         <p class="consultation-share-note">{{ __('公開用URLにはメールアドレスやユーザーIDは含まれません。URLを知っている人は結果を閲覧できます（有効期限30日）。') }}</p>
 
                         <div class="consultation-share-actions">
-                            <button class="consultation-share-button" type="button" data-share-link aria-label="{{ __('Share Linkでシェア') }}">{{ __('シェア') }}</button>
+                            <button class="consultation-share-button" type="button" data-share-link aria-label="{{ __('リンクでシェア') }}">{{ __('シェア') }}</button>
                         </div>
                         <div class="consultation-share-url">
                             <input

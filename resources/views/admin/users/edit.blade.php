@@ -11,7 +11,7 @@
         @include('partials.site-header')
         <main class="page-content admin-content">
             <section class="admin-panel admin-form-panel">
-                <p class="eyebrow">EDIT USER</p>
+                <p class="eyebrow">{{ __('EDIT USER') }}</p>
                 <h1>{{ __('ユーザー情報を編集') }}</h1>
                 <form class="question-form" method="POST" action="{{ route('admin.users.update', $user) }}">
                     @csrf

@@ -14,7 +14,7 @@
         @include('partials.site-header')
         <main class="page-content admin-content">
             <section class="admin-panel account-settings-panel">
-                <p class="eyebrow">ACCOUNT SETTINGS</p>
+                <p class="eyebrow">{{ __('ACCOUNT SETTINGS') }}</p>
                 <h1>{{ __('アカウント設定') }}</h1>
 
                 @if (session('status'))
@@ -99,16 +99,6 @@
                     @if (request('billing') === 'returned')
                         <p class="settings-note" role="status">{{ __('Stripeの管理画面から戻りました。契約内容の変更はWebhookで反映されるため、反映まで時間がかかる場合があります。最新の状態を確認するには、このページを再読み込みしてください。') }}</p>
                     @endif
-                    @if ($user->stripe_customer_id !== null)
-                        <form method="POST" action="{{ route('billing.portal') }}">
-                            @csrf
-                            @if ($user->stripe_subscription_id !== null)
-                                <button class="secondary-action" type="submit">{{ __('契約・お支払いを管理') }}</button>
-                            @else
-                                <button class="text-link" type="submit">{{ __('お支払い情報を管理（Stripe）') }}</button>
-                            @endif
-                        </form>
-                    @endif
                     @if ($user->stripe_scheduled_plan === \App\Models\User::PLAN_LITE && $user->stripe_current_period_end)
                         <p role="status">
                             {{ app()->isLocale('ja') ? $user->stripe_current_period_end->format('Y年n月j日').'にライトプランへ切り替わる予定です。' : __('ライトプランへの切り替え予定日').' '.$user->stripe_current_period_end->format('M j, Y') }}
@@ -119,18 +109,32 @@
                             <button class="secondary-action" type="submit">{{ __('予約を取り消す') }}</button>
                         </form>
                     @elseif ($user->stripe_subscription_id !== null && $user->plan === \App\Models\User::PLAN_LITE && ! $user->stripe_cancel_at_period_end)
-                        <p class="settings-note">{{ __('プレミアムへの変更は即時適用され、現在の期間の未使用分は日割り計算で今回の請求に充当されます。') }}</p>
-                        <form method="POST" action="{{ route('billing.plan.change') }}">
+                        <form class="billing-action-form" method="POST" action="{{ route('billing.plan.change') }}" data-plan-change-form data-confirmation-note="{{ __('プレミアムプランへの変更は即時適用され、現在の期間の未使用分は日割り計算で今回の請求に充当されます。') }}">
                             @csrf
                             <input type="hidden" name="plan" value="premium">
-                            <button class="primary-action" type="submit">{{ __('プレミアムへ変更') }}</button>
+                            <button class="primary-action" type="submit">{{ __('プレミアムプランへ変更') }}</button>
                         </form>
                     @elseif ($user->stripe_subscription_id !== null && $user->plan === \App\Models\User::PLAN_PREMIUM && ! $user->stripe_cancel_at_period_end)
-                        <p class="settings-note">{{ __('ライトへの変更は予約として登録され、現在のプレミアム期間終了後に適用されます。') }}</p>
-                        <form method="POST" action="{{ route('billing.plan.change') }}">
+                        <form class="billing-action-form" method="POST" action="{{ route('billing.plan.change') }}" data-plan-change-form data-confirmation-note="{{ __('ライトプランへの変更は予約として登録され、現在のプレミアム期間終了後に適用されます。') }}">
                             @csrf
                             <input type="hidden" name="plan" value="lite">
-                            <button class="secondary-action" type="submit">{{ __('ライトへ変更') }}</button>
+                            <button class="secondary-action" type="submit">{{ __('ライトプランへ変更') }}</button>
+                        </form>
+                    @endif
+                    @if ($user->stripe_customer_id !== null && ! ($user->stripe_subscription_id !== null && $user->plan === \App\Models\User::PLAN_PREMIUM && ! $user->stripe_cancel_at_period_end))
+                        <form class="billing-action-form" method="POST" action="{{ route('billing.portal') }}">
+                            @csrf
+                            @if ($user->stripe_subscription_id !== null)
+                                <button class="secondary-action" type="submit">{{ __('契約・お支払いを管理') }}</button>
+                            @else
+                                <button class="text-link" type="submit">{{ __('お支払い情報を管理（Stripe）') }}</button>
+                            @endif
+                        </form>
+                    @endif
+                    @if ($user->stripe_customer_id !== null && $user->stripe_subscription_id !== null && $user->plan === \App\Models\User::PLAN_PREMIUM && ! $user->stripe_cancel_at_period_end)
+                        <form class="billing-action-form" method="POST" action="{{ route('billing.portal') }}">
+                            @csrf
+                            <button class="secondary-action" type="submit">{{ __('契約・お支払いを管理') }}</button>
                         </form>
                     @endif
                 </section>
@@ -155,12 +159,13 @@
         </main>
         @include('partials.site-footer')
     </div>
+    @include('partials.plan-change-dialog')
     <dialog class="confirm-dialog" data-delete-account-dialog aria-labelledby="delete-account-dialog-title">
-        <h2 id="delete-account-dialog-title">{{ __('アカウントを削除する') }}</h2>
-        <p>{{ __('アカウントと関連データを削除します。この操作は取り消せません。削除しますか？') }}</p>
+        <h2 class="danger-title" id="delete-account-dialog-title">{{ __('アカウントを削除する') }}</h2>
+        <p class="danger-title">{{ __('アカウントと関連データを削除します。この操作は取り消せません。削除しますか？') }}</p>
         <div class="confirm-dialog-actions">
             <button class="secondary-action" type="button" data-delete-account-cancel>{{ __('キャンセル') }}</button>
-            <button class="danger-action" type="button" data-delete-account-confirm>{{ __('アカウントを削除する') }}</button>
+            <button class="danger-action" type="button" data-delete-account-confirm>{{ __('削除する') }}</button>
         </div>
     </dialog>
     <script>

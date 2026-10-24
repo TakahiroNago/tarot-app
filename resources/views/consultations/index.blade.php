@@ -12,7 +12,7 @@
         @include('partials.site-header')
         <main class="page-content history-content">
             <section class="history-panel">
-                <p class="eyebrow">ZEN JOURNAL</p>
+                <p class="eyebrow">{{ __('ZEN JOURNAL') }}</p>
                 @if (session('status'))
                     @include('partials.toast', ['message' => session('status')])
                 @endif

@@ -143,7 +143,10 @@ test('lite members can upgrade to premium from the plans page while premium memb
         ->assertOk()
         ->assertSee('action="'.route('billing.plan.change').'"', false)
         ->assertSee('name="plan" value="premium"', false)
-        ->assertSee('プレミアムに申し込む');
+        ->assertSee('プレミアムに申し込む')
+        ->assertSee('data-plan-change-form', false)
+        ->assertSee('data-plan-change-dialog', false)
+        ->assertSee('日割り計算で今回の請求に充当されます。');
 
     $premiumMember = User::factory()->create([
         'plan' => User::PLAN_PREMIUM,

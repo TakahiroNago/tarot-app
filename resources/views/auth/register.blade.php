@@ -11,7 +11,7 @@
         @include('partials.site-header')
         <main class="page-content">
             <section class="form-panel">
-                <p class="eyebrow">CREATE ACCOUNT</p>
+                <p class="eyebrow">{{ __('CREATE ACCOUNT') }}</p>
                 <h1>{{ __('新規登録') }}</h1>
                 <form class="question-form" method="POST" action="{{ route('register.store') }}">
                     @csrf

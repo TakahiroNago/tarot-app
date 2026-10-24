@@ -11,7 +11,7 @@
         @include('partials.site-header')
         <main class="page-content">
             <section class="form-panel">
-                <p class="eyebrow">NEW PASSWORD</p>
+                <p class="eyebrow">{{ __('NEW PASSWORD') }}</p>
                 <h1>{{ __('新しいパスワード') }}</h1>
                 <form class="question-form" method="POST" action="{{ route('password.update') }}">
                     @csrf

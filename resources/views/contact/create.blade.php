@@ -11,7 +11,7 @@
         @include('partials.site-header')
         <main class="page-content">
             <section class="form-panel">
-                <p class="eyebrow">CONTACT</p>
+                <p class="eyebrow">{{ __('CONTACT') }}</p>
                 <h1>{{ __('お問い合わせ') }}</h1>
                 <p class="page-description">{{ __('ご質問やご相談はこちらのフォームからお送りください。内容を確認のうえ、必要に応じてご入力いただいたメールアドレス宛に返信します。') }}</p>
 

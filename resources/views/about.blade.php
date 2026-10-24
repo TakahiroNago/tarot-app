@@ -11,7 +11,7 @@
         @include('partials.site-header')
         <main class="page-content history-content">
             <article class="history-panel">
-                <p class="eyebrow">ABOUT KOKORO NO IORI</p>
+                <p class="eyebrow">{{ __('ABOUT KOKORO NO IORI') }}</p>
                 <h1>{{ __('心の庵について') }}</h1>
 
                 @if (app()->isLocale('en'))
