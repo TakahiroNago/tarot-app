@@ -115,7 +115,7 @@
                             <button class="primary-action" type="submit">{{ __('プレミアムプランへ変更') }}</button>
                         </form>
                     @elseif ($user->stripe_subscription_id !== null && $user->plan === \App\Models\User::PLAN_PREMIUM && ! $user->stripe_cancel_at_period_end)
-                        <form class="billing-action-form" method="POST" action="{{ route('billing.plan.change') }}" data-plan-change-form data-confirmation-note="{{ __('ライトプランへの変更は予約として登録され、現在のプレミアム期間終了後に適用されます。') }}">
+                        <form class="billing-action-form" method="POST" action="{{ route('billing.plan.change') }}" data-plan-change-form data-confirmation-note="{{ __('ライトプランへの変更は、現在のプレミアム期間終了後に適用されます。') }}" data-confirmation-period-end-label="{{ $user->stripe_current_period_end ? __('現在のプレミアム期間終了日時:') : '' }}" data-confirmation-period-end-date="{{ $user->stripe_current_period_end?->format(app()->isLocale('ja') ? 'Y年n月j日 H:i' : 'M j, Y H:i') ?? '' }}">
                             @csrf
                             <input type="hidden" name="plan" value="lite">
                             <button class="secondary-action" type="submit">{{ __('ライトプランへ変更') }}</button>

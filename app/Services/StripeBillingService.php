@@ -26,7 +26,9 @@ class StripeBillingService
             'credits_50' => ['price_id' => config('services.stripe.prices.credits_50'), 'amount' => 400, 'credits' => 50],
             'credits_100' => ['price_id' => config('services.stripe.prices.credits_100'), 'amount' => 500, 'credits' => 100],
             'lite' => ['price_id' => config('services.stripe.prices.lite'), 'amount' => 220, 'plan' => User::PLAN_LITE],
+            'lite_yearly' => ['price_id' => config('services.stripe.prices.lite_yearly'), 'amount' => 2200, 'plan' => User::PLAN_LITE],
             'premium' => ['price_id' => config('services.stripe.prices.premium'), 'amount' => 580, 'plan' => User::PLAN_PREMIUM],
+            'premium_yearly' => ['price_id' => config('services.stripe.prices.premium_yearly'), 'amount' => 5800, 'plan' => User::PLAN_PREMIUM],
         ];
     }
 
@@ -62,15 +64,15 @@ class StripeBillingService
                         $lockedUser->stripe_pending_subscription_checkout_id,
                     );
                     if ($pendingSession->status === 'open') {
-                        if ($lockedUser->stripe_pending_subscription_product !== $productKey) {
-                            throw ValidationException::withMessages([
-                                'billing' => '別のプランの決済手続きが進行中です。先にその手続きを完了するか、期限切れをお待ちください。',
-                            ]);
-                        }
-
-                        if (is_string($pendingSession->url) && $pendingSession->url !== '') {
+                        if (
+                            $lockedUser->stripe_pending_subscription_product === $productKey
+                            && is_string($pendingSession->url)
+                            && $pendingSession->url !== ''
+                        ) {
                             return $pendingSession->url;
                         }
+
+                        $this->stripe()->checkout->sessions->expire($pendingSession->id);
                     } elseif ($pendingSession->status === 'complete') {
                         throw ValidationException::withMessages([
                             'billing' => '決済を確認中です。しばらくお待ちください。',
@@ -143,15 +145,20 @@ class StripeBillingService
         return $session->url;
     }
 
-    public function changePlan(User $user, string $targetPlan): string
+    public function changePlan(User $user, string $targetProduct): string
     {
-        if (! in_array($targetPlan, [User::PLAN_LITE, User::PLAN_PREMIUM], true)) {
+        $product = $this->products()[$targetProduct] ?? null;
+        $targetPlan = $product['plan'] ?? null;
+        if (
+            ! in_array($targetProduct, ['lite', 'premium', 'premium_yearly'], true)
+            || ! in_array($targetPlan, [User::PLAN_LITE, User::PLAN_PREMIUM], true)
+        ) {
             throw ValidationException::withMessages([
                 'billing' => '選択したプランは変更できません。',
             ]);
         }
 
-        return DB::transaction(function () use ($user, $targetPlan): string {
+        return DB::transaction(function () use ($user, $targetPlan, $targetProduct): string {
             $account = User::query()->lockForUpdate()->findOrFail($user->id);
 
             if (
@@ -221,7 +228,7 @@ class StripeBillingService
                 ]);
             }
 
-            $targetPriceId = $this->products()[$targetPlan]['price_id'];
+            $targetPriceId = $this->products()[$targetProduct]['price_id'];
             if (! is_string($targetPriceId) || $targetPriceId === '') {
                 throw ValidationException::withMessages([
                     'billing' => '変更先プランの決済設定が完了していません。',
@@ -369,10 +376,19 @@ class StripeBillingService
             'transfer_data',
         ];
 
-        return array_filter(
+        $parameters = array_filter(
             array_intersect_key($phaseData, array_flip($parameterKeys)),
             static fn (mixed $value): bool => $value !== null,
         );
+
+        if (is_array($parameters['automatic_tax'] ?? null)) {
+            $parameters['automatic_tax'] = array_intersect_key(
+                $parameters['automatic_tax'],
+                array_flip(['enabled', 'liability']),
+            );
+        }
+
+        return $parameters;
     }
 
     /**
@@ -695,7 +711,9 @@ class StripeBillingService
 
         return match ($priceId) {
             config('services.stripe.prices.lite') => User::PLAN_LITE,
+            config('services.stripe.prices.lite_yearly') => User::PLAN_LITE,
             config('services.stripe.prices.premium') => User::PLAN_PREMIUM,
+            config('services.stripe.prices.premium_yearly') => User::PLAN_PREMIUM,
             default => null,
         };
     }

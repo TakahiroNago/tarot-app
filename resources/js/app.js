@@ -65,7 +65,13 @@ if (planChangeDialog) {
 
 			event.preventDefault();
 			pendingPlanChangeForm = form;
-			planChangeNote.textContent = form.dataset.confirmationNote;
+			const confirmationNotes = [form.dataset.confirmationNote];
+
+			if (form.dataset.confirmationPeriodEndLabel && form.dataset.confirmationPeriodEndDate) {
+				confirmationNotes.push(`${form.dataset.confirmationPeriodEndLabel}\n${form.dataset.confirmationPeriodEndDate}`);
+			}
+
+			planChangeNote.textContent = confirmationNotes.join('\n\n');
 			planChangeDialog.showModal();
 		});
 	});

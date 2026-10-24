@@ -1128,6 +1128,42 @@ h2 {
     background: rgb(255 255 255 / 62%);
 }
 
+.plan-billing-options {
+    display: grid;
+    gap: 8px;
+    margin: 12px 0;
+    padding: 0;
+    border: 0;
+}
+
+.plan-billing-options legend {
+    margin-bottom: 8px;
+    color: var(--color-muted);
+    font-size: 13px;
+}
+
+.plan-billing-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--color-muted);
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.plan-billing-option input {
+    accent-color: var(--color-forest);
+}
+
+.plan-card:first-child .plan-billing-options legend,
+.plan-card:first-child .plan-billing-option {
+    color: #8a682f;
+}
+
+.plan-card:first-child .plan-billing-option input {
+    accent-color: #8a682f;
+}
+
 .plan-card h2 {
     margin-bottom: 16px;
     font-size: 17px;
@@ -1470,6 +1506,10 @@ h2 {
     margin: 0 0 20px;
     font-size: 14px;
     line-height: 1.7;
+}
+
+.confirm-dialog [data-plan-change-note] {
+    white-space: pre-line;
 }
 
 .confirm-dialog-actions {

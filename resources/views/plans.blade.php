@@ -38,23 +38,55 @@
                         <p>&bull; {{ __('相談回数無制限') }}</p>
                         <p>&bull; {{ __('すべての相談の記録') }}</p>
                         <p>&bull; {{ __('過去の相談を踏まえた回答') }}</p>
-                        <p class="plan-price"><strong>{{ app()->isLocale('ja') ? '580円' : '¥580' }}/<span class="plan-price-period">{{ __('月') }}</span></strong></p>
-                        @if (auth()->check() && auth()->user()->stripe_subscription_id !== null && auth()->user()->plan === \App\Models\User::PLAN_LITE && ! auth()->user()->stripe_cancel_at_period_end && auth()->user()->stripe_scheduled_plan === null && config('services.stripe.secret') && config('services.stripe.prices.premium'))
+                        @if (auth()->check() && auth()->user()->stripe_subscription_id !== null && auth()->user()->plan === \App\Models\User::PLAN_LITE && ! auth()->user()->stripe_cancel_at_period_end && auth()->user()->stripe_scheduled_plan === null && config('services.stripe.secret') && (config('services.stripe.prices.premium') || config('services.stripe.prices.premium_yearly')))
                             <form method="POST" action="{{ route('billing.plan.change') }}" data-plan-change-form data-confirmation-note="{{ __('プレミアムへの変更は即時適用され、現在の期間の未使用分は日割り計算で今回の請求に充当されます。') }}">
                                 @csrf
-                                <input type="hidden" name="plan" value="premium">
+                                <fieldset class="plan-billing-options">
+                                    <legend>{{ __('お支払い方法') }}</legend>
+                                    @if (config('services.stripe.prices.premium'))
+                                        <label class="plan-billing-option">
+                                            <input type="radio" name="plan" value="premium" checked required>
+                                            <span>{{ app()->isLocale('ja') ? '580円' : '¥580' }}/{{ __('月') }}</span>
+                                        </label>
+                                    @endif
+                                    @if (config('services.stripe.prices.premium_yearly'))
+                                        <label class="plan-billing-option">
+                                            <input type="radio" name="plan" value="premium_yearly" @checked(! config('services.stripe.prices.premium')) required>
+                                            <span>{{ app()->isLocale('ja') ? '5,800円' : '¥5,800' }}/{{ __('年') }}</span>
+                                        </label>
+                                    @endif
+                                </fieldset>
                                 <button class="primary-action" type="submit">{{ __('プレミアムに申し込む') }}</button>
                             </form>
-                        @elseif (auth()->check() && auth()->user()->stripe_subscription_id === null && auth()->user()->plan === \App\Models\User::PLAN_FREE && config('services.stripe.secret') && config('services.stripe.prices.premium'))
+                        @elseif (auth()->check() && auth()->user()->stripe_subscription_id === null && auth()->user()->plan === \App\Models\User::PLAN_FREE && config('services.stripe.secret') && (config('services.stripe.prices.premium') || config('services.stripe.prices.premium_yearly')))
                             <form method="POST" action="{{ route('billing.checkout') }}">
                                 @csrf
-                                <input type="hidden" name="product" value="premium">
+                                <fieldset class="plan-billing-options">
+                                    <legend>{{ __('お支払い方法') }}</legend>
+                                    @if (config('services.stripe.prices.premium'))
+                                        <label class="plan-billing-option">
+                                            <input type="radio" name="product" value="premium" checked required>
+                                            <span>{{ app()->isLocale('ja') ? '580円' : '¥580' }}/{{ __('月') }}</span>
+                                        </label>
+                                    @endif
+                                    @if (config('services.stripe.prices.premium_yearly'))
+                                        <label class="plan-billing-option">
+                                            <input type="radio" name="product" value="premium_yearly" @checked(! config('services.stripe.prices.premium')) required>
+                                            <span>{{ app()->isLocale('ja') ? '5,800円' : '¥5,800' }}/{{ __('年') }}</span>
+                                        </label>
+                                    @endif
+                                </fieldset>
                                 <button class="primary-action" type="submit">{{ __('プレミアムに申し込む') }}</button>
                             </form>
                         @elseif (auth()->guest())
+                            <p class="plan-price"><strong>{{ app()->isLocale('ja') ? '580円' : '¥580' }}/<span class="plan-price-period">{{ __('月') }}</span></strong></p>
+                            <p class="plan-price"><strong>{{ app()->isLocale('ja') ? '5,800円' : '¥5,800' }}/<span class="plan-price-period">{{ __('年') }}</span></strong></p>
                             <p><a class="primary-action" href="{{ route('login') }}">→ {{ __('ログインして') }}<br>{{ __('プレミアムに申し込む') }}</a></p>
-                        @elseif (! auth()->check() || ! config('services.stripe.secret') || ! config('services.stripe.prices.premium'))
+                        @elseif (! auth()->check() || ! config('services.stripe.secret') || (! config('services.stripe.prices.premium') && ! config('services.stripe.prices.premium_yearly')))
                             <p>{{ __('決済準備中') }}</p>
+                        @else
+                            <p class="plan-price"><strong>{{ app()->isLocale('ja') ? '580円' : '¥580' }}/<span class="plan-price-period">{{ __('月') }}</span></strong></p>
+                            <p class="plan-price"><strong>{{ app()->isLocale('ja') ? '5,800円' : '¥5,800' }}/<span class="plan-price-period">{{ __('年') }}</span></strong></p>
                         @endif
                         <p>{{ app()->isLocale('ja') ? '※ ' : '* ' }}{{ __('短時間でのボットなどによる過重アクセスは一時的に制限される場合があります。') }}</p>
                     </section>
@@ -62,17 +94,35 @@
                         <h2>{{ __('ライトプラン') }}</h2>
                         <p>&bull; {{ __('1日10回（最大50回まで引継ぎ）') }}</p>
                         <p>&bull; {{ __('過去3か月の相談の記録') }}</p>
-                        <p class="plan-price"><strong>{{ app()->isLocale('ja') ? '220円' : '¥220' }}/<span class="plan-price-period">{{ __('月') }}</span></strong></p>
-                        @if (auth()->check() && auth()->user()->stripe_subscription_id === null && auth()->user()->plan === \App\Models\User::PLAN_FREE && config('services.stripe.secret') && config('services.stripe.prices.lite'))
+                        @if (auth()->check() && auth()->user()->stripe_subscription_id === null && auth()->user()->plan === \App\Models\User::PLAN_FREE && config('services.stripe.secret') && (config('services.stripe.prices.lite') || config('services.stripe.prices.lite_yearly')))
                             <form method="POST" action="{{ route('billing.checkout') }}">
                                 @csrf
-                                <input type="hidden" name="product" value="lite">
+                                <fieldset class="plan-billing-options">
+                                    <legend>{{ __('お支払い方法') }}</legend>
+                                    @if (config('services.stripe.prices.lite'))
+                                        <label class="plan-billing-option">
+                                            <input type="radio" name="product" value="lite" checked required>
+                                            <span>{{ app()->isLocale('ja') ? '220円' : '¥220' }}/{{ __('月') }}</span>
+                                        </label>
+                                    @endif
+                                    @if (config('services.stripe.prices.lite_yearly'))
+                                        <label class="plan-billing-option">
+                                            <input type="radio" name="product" value="lite_yearly" @checked(! config('services.stripe.prices.lite')) required>
+                                            <span>{{ app()->isLocale('ja') ? '2,200円' : '¥2,200' }}/{{ __('年') }}</span>
+                                        </label>
+                                    @endif
+                                </fieldset>
                                 <button class="primary-action" type="submit">{{ __('ライトに申し込む') }}</button>
                             </form>
                         @elseif (auth()->guest())
+                            <p class="plan-price"><strong>{{ app()->isLocale('ja') ? '220円' : '¥220' }}/<span class="plan-price-period">{{ __('月') }}</span></strong></p>
+                            <p class="plan-price"><strong>{{ app()->isLocale('ja') ? '2,200円' : '¥2,200' }}/<span class="plan-price-period">{{ __('年') }}</span></strong></p>
                             <p><a class="primary-action" href="{{ route('login') }}">→ {{ __('ログインして') }}<br>{{ __('ライトに申し込む') }}</a></p>
-                        @elseif (! auth()->check() || ! config('services.stripe.secret') || ! config('services.stripe.prices.lite'))
+                        @elseif (! auth()->check() || ! config('services.stripe.secret') || (! config('services.stripe.prices.lite') && ! config('services.stripe.prices.lite_yearly')))
                             <p>{{ __('決済準備中') }}</p>
+                        @else
+                            <p class="plan-price"><strong>{{ app()->isLocale('ja') ? '220円' : '¥220' }}/<span class="plan-price-period">{{ __('月') }}</span></strong></p>
+                            <p class="plan-price"><strong>{{ app()->isLocale('ja') ? '2,200円' : '¥2,200' }}/<span class="plan-price-period">{{ __('年') }}</span></strong></p>
                         @endif
                     </section>
                     <section class="plan-card">

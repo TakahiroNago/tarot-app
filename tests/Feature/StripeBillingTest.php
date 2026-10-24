@@ -33,7 +33,9 @@ test('free members can check out lite and premium plans and receive the plan aft
         'services.stripe.secret' => 'sk_test',
         'services.stripe.webhook_secret' => 'whsec_test',
         'services.stripe.prices.lite' => 'price_lite',
+        'services.stripe.prices.lite_yearly' => 'price_lite_yearly',
         'services.stripe.prices.premium' => 'price_premium',
+        'services.stripe.prices.premium_yearly' => 'price_premium_yearly',
     ]);
     $httpClient = new class implements ClientInterface
     {
@@ -65,7 +67,9 @@ test('free members can check out lite and premium plans and receive the plan aft
     try {
         foreach ([
             ['lite', User::PLAN_LITE, 'price_lite'],
+            ['lite_yearly', User::PLAN_LITE, 'price_lite_yearly'],
             ['premium', User::PLAN_PREMIUM, 'price_premium'],
+            ['premium_yearly', User::PLAN_PREMIUM, 'price_premium_yearly'],
         ] as [$product, $expectedPlan, $priceId]) {
             $user = User::factory()->create();
 
@@ -125,11 +129,105 @@ test('free members can check out lite and premium plans and receive the plan aft
     }
 });
 
+test('free members can select the configured yearly plans', function () {
+    config([
+        'services.stripe.secret' => 'sk_test',
+        'services.stripe.prices.lite' => null,
+        'services.stripe.prices.lite_yearly' => 'price_lite_yearly',
+        'services.stripe.prices.premium' => null,
+        'services.stripe.prices.premium_yearly' => 'price_premium_yearly',
+    ]);
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->get(route('plans'))
+        ->assertOk()
+        ->assertSee('2,200円')
+        ->assertSee('5,800円')
+        ->assertSee('name="product" value="lite_yearly"', false)
+        ->assertSee('name="product" value="premium_yearly"', false)
+        ->assertSee('name="product" value="lite_yearly" checked', false)
+        ->assertSee('name="product" value="premium_yearly" checked', false)
+        ->assertSee('ライトに申し込む')
+        ->assertSee('プレミアムに申し込む')
+        ->assertDontSee('月額で申し込む')
+        ->assertDontSee('年額で申し込む');
+});
+
+test('free members can switch plans after returning from an open checkout session', function () {
+    config([
+        'services.stripe.secret' => 'sk_test',
+        'services.stripe.prices.lite' => 'price_lite',
+        'services.stripe.prices.premium' => 'price_premium',
+    ]);
+    $user = User::factory()->create([
+        'stripe_customer_id' => 'cus_test',
+        'stripe_pending_subscription_checkout_id' => 'cs_lite',
+        'stripe_pending_subscription_product' => 'lite',
+    ]);
+    $httpClient = new class implements ClientInterface
+    {
+        public array $requests = [];
+
+        public function request($method, $absUrl, $headers, $params, $hasFile, $apiMode = 'v1', $maxNetworkRetries = null)
+        {
+            $this->requests[] = compact('method', 'absUrl', 'params');
+
+            if ($method === 'get' && str_ends_with($absUrl, '/v1/checkout/sessions/cs_lite')) {
+                $response = [
+                    'id' => 'cs_lite',
+                    'object' => 'checkout.session',
+                    'status' => 'open',
+                    'url' => 'https://checkout.stripe.test/cs_lite',
+                ];
+            } elseif ($method === 'post' && str_ends_with($absUrl, '/v1/checkout/sessions/cs_lite/expire')) {
+                $response = [
+                    'id' => 'cs_lite',
+                    'object' => 'checkout.session',
+                    'status' => 'expired',
+                ];
+            } elseif ($method === 'post' && str_ends_with($absUrl, '/v1/checkout/sessions')) {
+                $response = [
+                    'id' => 'cs_premium',
+                    'object' => 'checkout.session',
+                    'url' => 'https://checkout.stripe.test/cs_premium',
+                    'status' => 'open',
+                ];
+            } else {
+                throw new RuntimeException("Unexpected Stripe request: {$method} {$absUrl}");
+            }
+
+            return [json_encode($response, JSON_THROW_ON_ERROR), 200, ['Content-Type' => 'application/json']];
+        }
+    };
+    ApiRequestor::setHttpClient($httpClient);
+
+    try {
+        $this->actingAs($user)
+            ->get(route('plans', ['checkout' => 'cancelled']))
+            ->assertOk()
+            ->assertSee('決済は完了していません。');
+
+        $this->post(route('billing.checkout'), ['product' => 'premium'])
+            ->assertRedirect('https://checkout.stripe.test/cs_premium');
+
+        expect($httpClient->requests)
+            ->toHaveCount(3)
+            ->and($httpClient->requests[1]['absUrl'])->toEndWith('/v1/checkout/sessions/cs_lite/expire')
+            ->and($httpClient->requests[2]['params']['line_items'][0]['price'])->toBe('price_premium')
+            ->and($user->fresh()->stripe_pending_subscription_checkout_id)->toBe('cs_premium')
+            ->and($user->fresh()->stripe_pending_subscription_product)->toBe('premium');
+    } finally {
+        ApiRequestor::setHttpClient(new CurlClient);
+    }
+});
+
 test('lite members can upgrade to premium from the plans page while premium members do not see that action', function () {
     config([
         'services.stripe.secret' => 'sk_test',
         'services.stripe.prices.lite' => 'price_lite',
         'services.stripe.prices.premium' => 'price_premium',
+        'services.stripe.prices.premium_yearly' => 'price_premium_yearly',
     ]);
 
     $liteMember = User::factory()->create([
@@ -143,6 +241,7 @@ test('lite members can upgrade to premium from the plans page while premium memb
         ->assertOk()
         ->assertSee('action="'.route('billing.plan.change').'"', false)
         ->assertSee('name="plan" value="premium"', false)
+        ->assertSee('name="plan" value="premium_yearly"', false)
         ->assertSee('プレミアムに申し込む')
         ->assertSee('data-plan-change-form', false)
         ->assertSee('data-plan-change-dialog', false)
@@ -222,6 +321,71 @@ test('lite members can immediately upgrade with Stripe prorations', function () 
 
         expect($httpClient->requests)->toHaveCount(2)
             ->and($httpClient->requests[1]['params']['items'][0]['price'])->toBe('price_premium')
+            ->and($httpClient->requests[1]['params']['proration_behavior'])->toBe('always_invoice')
+            ->and($httpClient->requests[1]['params']['payment_behavior'])->toBe('pending_if_incomplete')
+            ->and($user->fresh()->plan)->toBe(User::PLAN_LITE);
+    } finally {
+        ApiRequestor::setHttpClient(new CurlClient);
+    }
+});
+
+test('lite members can upgrade to annual premium with Stripe prorations', function () {
+    config([
+        'services.stripe.secret' => 'sk_test',
+        'services.stripe.prices.lite' => 'price_lite',
+        'services.stripe.prices.premium_yearly' => 'price_premium_yearly',
+    ]);
+    $httpClient = new class implements ClientInterface
+    {
+        public array $requests = [];
+
+        public function request($method, $absUrl, $headers, $params, $hasFile, $apiMode = 'v1', $maxNetworkRetries = null)
+        {
+            $this->requests[] = compact('method', 'absUrl', 'params');
+            $response = $method === 'get'
+                ? [
+                    'id' => 'sub_lite',
+                    'object' => 'subscription',
+                    'customer' => 'cus_lite',
+                    'status' => 'active',
+                    'current_period_start' => now()->subDays(10)->timestamp,
+                    'current_period_end' => now()->addDays(20)->timestamp,
+                    'cancel_at_period_end' => false,
+                    'items' => [
+                        'object' => 'list',
+                        'data' => [[
+                            'id' => 'si_lite',
+                            'object' => 'subscription_item',
+                            'price' => ['id' => 'price_lite', 'object' => 'price'],
+                            'quantity' => 1,
+                        ]],
+                    ],
+                ]
+                : [
+                    'id' => 'sub_lite',
+                    'object' => 'subscription',
+                    'pending_update' => null,
+                ];
+
+            return [json_encode($response, JSON_THROW_ON_ERROR), 200, ['Content-Type' => 'application/json']];
+        }
+    };
+    ApiRequestor::setHttpClient($httpClient);
+
+    try {
+        $user = User::factory()->create([
+            'plan' => User::PLAN_LITE,
+            'stripe_customer_id' => 'cus_lite',
+            'stripe_subscription_id' => 'sub_lite',
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('billing.plan.change'), ['plan' => 'premium_yearly'])
+            ->assertRedirect(route('account.settings.edit'))
+            ->assertSessionHas('status', 'プレミアムプランへ切り替えました。日割り分は今回の請求に反映されています。');
+
+        expect($httpClient->requests)->toHaveCount(2)
+            ->and($httpClient->requests[1]['params']['items'][0]['price'])->toBe('price_premium_yearly')
             ->and($httpClient->requests[1]['params']['proration_behavior'])->toBe('always_invoice')
             ->and($httpClient->requests[1]['params']['payment_behavior'])->toBe('pending_if_incomplete')
             ->and($user->fresh()->plan)->toBe(User::PLAN_LITE);
@@ -334,6 +498,10 @@ test('premium members can schedule a lite downgrade for the current period end',
                             'quantity' => 1,
                             'tax_rates' => [],
                         ]],
+                        'automatic_tax' => [
+                            'enabled' => false,
+                            'disabled_reason' => 'requires_location_inputs',
+                        ],
                         'proration_behavior' => 'create_prorations',
                     ]],
                 ];
@@ -366,6 +534,8 @@ test('premium members can schedule a lite downgrade for the current period end',
             ->and($httpClient->requests[1]['params']['from_subscription'])->toBe('sub_premium')
             ->and($httpClient->requests[2]['params']['phases'][1]['start_date'])->toBe($periodEnd)
             ->and($httpClient->requests[2]['params']['phases'][1]['items'][0]['price'])->toBe('price_lite')
+            ->and($httpClient->requests[2]['params']['phases'][0]['automatic_tax'])->toBe(['enabled' => 'false'])
+            ->and($httpClient->requests[2]['params']['phases'][1]['automatic_tax'])->toBe(['enabled' => 'false'])
             ->and($user->fresh()->stripe_scheduled_plan)->toBe(User::PLAN_LITE)
             ->and($user->fresh()->stripe_subscription_schedule_id)->toBe('sched_premium')
             ->and($user->fresh()->plan)->toBe(User::PLAN_PREMIUM);

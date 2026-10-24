@@ -14,7 +14,7 @@ class BillingController extends Controller
     public function checkout(Request $request, StripeBillingService $billingService): RedirectResponse
     {
         $validated = $request->validate([
-            'product' => ['required', 'string', 'in:credits_10,credits_50,credits_100,lite,premium'],
+            'product' => ['required', 'string', 'in:credits_10,credits_50,credits_100,lite,lite_yearly,premium,premium_yearly'],
         ]);
         $user = $request->user();
         abort_unless($user instanceof User, 403);
@@ -58,7 +58,7 @@ class BillingController extends Controller
     public function changePlan(Request $request, StripeBillingService $billingService): RedirectResponse
     {
         $validated = $request->validate([
-            'plan' => ['required', 'string', 'in:lite,premium'],
+            'plan' => ['required', 'string', 'in:lite,premium,premium_yearly'],
         ]);
         $user = $request->user();
         abort_unless($user instanceof User, 403);

@@ -346,10 +346,12 @@ test('account settings offer immediate upgrades and end-of-period downgrades', f
         ->assertSee('data-plan-change-dialog', false)
         ->assertSee('日割り計算で今回の請求に充当されます。');
 
+    $periodEnd = now()->addDays(10)->setTime(17, 30);
     $premiumMember = User::factory()->create([
         'plan' => User::PLAN_PREMIUM,
         'stripe_customer_id' => 'cus_downgrade',
         'stripe_subscription_id' => 'sub_downgrade',
+        'stripe_current_period_end' => $periodEnd,
     ]);
 
     $this->actingAs($premiumMember)
@@ -358,7 +360,9 @@ test('account settings offer immediate upgrades and end-of-period downgrades', f
         ->assertSeeInOrder(['ライトプランへ変更', '契約・お支払いを管理'])
         ->assertSee('data-plan-change-form', false)
         ->assertSee('data-plan-change-dialog', false)
-        ->assertSee('現在のプレミアム期間終了後に適用されます。');
+        ->assertSee('現在のプレミアム期間終了後に適用されます。')
+        ->assertSee('data-confirmation-period-end-label="現在のプレミアム期間終了日時:"', false)
+        ->assertSee('data-confirmation-period-end-date="'.$periodEnd->format('Y年n月j日 H:i').'"', false);
 });
 
 test('account settings show and allow cancellation of a scheduled downgrade', function () {

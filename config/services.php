@@ -54,7 +54,9 @@ return [
             'credits_50' => env('STRIPE_PRICE_CREDITS_50'),
             'credits_100' => env('STRIPE_PRICE_CREDITS_100'),
             'lite' => env('STRIPE_PRICE_LITE'),
+            'lite_yearly' => env('STRIPE_PRICE_LITE_YEARLY'),
             'premium' => env('STRIPE_PRICE_PREMIUM'),
+            'premium_yearly' => env('STRIPE_PRICE_PREMIUM_YEARLY'),
         ],
     ],
 
