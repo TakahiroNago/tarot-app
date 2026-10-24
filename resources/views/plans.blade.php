@@ -39,7 +39,13 @@
                         <p>&bull; {{ __('すべての相談の記録') }}</p>
                         <p>&bull; {{ __('過去の相談を踏まえた回答') }}</p>
                         <p class="plan-price"><strong>{{ app()->isLocale('ja') ? '580円' : '¥580' }}/<span class="plan-price-period">{{ __('月') }}</span></strong></p>
-                        @if (auth()->check() && auth()->user()->stripe_subscription_id === null && auth()->user()->plan === \App\Models\User::PLAN_FREE && config('services.stripe.secret') && config('services.stripe.prices.premium'))
+                        @if (auth()->check() && auth()->user()->stripe_subscription_id !== null && auth()->user()->plan === \App\Models\User::PLAN_LITE && ! auth()->user()->stripe_cancel_at_period_end && auth()->user()->stripe_scheduled_plan === null && config('services.stripe.secret') && config('services.stripe.prices.premium'))
+                            <form method="POST" action="{{ route('billing.plan.change') }}">
+                                @csrf
+                                <input type="hidden" name="plan" value="premium">
+                                <button class="primary-action" type="submit">{{ __('プレミアムに申し込む') }}</button>
+                            </form>
+                        @elseif (auth()->check() && auth()->user()->stripe_subscription_id === null && auth()->user()->plan === \App\Models\User::PLAN_FREE && config('services.stripe.secret') && config('services.stripe.prices.premium'))
                             <form method="POST" action="{{ route('billing.checkout') }}">
                                 @csrf
                                 <input type="hidden" name="product" value="premium">
@@ -73,7 +79,6 @@
                         <h2>{{ __('無料会員') }}</h2>
                         <p>&bull; {{ __('1日1回（回数引継ぎなし）') }}</p>
                         <p>&bull; {{ __('過去3か月（最大50件）までの相談の記録') }}</p>
-                        <p>&bull; {{ __('未ログインでの無料体験は1回まで') }}</p>
                         @if (auth()->guest())
                             <p><a class="primary-action" href="{{ route('register') }}">→ {{ __('新規登録') }}</a></p>
                         @endif

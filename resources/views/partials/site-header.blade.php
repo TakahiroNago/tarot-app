@@ -19,7 +19,7 @@
                     href="{{ route('plans') }}"
                     aria-label="{{ $creditSummary['unlimited'] ? __('相談回数無制限') : __('利用可能な相談回数').(app()->isLocale('ja') ? ' '.$creditSummary['total'].'回' : ': '.$creditSummary['total'].' '.($creditSummary['total'] === 1 ? 'consultation' : 'consultations')) }}{{ app()->isLocale('ja') ? '。' : '. ' }}{{ __('料金・プランを見る') }}"
                 >
-                    <strong>{{ $creditSummary['unlimited'] ? __('無制限') : $creditSummary['total'] }}</strong>@if (! $creditSummary['unlimited'])<span class="credit-balance-unit">{{ app()->isLocale('ja') ? ' '.__('回') : ' '.($creditSummary['total'] === 1 ? 'consultation' : 'consultations') }}</span>@endif
+                    <strong>{{ $creditSummary['unlimited'] ? '∞' : $creditSummary['total'] }}</strong>@if (! $creditSummary['unlimited'])<span class="credit-balance-unit">{{ app()->isLocale('ja') ? ' '.__('回') : ' '.($creditSummary['total'] === 1 ? 'consultation' : 'consultations') }}</span>@endif
                 </a>
             @else
                 <a href="{{ route('plans') }}">{{ __('料金・プラン') }}</a>

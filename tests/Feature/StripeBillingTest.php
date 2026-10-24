@@ -125,28 +125,36 @@ test('free members can check out lite and premium plans and receive the plan aft
     }
 });
 
-test('paid members do not see the checkout button for their current plan', function () {
+test('lite members can upgrade to premium from the plans page while premium members do not see that action', function () {
     config([
         'services.stripe.secret' => 'sk_test',
         'services.stripe.prices.lite' => 'price_lite',
         'services.stripe.prices.premium' => 'price_premium',
     ]);
 
-    foreach ([
-        [User::PLAN_LITE, 'ライトに申し込む'],
-        [User::PLAN_PREMIUM, 'プレミアムに申し込む'],
-    ] as [$plan, $buttonText]) {
-        $user = User::factory()->create([
-            'plan' => $plan,
-            'stripe_customer_id' => 'cus_'.$plan,
-            'stripe_subscription_id' => 'sub_'.$plan,
-        ]);
+    $liteMember = User::factory()->create([
+        'plan' => User::PLAN_LITE,
+        'stripe_customer_id' => 'cus_lite',
+        'stripe_subscription_id' => 'sub_lite',
+    ]);
 
-        $this->actingAs($user)
-            ->get(route('plans'))
-            ->assertOk()
-            ->assertDontSee($buttonText);
-    }
+    $this->actingAs($liteMember)
+        ->get(route('plans'))
+        ->assertOk()
+        ->assertSee('action="'.route('billing.plan.change').'"', false)
+        ->assertSee('name="plan" value="premium"', false)
+        ->assertSee('プレミアムに申し込む');
+
+    $premiumMember = User::factory()->create([
+        'plan' => User::PLAN_PREMIUM,
+        'stripe_customer_id' => 'cus_premium',
+        'stripe_subscription_id' => 'sub_premium',
+    ]);
+
+    $this->actingAs($premiumMember)
+        ->get(route('plans'))
+        ->assertOk()
+        ->assertDontSee('プレミアムに申し込む');
 });
 
 test('lite members can immediately upgrade with Stripe prorations', function () {

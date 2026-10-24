@@ -16,7 +16,7 @@ test('the plans page explains free membership and does not offer credit purchase
 
     $response->assertOk()
         ->assertSee('1日1回（回数引継ぎなし）')
-        ->assertSee('未ログインでの無料体験は1回まで')
+        ->assertDontSee('未ログインでの無料体験は1回まで')
         ->assertSee('過去3か月（最大50件）までの相談の記録')
         ->assertDontSee('10回分を購入')
         ->assertDontSee('50回分を購入')
@@ -151,7 +151,7 @@ test('premium members retain unlimited readings without an exhausted-credit noti
     $this->actingAs($premiumMember)
         ->get(route('zen'))
         ->assertOk()
-        ->assertSee('<strong>無制限</strong>', false)
+        ->assertSee('<strong>∞</strong>', false)
         ->assertDontSee('本日利用可能なクレジットを使い切りました。');
 });
 

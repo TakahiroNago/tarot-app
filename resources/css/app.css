@@ -1384,6 +1384,15 @@ h2 {
     margin-top: 24px;
 }
 
+.account-settings-section .form-notice {
+    margin-bottom: 20px;
+}
+
+.account-settings-section form + p,
+.account-settings-section p + form {
+    margin-top: 20px;
+}
+
 .settings-note {
     color: var(--color-muted);
     font-size: 13px;
@@ -1749,6 +1758,10 @@ h2 {
 
     html[lang^="en"] .credit-balance-unit {
         display: none;
+    }
+
+    .account-navigation .credit-balance-link {
+        margin-left: 8px;
     }
 
     .account-navigation {
