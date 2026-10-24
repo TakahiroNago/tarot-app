@@ -174,13 +174,19 @@ class ZenController extends Controller
                 'messages' => [
                     [
                         'role' => 'system',
-                        'content' => '[REDACTED]',
+                        'content' => $this->zenPrompt('teacher.'.(app()->isLocale('en') ? 'en' : 'ja'))
+                            .($isPremiumMember
+                                ? $this->zenPrompt('premium_history_system.'.(app()->isLocale('ja') ? 'ja' : 'en'))
+                                : ''),
                     ],
                     [
                         'role' => 'user',
                         'content' => $isPremiumMember
                             ? $this->premiumConsultationPrompt($concern, $history)
-                            : (app()->isLocale('ja') ? "相談：{$concern}" : "Concern: {$concern}"),
+                            : $this->formatZenPrompt(
+                                'concern_user.'.(app()->isLocale('ja') ? 'ja' : 'en'),
+                                ['{concern}' => $concern],
+                            ),
                     ],
                 ],
             ]);
@@ -242,7 +248,7 @@ class ZenController extends Controller
             'messages' => [
                 [
                     'role' => 'system',
-                    'content' => '[REDACTED]',
+                    'content' => $this->zenPrompt('topic.ja'),
                 ],
                 [
                     'role' => 'user',
@@ -264,23 +270,44 @@ class ZenController extends Controller
      */
     private function premiumConsultationPrompt(string $concern, Collection $history): string
     {
-        $historyContext = $history->isEmpty()
-            ? (app()->isLocale('ja')
-                ? '該当テーマの過去の相談記録はありません。'
-                : 'There are no past consultation records for this topic.')
+        $locale = app()->isLocale('ja') ? 'ja' : 'en';
+
+        $historyText = $history->isEmpty()
+            ? $this->zenPrompt('history_empty.'.$locale)
             : $history
-                ->map(fn (ZenConsultation $consultation): string => app()->isLocale('ja')
-                    ? "- {$consultation->created_at->format('Y/m/d H:i')}：{$consultation->summary}"
-                    : "- {$consultation->created_at->format('M j, Y H:i')}: {$consultation->summary}")
+                ->map(fn (ZenConsultation $consultation): string => $this->formatZenPrompt(
+                    'history_list_item.'.$locale,
+                    [
+                        '{date}' => $consultation->created_at->format($locale === 'ja' ? 'Y/m/d H:i' : 'M j, Y H:i'),
+                        '{summary}' => (string) $consultation->summary,
+                    ]
+                ))
                 ->implode("\n");
 
-        return app()->isLocale('ja')
-            ? "過去の同テーマの相談要約と日時：\n{$historyContext}\n\n今回の相談：{$concern}"
-            : "Summaries and dates of past consultations on the same topic:\n{$historyContext}\n\nCurrent concern: {$concern}";
+        return $this->formatZenPrompt('history_user.'.$locale, [
+            '{history}' => $historyText,
+            '{concern}' => $concern,
+        ]);
     }
 
-    private function zenTeacherInstructions(): string
-    { return '[REDACTED]'; }
+    private function zenPrompt(string $name): string
+    {
+        $prompt = config("zen.prompts.{$name}");
+
+        if (! is_string($prompt) || trim($prompt) === '') {
+            throw new UnexpectedValueException("Zen prompt [{$name}] is missing or invalid.");
+        }
+
+        return $prompt;
+    }
+
+    /**
+     * @param  array<string, string>  $replacements
+     */
+    private function formatZenPrompt(string $name, array $replacements): string
+    {
+        return strtr($this->zenPrompt($name), $replacements);
+    }
 
     private function consultationSummary(string $concern, string $answer): string
     {
@@ -289,13 +316,14 @@ class ZenController extends Controller
             'messages' => [
                 [
                     'role' => 'system',
-                    'content' => '[REDACTED]',
+                    'content' => $this->zenPrompt('summary.'.(app()->isLocale('ja') ? 'ja' : 'en')),
                 ],
                 [
                     'role' => 'user',
-                    'content' => app()->isLocale('ja')
-                        ? "相談：{$concern}\n回答：{$answer}"
-                        : "Concern: {$concern}\nResponse: {$answer}",
+                    'content' => $this->formatZenPrompt(
+                        'summary_user.'.(app()->isLocale('ja') ? 'ja' : 'en'),
+                        ['{concern}' => $concern, '{answer}' => $answer],
+                    ),
                 ],
             ],
             'response_format' => ['type' => 'json_object'],
@@ -329,13 +357,14 @@ class ZenController extends Controller
             'messages' => [
                 [
                     'role' => 'system',
-                    'content' => '[REDACTED]',
+                    'content' => $this->zenPrompt('metadata.'.(app()->isLocale('ja') ? 'ja' : 'en')),
                 ],
                 [
                     'role' => 'user',
-                    'content' => app()->isLocale('ja')
-                        ? "相談：{$concern}\n回答：{$answer}"
-                        : "Concern: {$concern}\nResponse: {$answer}",
+                    'content' => $this->formatZenPrompt(
+                        'metadata_user.'.(app()->isLocale('ja') ? 'ja' : 'en'),
+                        ['{concern}' => $concern, '{answer}' => $answer],
+                    ),
                 ],
             ],
             'response_format' => ['type' => 'json_object'],

@@ -1,6 +1,15 @@
 <?php
 
+$privatePromptsPath = storage_path('app/private/zen-prompts.php');
+$prompts = is_file($privatePromptsPath) ? require $privatePromptsPath : [];
+
+if (! is_array($prompts)) {
+    throw new UnexpectedValueException('Private Zen prompts must return an array.');
+}
+
 return [
+
+    'prompts' => $prompts,
 
     /*
     | Number of days saved consultations that contain detected personal
