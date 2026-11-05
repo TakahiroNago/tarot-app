@@ -38,6 +38,11 @@ Route::post('/cart/items', [CartController::class, 'store'])->name('shop.cart.st
 Route::patch('/cart/items/{item}', [CartController::class, 'update'])->name('shop.cart.update');
 Route::delete('/cart/items/{item}', [CartController::class, 'destroy'])->name('shop.cart.destroy');
 Route::get('/checkout', [CheckoutController::class, 'index'])->name('shop.checkout.index');
+Route::get('/checkout/confirm', [CheckoutController::class, 'showConfirm']);
+Route::post('/checkout/confirm', [CheckoutController::class, 'confirm'])
+    ->middleware('throttle:30,1')
+    ->name('shop.checkout.confirm');
+Route::post('/checkout/edit', [CheckoutController::class, 'edit'])->name('shop.checkout.edit');
 Route::post('/checkout', [CheckoutController::class, 'store'])
     ->middleware('throttle:5,1')
     ->name('shop.checkout.store');

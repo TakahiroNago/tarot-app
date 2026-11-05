@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Models\User;
 use App\Services\CartService;
 use App\Services\CheckoutConflictException;
+use App\Services\CheckoutQuoteChangedException;
 use App\Services\CheckoutService;
 use App\Services\CheckoutSessionUnavailableException;
 use App\Services\StripeCheckoutSessionService;
@@ -24,6 +25,14 @@ class CheckoutController extends Controller
     private const NOTICE_STILL_OPEN = '決済の準備状況を確認できませんでした。入力内容と注文情報は保持されています。時間をおいて同じ画面から再試行してください。在庫予約は有効期限まで維持されます。';
 
     private const NOTICE_CLOSED = '決済を開始できなかったため、ご注文を取り消しました。在庫の予約は解除しています。入力内容をご確認のうえ、もう一度お試しください。';
+
+    private const NOTICE_QUOTE_CHANGED = '価格・送料・税額などが、確認いただいた内容から変更されました。最新の内容をご確認のうえ、もう一度ご注文ください。';
+
+    private const DETAIL_FIELDS = [
+        'checkout_key', 'customer_name', 'customer_email', 'customer_phone', 'shipping_recipient',
+        'shipping_country_code', 'shipping_postal_code', 'shipping_region', 'shipping_city',
+        'shipping_address_line1', 'shipping_address_line2', 'shipping_rate_id',
+    ];
 
     public function index(Request $request, CartService $cartService, CheckoutService $checkoutService): View
     {
@@ -48,31 +57,58 @@ class CheckoutController extends Controller
         ]);
     }
 
+    public function confirm(
+        Request $request,
+        CartService $cartService,
+        CheckoutService $checkoutService,
+    ): View|RedirectResponse {
+        $validated = $request->validate($this->detailRules($checkoutService));
+        $cart = $cartService->current($request);
+
+        if ($checkoutService->activeOrderFor($cart) instanceof Order) {
+            return to_route('shop.checkout.index')->withInput();
+        }
+
+        return $this->confirmationPage($cart, $validated, $checkoutService);
+    }
+
+    /**
+     * A reload or a failed validation can land on this address, which only accepts a form post.
+     */
+    public function showConfirm(Request $request): RedirectResponse
+    {
+        $request->session()->reflash();
+
+        return to_route('shop.checkout.index');
+    }
+
+    public function edit(Request $request): RedirectResponse
+    {
+        return to_route('shop.checkout.index')->withInput($request->only(self::DETAIL_FIELDS));
+    }
+
     public function store(
         Request $request,
         CartService $cartService,
         CheckoutService $checkoutService,
         StripeCheckoutSessionService $checkoutSessionService,
         ConcurrencyErrorDetector $concurrencyErrorDetector,
-    ): RedirectResponse {
-        $availableCountries = $checkoutService->availableShippingRates()
-            ->pluck('country_code')
-            ->unique()
-            ->all();
+    ): View|RedirectResponse {
         $validated = $request->validate([
-            'checkout_key' => ['required', 'string', 'regex:/\A[a-f0-9]{64}\z/'],
-            'customer_name' => ['required', 'string', 'max:255'],
-            'customer_email' => ['required', 'email:rfc', 'max:255'],
-            'customer_phone' => ['nullable', 'string', 'max:40'],
-            'shipping_recipient' => ['required', 'string', 'max:255'],
-            'shipping_country_code' => ['required', 'string', 'size:2', Rule::in($availableCountries)],
-            'shipping_postal_code' => ['required', 'string', 'max:40'],
-            'shipping_region' => ['nullable', 'string', 'max:255'],
-            'shipping_city' => ['required', 'string', 'max:255'],
-            'shipping_address_line1' => ['required', 'string', 'max:255'],
-            'shipping_address_line2' => ['nullable', 'string', 'max:255'],
-            'shipping_rate_id' => ['required', 'integer'],
+            ...$this->detailRules($checkoutService),
+            'quote_hash' => ['required', 'string', 'regex:/\A[a-f0-9]{64}\z/'],
+            'quoted_total' => ['nullable', 'integer'],
         ]);
+
+        if (! $request->boolean('terms_accepted')) {
+            return $this->confirmationPage(
+                $cartService->current($request),
+                $validated,
+                $checkoutService,
+                termsError: 'ご注文には、利用規約と表示内容への同意が必要です。',
+            );
+        }
+        $validated['terms_accepted'] = true;
 
         $user = $request->user();
         abort_unless($user === null || $user instanceof User, 403);
@@ -86,6 +122,8 @@ class CheckoutController extends Controller
         $cart = $cartService->current($request);
         try {
             $order = $checkoutService->reserveOrder($cart, $validated, $user);
+        } catch (CheckoutQuoteChangedException) {
+            return $this->confirmationPage($cart, $validated, $checkoutService);
         } catch (CheckoutConflictException) {
             return to_route('shop.checkout.index')
                 ->with('status', 'お支払い待ちのご注文と、入力内容またはカートの内容が異なります。そのまま決済を再開するか、ご注文を取り消してから新しくご注文ください。')
@@ -168,6 +206,53 @@ class CheckoutController extends Controller
     {
         return to_route('shop.checkout.index')
             ->with('status', '決済は完了していません。在庫は予約期限まで確保されています。');
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     */
+    private function confirmationPage(
+        Cart $cart,
+        array $validated,
+        CheckoutService $checkoutService,
+        ?string $termsError = null,
+    ): View {
+        $quote = $checkoutService->quote($cart, $validated);
+        $hasChanged = isset($validated['quote_hash']) && ! hash_equals($quote['hash'], $validated['quote_hash']);
+
+        return view('shop.checkout.confirm', [
+            'details' => Arr::only($validated, self::DETAIL_FIELDS),
+            'quote' => $quote,
+            'termsError' => $termsError,
+            'changedNotice' => $hasChanged ? self::NOTICE_QUOTE_CHANGED : null,
+            'previousTotal' => $hasChanged && isset($validated['quoted_total']) ? (int) $validated['quoted_total'] : null,
+        ]);
+    }
+
+    /**
+     * @return array<string, array<int, mixed>>
+     */
+    private function detailRules(CheckoutService $checkoutService): array
+    {
+        $availableCountries = $checkoutService->availableShippingRates()
+            ->pluck('country_code')
+            ->unique()
+            ->all();
+
+        return [
+            'checkout_key' => ['required', 'string', 'regex:/\A[a-f0-9]{64}\z/'],
+            'customer_name' => ['required', 'string', 'max:255'],
+            'customer_email' => ['required', 'email:rfc', 'max:255'],
+            'customer_phone' => ['nullable', 'string', 'max:40'],
+            'shipping_recipient' => ['required', 'string', 'max:255'],
+            'shipping_country_code' => ['required', 'string', 'size:2', Rule::in($availableCountries)],
+            'shipping_postal_code' => ['required', 'string', 'max:40'],
+            'shipping_region' => ['nullable', 'string', 'max:255'],
+            'shipping_city' => ['required', 'string', 'max:255'],
+            'shipping_address_line1' => ['required', 'string', 'max:255'],
+            'shipping_address_line2' => ['nullable', 'string', 'max:255'],
+            'shipping_rate_id' => ['required', 'integer'],
+        ];
     }
 
     private function redirectToPayment(

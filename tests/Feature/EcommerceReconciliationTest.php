@@ -28,6 +28,7 @@ use Illuminate\Support\Facades\Mail;
 use Stripe\Exception\ApiConnectionException;
 use Stripe\Refund;
 use Stripe\WebhookSignature;
+use Tests\Support\CheckoutForm;
 use Tests\Support\Stripe\FakeStripeBillingService;
 use Tests\Support\Stripe\FakeStripeRefunds;
 
@@ -78,7 +79,7 @@ beforeEach(function () {
 
 function placeOrder(mixed $test): Order
 {
-    $test->post(route('shop.checkout.store'), $test->form)->assertRedirect();
+    $test->post(route('shop.checkout.store'), CheckoutForm::confirmed($test->form))->assertRedirect();
 
     return Order::query()->sole();
 }
@@ -316,7 +317,7 @@ test('one failing order does not stop the others', function () {
     $secondUser = User::factory()->create();
     $secondCart = Cart::query()->create(['user_id' => $secondUser->id]);
     CartItem::query()->create(['cart_id' => $secondCart->id, 'variant_id' => $this->variant->id, 'quantity' => 1]);
-    $this->actingAs($secondUser)->post(route('shop.checkout.store'), $this->form)->assertRedirect();
+    $this->actingAs($secondUser)->post(route('shop.checkout.store'), CheckoutForm::confirmed($this->form))->assertRedirect();
     $healthy = Order::query()->whereKeyNot($broken->id)->sole();
 
     $this->travel(PAST_EXPIRY_AND_GRACE_MINUTES)->minutes();

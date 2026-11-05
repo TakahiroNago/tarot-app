@@ -7,6 +7,7 @@ use App\Models\CartItem;
 use App\Models\InventoryBalance;
 use App\Models\InventoryMovement;
 use App\Models\Order;
+use App\Models\OrderEvent;
 use App\Models\OrderItem;
 use App\Models\Payment;
 use App\Models\ShippingRate;
@@ -83,6 +84,144 @@ class CheckoutService
 
             return $this->resumeExistingOrder($existingOrderId, $user, $fingerprint);
         }
+    }
+
+    /**
+     * What the order would be if placed now, for the buyer to confirm. Nothing is reserved. The hash
+     * covers the details and amounts, so placing the order detects any change since this was shown.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array{lines: array<int, array{name: string, label: string, quantity: int, unit_price: int, line_total: int}>, subtotal: int, tax: int, shipping: int, total: int, shipping_method: string, hash: string}
+     */
+    public function quote(Cart $cart, array $data): array
+    {
+        $shippingRate = $this->shippingRateFor($data);
+        $taxRate = $this->taxRateFor($data);
+        $items = CartItem::query()
+            ->with(['variant.product', 'variant.inventoryBalance'])
+            ->where('cart_id', $cart->id)
+            ->orderBy('variant_id')
+            ->get();
+        if ($items->isEmpty()) {
+            throw ValidationException::withMessages([
+                'cart' => 'カートに商品がありません。',
+            ]);
+        }
+
+        $lines = [];
+        $hashLines = [];
+        $subtotal = 0;
+        $tax = 0;
+        foreach ($items as $item) {
+            $variant = $item->variant;
+            $product = $variant?->product;
+            if (
+                $product === null
+                || $product->status !== 'published'
+                || ! $variant->is_active
+                || $variant->inventoryBalance === null
+                || $variant->inventoryBalance->available() < $item->quantity
+            ) {
+                throw ValidationException::withMessages([
+                    'cart' => '商品または在庫の状態が変わりました。カートを確認してください。',
+                ]);
+            }
+
+            $lineTotal = $variant->price_minor * $item->quantity;
+            $lineTax = $this->includedTax($lineTotal, $taxRate->tax_basis_points);
+            $lines[] = [
+                'name' => $product->name,
+                'label' => $variant->label,
+                'quantity' => $item->quantity,
+                'unit_price' => $variant->price_minor,
+                'line_total' => $lineTotal,
+            ];
+            $hashLines[] = [$variant->id, $variant->price_minor, $lineTax];
+            $subtotal += $lineTotal;
+            $tax += $lineTax;
+        }
+
+        $shipping = $shippingRate->fee_minor;
+        if ($taxRate->shipping_taxable) {
+            $tax += $this->includedTax($shipping, $taxRate->tax_basis_points);
+        }
+        if ($subtotal + $shipping < 1) {
+            throw ValidationException::withMessages([
+                'cart' => '合計金額が0円のため、オンライン決済を利用できません。',
+            ]);
+        }
+
+        return [
+            'lines' => $lines,
+            'subtotal' => $subtotal,
+            'tax' => $tax,
+            'shipping' => $shipping,
+            'total' => $subtotal + $shipping,
+            'shipping_method' => $shippingRate->shippingMethod->name,
+            'hash' => $this->quoteHash($items, $data, $hashLines, $shipping, $tax, $taxRate->tax_basis_points),
+        ];
+    }
+
+    /**
+     * @param  Collection<int, CartItem>  $items
+     * @param  array<string, mixed>  $data
+     * @param  array<int, array{0: int, 1: int, 2: int}>  $lines
+     */
+    private function quoteHash(Collection $items, array $data, array $lines, int $shipping, int $tax, int $taxBasisPoints): string
+    {
+        return hash_hmac('sha256', json_encode([
+            'fingerprint' => $this->checkoutFingerprint($items, $data),
+            'lines' => $lines,
+            'shipping' => $shipping,
+            'tax' => $tax,
+            'tax_basis_points' => $taxBasisPoints,
+        ], JSON_THROW_ON_ERROR), (string) config('app.key'));
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function shippingRateFor(array $data): ShippingRate
+    {
+        $shippingRate = ShippingRate::query()
+            ->with('shippingMethod')
+            ->whereKey($data['shipping_rate_id'])
+            ->where('country_code', $data['shipping_country_code'])
+            ->where('currency', 'JPY')
+            ->where('is_active', true)
+            ->whereHas('shippingMethod', fn ($query) => $query->where('is_active', true))
+            ->first();
+
+        if (! $shippingRate instanceof ShippingRate) {
+            throw ValidationException::withMessages([
+                'shipping_rate_id' => '選択した配送先・配送方法は現在利用できません。',
+            ]);
+        }
+
+        return $shippingRate;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function taxRateFor(array $data): TaxRate
+    {
+        $taxRates = TaxRate::query()
+            ->where('country_code', $data['shipping_country_code'])
+            ->where('is_active', true)
+            ->whereDate('active_from', '<=', today())
+            ->where(function ($query): void {
+                $query->whereNull('active_until')->orWhereDate('active_until', '>=', today());
+            })
+            ->get();
+
+        if ($taxRates->count() !== 1) {
+            throw ValidationException::withMessages([
+                'shipping_country_code' => '配送先の税ルールが未設定または重複しているため、注文を確定できません。',
+            ]);
+        }
+
+        return $taxRates->sole();
     }
 
     public function activeOrderFor(Cart $cart): ?Order
@@ -188,34 +327,8 @@ class CheckoutService
                 ]);
             }
 
-            $shippingRate = ShippingRate::query()
-                ->with('shippingMethod')
-                ->whereKey($data['shipping_rate_id'])
-                ->where('country_code', $data['shipping_country_code'])
-                ->where('currency', 'JPY')
-                ->where('is_active', true)
-                ->whereHas('shippingMethod', fn ($query) => $query->where('is_active', true))
-                ->first();
-            if (! $shippingRate instanceof ShippingRate) {
-                throw ValidationException::withMessages([
-                    'shipping_rate_id' => '選択した配送先・配送方法は現在利用できません。',
-                ]);
-            }
-
-            $taxRates = TaxRate::query()
-                ->where('country_code', $data['shipping_country_code'])
-                ->where('is_active', true)
-                ->whereDate('active_from', '<=', today())
-                ->where(function ($query): void {
-                    $query->whereNull('active_until')->orWhereDate('active_until', '>=', today());
-                })
-                ->get();
-            if ($taxRates->count() !== 1) {
-                throw ValidationException::withMessages([
-                    'shipping_country_code' => '配送先の税ルールが未設定または重複しているため、注文を確定できません。',
-                ]);
-            }
-            $taxRate = $taxRates->sole();
+            $shippingRate = $this->shippingRateFor($data);
+            $taxRate = $this->taxRateFor($data);
 
             $items = CartItem::query()
                 ->where('cart_id', $cart->id)
@@ -280,6 +393,18 @@ class CheckoutService
                 ]);
             }
 
+            if (isset($data['quote_hash'])) {
+                $currentHash = $this->quoteHash($items, $data, array_map(fn (array $line): array => [
+                    $line['variant']->id,
+                    $line['variant']->price_minor,
+                    $line['line_tax'],
+                ], $orderLines), $shipping, $tax, $taxRate->tax_basis_points);
+
+                if (! hash_equals($currentHash, (string) $data['quote_hash'])) {
+                    throw new CheckoutQuoteChangedException;
+                }
+            }
+
             $now = now();
             $orderNumber = 'EC'.$now->format('ymd').Str::upper(Str::random(8));
             $guestAccessExpiresAt = $user === null ? $now->copy()->addDays(30) : null;
@@ -326,6 +451,15 @@ class CheckoutService
 
                 $order->guest_access_token_hash = hash('sha256', $signature);
                 $order->save();
+            }
+
+            if (! empty($data['terms_accepted'])) {
+                OrderEvent::query()->create([
+                    'order_id' => $order->id,
+                    'event_type' => 'terms_accepted',
+                    'to_status' => $order->status,
+                    'to_payment_status' => $order->payment_status,
+                ]);
             }
 
             foreach ($orderLines as $line) {

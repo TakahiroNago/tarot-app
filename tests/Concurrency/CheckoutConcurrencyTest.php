@@ -11,6 +11,7 @@ use App\Models\ShippingRate;
 use App\Models\TaxRate;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Tests\Support\CheckoutForm;
 use Tests\Support\Concurrency\CheckoutScenario;
 use Tests\Support\Concurrency\ConcurrencyHarness;
 use Tests\Support\Concurrency\ConcurrencyTestCase;
@@ -202,7 +203,7 @@ test('the same key over HTTP creates one order and one Stripe session', function
 
     $results = ConcurrencyHarness::run('http-checkout', array_fill(0, 8, [
         'user_id' => $user->id,
-        'data' => CheckoutScenario::checkoutData($rate, 'http-same-key'),
+        'data' => CheckoutForm::confirmed(CheckoutScenario::checkoutData($rate, 'http-same-key'), $cart),
     ]));
 
     $counts = CheckoutScenario::outcomeCounts($results, 'HTTP same key');
