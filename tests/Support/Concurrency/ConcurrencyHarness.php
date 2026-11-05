@@ -66,6 +66,9 @@ final class ConcurrencyHarness
             $table->string('idempotency_key', 100)->primary();
             $table->string('session_id', 64)->unique();
             $table->char('params_hash', 64);
+            $table->text('params');
+            $table->string('status', 20);
+            $table->string('payment_status', 20);
             $table->unsignedBigInteger('expires_at');
         });
     }

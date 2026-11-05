@@ -112,7 +112,7 @@ class CartService
             }
 
             Cart::query()->lockForUpdate()->findOrFail($cart->id);
-            $variant = ProductVariant::query()->lockForUpdate()->findOrFail($variantId);
+            $variant = ProductVariant::query()->sharedLock()->findOrFail($variantId);
             $balance = InventoryBalance::query()->lockForUpdate()->find($variant->id);
             if (
                 ! $variant->is_active
