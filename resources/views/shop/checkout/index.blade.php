@@ -52,7 +52,7 @@
                         <p class="product-price">商品小計（税込）: ¥{{ number_format($subtotal) }}</p>
                         <p class="settings-note">送料と適用税額は配送先に基づいて確定します。カード情報はStripeの決済画面で入力し、本サイトでは保存しません。</p>
                     </div>
-                    <form class="question-form checkout-form" method="POST" action="{{ route('shop.checkout.store') }}">
+                    <form class="question-form checkout-form" method="POST" action="{{ route('shop.checkout.confirm') }}">
                         @csrf
                         <input type="hidden" name="checkout_key" value="{{ $checkoutKey }}">
                         <h2>ご連絡先</h2>
@@ -115,7 +115,7 @@
 
                         @error('cart')<p class="form-error" role="alert">{{ $message }}</p>@enderror
                         @error('checkout_key')<p class="form-error" role="alert">{{ $message }}</p>@enderror
-                        <button class="primary-action" type="submit">Stripeでお支払いへ <span class="action-arrow" aria-hidden="true">→</span></button>
+                        <button class="primary-action" type="submit">ご注文内容の確認へ <span class="action-arrow" aria-hidden="true">→</span></button>
                     </form>
                 @endif
             </section>

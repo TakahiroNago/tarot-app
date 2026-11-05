@@ -38,6 +38,11 @@ Route::post('/cart/items', [CartController::class, 'store'])->name('shop.cart.st
 Route::patch('/cart/items/{item}', [CartController::class, 'update'])->name('shop.cart.update');
 Route::delete('/cart/items/{item}', [CartController::class, 'destroy'])->name('shop.cart.destroy');
 Route::get('/checkout', [CheckoutController::class, 'index'])->name('shop.checkout.index');
+Route::get('/checkout/confirm', [CheckoutController::class, 'showConfirm']);
+Route::post('/checkout/confirm', [CheckoutController::class, 'confirm'])
+    ->middleware('throttle:30,1')
+    ->name('shop.checkout.confirm');
+Route::post('/checkout/edit', [CheckoutController::class, 'edit'])->name('shop.checkout.edit');
 Route::post('/checkout', [CheckoutController::class, 'store'])
     ->middleware('throttle:5,1')
     ->name('shop.checkout.store');
@@ -48,11 +53,12 @@ Route::post('/checkout/pending/cancel', [CheckoutController::class, 'cancelPendi
     ->middleware('throttle:5,1')
     ->name('shop.checkout.pending.cancel');
 Route::get('/checkout/complete/{orderNumber}', [CheckoutController::class, 'success'])
+    ->middleware('sensitive')
     ->where('orderNumber', '[A-Z0-9-]{8,32}')
     ->name('shop.checkout.success');
 Route::get('/checkout/cancelled', [CheckoutController::class, 'cancel'])->name('shop.checkout.cancel');
 Route::get('/orders/guest/{orderNumber}', [OrderController::class, 'guestShow'])
-    ->middleware(['signed', 'throttle:30,1'])
+    ->middleware(['sensitive', 'signed:relative', 'throttle:30,1'])
     ->where('orderNumber', '[A-Z0-9-]{8,32}')
     ->name('shop.orders.guest-show');
 

@@ -21,6 +21,7 @@ use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\Mail;
 use Stripe\Exception\ApiConnectionException;
 use Stripe\WebhookSignature;
+use Tests\Support\CheckoutForm;
 use Tests\Support\Stripe\FakeStripeBillingService;
 
 uses(RefreshDatabase::class);
@@ -70,7 +71,7 @@ beforeEach(function () {
  */
 function checkoutWith(mixed $test, array $changes = []): mixed
 {
-    return $test->post(route('shop.checkout.store'), [...$test->form, ...$changes]);
+    return $test->post(route('shop.checkout.store'), CheckoutForm::confirmed([...$test->form, ...$changes], $test->checkoutCart ?? null));
 }
 
 function hiddenCheckoutKey(mixed $response): string
@@ -362,7 +363,7 @@ test('a paid session cannot be cancelled', function () {
 
     expect(Order::query()->sole()->status)->toBe('pending_payment')
         ->and($this->balance->fresh()->reserved)->toBe(1)
-        ->and(OrderEvent::query()->count())->toBe(0);
+        ->and(OrderEvent::query()->where('event_type', '!=', 'terms_accepted')->count())->toBe(0);
 });
 
 test('nothing is cancelled when Stripe cannot confirm the session', function () {
@@ -424,6 +425,7 @@ test('a guest cart is served by its own cookie', function () {
     $guestCart = Cart::query()->create(['guest_token_hash' => hash('sha256', $token), 'expires_at' => now()->addDay()]);
     CartItem::query()->create(['cart_id' => $guestCart->id, 'variant_id' => $this->variant->id, 'quantity' => 1]);
 
+    $this->checkoutCart = $guestCart;
     $this->withCookie('ec_cart', $token);
     checkoutWith($this)->assertRedirect(PENDING_SESSION_URL.'cs_test_fake_1');
     $this->post(route('shop.checkout.pending.resume'))->assertRedirect(PENDING_SESSION_URL.'cs_test_fake_1');

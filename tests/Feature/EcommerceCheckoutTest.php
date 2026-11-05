@@ -16,6 +16,7 @@ use App\Models\User;
 use App\Services\CheckoutService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\CheckoutForm;
 
 uses(RefreshDatabase::class);
 
@@ -299,7 +300,7 @@ test('checkout does not reserve stock when Stripe is not configured', function (
         'is_active' => true,
     ]);
 
-    $this->actingAs($user)->post(route('shop.checkout.store'), [
+    $this->actingAs($user)->post(route('shop.checkout.store'), CheckoutForm::confirmed([
         'checkout_key' => str_repeat('d', 64),
         'customer_name' => '購入者',
         'customer_email' => 'buyer@example.test',
@@ -309,7 +310,7 @@ test('checkout does not reserve stock when Stripe is not configured', function (
         'shipping_city' => '千代田区',
         'shipping_address_line1' => '千代田1-1',
         'shipping_rate_id' => $shippingRate->id,
-    ])->assertRedirect(route('shop.checkout.index'))
+    ]))->assertRedirect(route('shop.checkout.index'))
         ->assertSessionHas('status')
         ->assertSessionHasInput('checkout_key', str_repeat('d', 64));
 

@@ -17,6 +17,7 @@ use Stripe\Exception\IdempotencyException;
 use Stripe\Exception\InvalidRequestException;
 use Stripe\Exception\UnknownApiErrorException;
 use Stripe\StripeClient;
+use Tests\Support\CheckoutForm;
 use Tests\Support\Stripe\FakeStripeBillingService;
 use Tests\Support\Stripe\FakeStripeCheckoutSessions;
 use Tests\Support\Stripe\FakeStripeClient;
@@ -203,7 +204,7 @@ test('the fake plugs into the real checkout route', function () {
         'is_active' => true,
     ]);
 
-    $this->actingAs($user)->post(route('shop.checkout.store'), [
+    $this->actingAs($user)->post(route('shop.checkout.store'), CheckoutForm::confirmed([
         'checkout_key' => str_repeat('a', 64),
         'customer_name' => '購入者',
         'customer_email' => 'buyer@example.test',
@@ -213,7 +214,7 @@ test('the fake plugs into the real checkout route', function () {
         'shipping_city' => '千代田区',
         'shipping_address_line1' => '千代田1-1',
         'shipping_rate_id' => $rate->id,
-    ])->assertRedirect('https://checkout.stripe.test/pay/cs_test_fake_1');
+    ]))->assertRedirect('https://checkout.stripe.test/pay/cs_test_fake_1');
 
     expect($sessions->createCallCount())->toBe(1)
         ->and(Order::query()->sole()->payments()->sole()->provider_checkout_id)->toBe('cs_test_fake_1');

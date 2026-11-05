@@ -19,6 +19,7 @@ use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Tests\Support\CheckoutForm;
 use Tests\Support\Concurrency\InjectedDeadlock;
 use Tests\Support\Stripe\FakeStripeBillingService;
 
@@ -96,7 +97,7 @@ test('one deadlock is retried and the order succeeds without duplicate rows', fu
     InjectedDeadlock::onPaymentCreation($deadlocks);
 
     $this->actingAs($scenario['user'])
-        ->post(route('shop.checkout.store'), reservationForm($scenario['rate']))
+        ->post(route('shop.checkout.store'), CheckoutForm::confirmed(reservationForm($scenario['rate'])))
         ->assertRedirect('https://checkout.stripe.test/pay/cs_test_fake_1');
 
     expectExactlyOneReservation($scenario);
@@ -110,7 +111,7 @@ test('exhausted retries show the notice and keep the input and key', function ()
     InjectedDeadlock::onPaymentCreation(3);
 
     $this->actingAs($scenario['user'])
-        ->post(route('shop.checkout.store'), $form)
+        ->post(route('shop.checkout.store'), CheckoutForm::confirmed($form))
         ->assertRedirect(route('shop.checkout.index'))
         ->assertSessionHas('status', BUSY_NOTICE)
         ->assertSessionHasInput('checkout_key', $form['checkout_key'])
@@ -138,8 +139,8 @@ test('resubmitting after exhausted retries creates a single order with the origi
     $form = reservationForm($scenario['rate']);
     InjectedDeadlock::onPaymentCreation(3);
 
-    $this->actingAs($scenario['user'])->post(route('shop.checkout.store'), $form)->assertSessionHas('status', BUSY_NOTICE);
-    $this->post(route('shop.checkout.store'), $form)->assertRedirect('https://checkout.stripe.test/pay/cs_test_fake_1');
+    $this->actingAs($scenario['user'])->post(route('shop.checkout.store'), CheckoutForm::confirmed($form))->assertSessionHas('status', BUSY_NOTICE);
+    $this->post(route('shop.checkout.store'), CheckoutForm::confirmed($form))->assertRedirect('https://checkout.stripe.test/pay/cs_test_fake_1');
 
     expectExactlyOneReservation($scenario);
     expect(Order::query()->sole()->idempotency_key)->toBe(hash('sha256', $form['checkout_key']));
@@ -158,7 +159,7 @@ test('other database errors are not reported as a busy notice', function () {
 
     try {
         $this->actingAs($scenario['user'])
-            ->post(route('shop.checkout.store'), reservationForm($scenario['rate']))
+            ->post(route('shop.checkout.store'), CheckoutForm::confirmed(reservationForm($scenario['rate'])))
             ->assertServerError();
     } finally {
         Str::createRandomStringsNormally();
@@ -240,7 +241,7 @@ test('admin setting changes do not alter a placed order or its Stripe amounts', 
     $admin = User::factory()->admin()->create();
     $form = reservationForm($scenario['rate']);
 
-    $this->actingAs($scenario['user'])->post(route('shop.checkout.store'), $form)->assertRedirect(route('shop.checkout.index'));
+    $this->actingAs($scenario['user'])->post(route('shop.checkout.store'), CheckoutForm::confirmed($form))->assertRedirect(route('shop.checkout.index'));
     $order = Order::query()->sole();
     $placed = $order->only(['shipping_minor', 'tax_minor', 'subtotal_minor', 'total_minor', 'tax_rate_basis_points']);
 
@@ -259,7 +260,7 @@ test('admin setting changes do not alter a placed order or its Stripe amounts', 
 
     expect($order->fresh()->only(array_keys($placed)))->toBe($placed);
 
-    $this->actingAs($scenario['user'])->post(route('shop.checkout.store'), $form)->assertRedirect('https://checkout.stripe.test/pay/cs_test_fake_1');
+    $this->actingAs($scenario['user'])->post(route('shop.checkout.store'), CheckoutForm::confirmed($form))->assertRedirect('https://checkout.stripe.test/pay/cs_test_fake_1');
 
     $amounts = array_map(
         fn (array $item): int => $item['price_data']['unit_amount'] * $item['quantity'],
@@ -276,8 +277,8 @@ test('a saved session is reused instead of creating another', function () {
     $scenario = reservationScenario();
     $form = reservationForm($scenario['rate']);
 
-    $this->actingAs($scenario['user'])->post(route('shop.checkout.store'), $form)->assertRedirect('https://checkout.stripe.test/pay/cs_test_fake_1');
-    $this->post(route('shop.checkout.store'), $form)->assertRedirect('https://checkout.stripe.test/pay/cs_test_fake_1');
+    $this->actingAs($scenario['user'])->post(route('shop.checkout.store'), CheckoutForm::confirmed($form))->assertRedirect('https://checkout.stripe.test/pay/cs_test_fake_1');
+    $this->post(route('shop.checkout.store'), CheckoutForm::confirmed($form))->assertRedirect('https://checkout.stripe.test/pay/cs_test_fake_1');
 
     expect($sessions->createCallCount())->toBe(1)
         ->and($sessions->sessionCount())->toBe(1);
@@ -289,9 +290,9 @@ test('resending after a lost response recovers the same session instead of creat
     $scenario = reservationScenario();
     $form = reservationForm($scenario['rate']);
 
-    $this->actingAs($scenario['user'])->post(route('shop.checkout.store'), $form)->assertRedirect(route('shop.checkout.index'));
+    $this->actingAs($scenario['user'])->post(route('shop.checkout.store'), CheckoutForm::confirmed($form))->assertRedirect(route('shop.checkout.index'));
     $this->travel(5)->seconds();
-    $this->post(route('shop.checkout.store'), $form)->assertRedirect('https://checkout.stripe.test/pay/cs_test_fake_1');
+    $this->post(route('shop.checkout.store'), CheckoutForm::confirmed($form))->assertRedirect('https://checkout.stripe.test/pay/cs_test_fake_1');
 
     expect($sessions->createCallCount())->toBe(2)
         ->and($sessions->sessionCount())->toBe(1)

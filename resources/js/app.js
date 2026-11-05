@@ -42,6 +42,20 @@ document.querySelectorAll('[data-auto-dismiss]').forEach((notice) => {
 	}, 5000);
 });
 
+document.querySelectorAll('[data-single-submit]').forEach((form) => {
+	form.addEventListener('submit', () => {
+		form.querySelector('button[type="submit"]').disabled = true;
+		form.setAttribute('aria-busy', 'true');
+	});
+});
+
+// Returning with the browser's back button can restore a page with its button still disabled.
+window.addEventListener('pageshow', () => {
+	document.querySelectorAll('[data-single-submit] button[type="submit"]').forEach((button) => {
+		button.disabled = false;
+	});
+});
+
 if (questionForm) {
 	const submitButton = questionForm.querySelector('button[type="submit"]');
 	const submitLabel = questionForm.querySelector('.submit-label');

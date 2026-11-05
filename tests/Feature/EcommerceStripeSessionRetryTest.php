@@ -20,6 +20,7 @@ use Stripe\Exception\IdempotencyException;
 use Stripe\Exception\InvalidRequestException;
 use Stripe\Exception\PermissionException;
 use Stripe\Exception\RateLimitException;
+use Tests\Support\CheckoutForm;
 use Tests\Support\Stripe\FakeStripeBillingService;
 use Tests\Support\Stripe\FakeStripeCheckoutSessions;
 
@@ -70,7 +71,7 @@ beforeEach(function () {
 
 function submitCheckout(mixed $test): mixed
 {
-    return $test->post(route('shop.checkout.store'), $test->form);
+    return $test->post(route('shop.checkout.store'), CheckoutForm::confirmed($test->form));
 }
 
 function expectStillOpen(mixed $response): void
