@@ -14,6 +14,8 @@ use RuntimeException;
 
 class InventoryService
 {
+    private const TRANSACTION_ATTEMPTS = 3;
+
     /**
      * A key that lets the unique ledger index reject a second reservation, release, or sale.
      */
@@ -104,7 +106,7 @@ class InventoryService
             ]);
 
             return $balance->refresh();
-        });
+        }, self::TRANSACTION_ATTEMPTS);
     }
 
     public function restockReturnedItem(

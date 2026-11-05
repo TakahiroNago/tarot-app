@@ -7,12 +7,14 @@ use App\Models\CartItem;
 use App\Models\InventoryBalance;
 use App\Models\InventoryMovement;
 use App\Models\Order;
+use App\Models\Payment;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\ShippingMethod;
 use App\Models\ShippingRate;
 use App\Models\TaxRate;
 use App\Models\User;
+use App\Services\CheckoutService;
 use App\Services\InventoryService;
 use Illuminate\Support\Facades\DB;
 
@@ -90,6 +92,79 @@ final class CheckoutScenario
     public static function reservePayload(Cart $cart, ShippingRate $rate, string $keySeed): array
     {
         return ['cart_id' => $cart->id, 'data' => self::checkoutData($rate, $keySeed)];
+    }
+
+    /**
+     * A real order awaiting payment, with its session saved and recorded in the shared fake.
+     */
+    public static function orderWithSession(ShippingRate $rate, ProductVariant $variant, string $keySeed): Order
+    {
+        $data = self::checkoutData($rate, $keySeed);
+        $order = app(CheckoutService::class)->reserveOrder(self::guestCart($variant), $data, null);
+        $payment = $order->payments()->sole();
+        $sessionId = 'cs_test_shared_'.substr(hash('sha256', $keySeed), 0, 24);
+
+        DB::table(SharedDatabaseStripeSessions::TABLE)->insert([
+            'idempotency_key' => $payment->idempotency_key,
+            'session_id' => $sessionId,
+            'params_hash' => hash('sha256', $sessionId),
+            'params' => json_encode([
+                'client_reference_id' => $order->order_number,
+                'metadata' => ['ec_order_id' => (string) $order->id, 'ec_payment_id' => (string) $payment->id],
+                'line_items' => [['price_data' => ['unit_amount' => $order->total_minor], 'quantity' => 1]],
+            ], JSON_THROW_ON_ERROR),
+            'status' => 'open',
+            'payment_status' => 'unpaid',
+            'expires_at' => now()->addMinutes(30)->timestamp,
+        ]);
+        $payment->update(['provider_checkout_id' => $sessionId, 'checkout_state' => Payment::CHECKOUT_CREATED]);
+
+        return $order->fresh();
+    }
+
+    public static function markSessionPaid(Order $order): void
+    {
+        DB::table(SharedDatabaseStripeSessions::TABLE)
+            ->where('session_id', $order->payments()->sole()->provider_checkout_id)
+            ->update(['status' => 'complete', 'payment_status' => 'paid']);
+    }
+
+    /**
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
+    public static function paidEvent(Order $order, string $eventId, array $overrides = [], string $type = 'checkout.session.completed'): array
+    {
+        $payment = $order->payments()->sole();
+
+        return self::event($eventId, $type, [
+            'id' => $payment->provider_checkout_id,
+            'object' => 'checkout.session',
+            'status' => 'complete',
+            'payment_status' => 'paid',
+            'amount_total' => $order->total_minor,
+            'currency' => 'jpy',
+            'client_reference_id' => $order->order_number,
+            'payment_intent' => 'pi_'.$payment->provider_checkout_id,
+            'metadata' => ['ec_order_id' => (string) $order->id, 'ec_payment_id' => (string) $payment->id],
+            ...$overrides,
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $object
+     * @return array<string, mixed>
+     */
+    public static function event(string $eventId, string $type, array $object): array
+    {
+        return [
+            'id' => $eventId,
+            'object' => 'event',
+            'type' => $type,
+            'livemode' => false,
+            'created' => now()->timestamp,
+            'data' => ['object' => $object],
+        ];
     }
 
     public static function seedExistingOrders(int $count): void

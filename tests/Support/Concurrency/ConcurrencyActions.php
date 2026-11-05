@@ -5,13 +5,20 @@ namespace Tests\Support\Concurrency;
 use App\Models\Cart;
 use App\Models\InventoryBalance;
 use App\Models\Order;
+use App\Models\ProductVariant;
 use App\Models\ShippingRate;
 use App\Models\TaxRate;
 use App\Models\User;
 use App\Services\CartService;
 use App\Services\CheckoutConflictException;
 use App\Services\CheckoutService;
+use App\Services\CheckoutSessionUnavailableException;
+use App\Services\EcommercePaymentWebhookService;
+use App\Services\InventoryService;
+use App\Services\PaymentReconciliationService;
 use App\Services\PaymentSettlementService;
+use App\Services\StripeCheckoutSessionService;
+use Closure;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -19,6 +26,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
+use Stripe\Event;
 use Tests\Support\Stripe\FakeStripeBillingService;
 use Throwable;
 
@@ -45,6 +53,21 @@ final class ConcurrencyActions
             'change-shipping-and-tax' => self::changeShippingAndTax($payload),
             'approve-review' => self::approveReview($payload),
             'add-to-cart' => self::addToCart($payload),
+            'webhook-event' => self::attempt('handled', fn () => app(EcommercePaymentWebhookService::class)->handle(Event::constructFrom($payload['event']))),
+            'reconcile' => self::attempt('reconciled', function (): void {
+                FakeStripeBillingService::install(app(), new SharedDatabaseStripeSessions);
+                app(PaymentReconciliationService::class)->run();
+            }),
+            'cancel-pending' => self::attempt('cancel_finished', function () use ($payload): void {
+                FakeStripeBillingService::install(app(), new SharedDatabaseStripeSessions);
+                app(StripeCheckoutSessionService::class)->cancelPendingOrder(Order::query()->findOrFail($payload['order_id']));
+            }),
+            'set-on-hand' => self::attempt('stock_set', fn () => app(InventoryService::class)->setOnHand(
+                ProductVariant::query()->findOrFail($payload['variant_id']),
+                $payload['quantity'],
+                User::query()->findOrFail($payload['actor_id']),
+                'concurrency test adjustment',
+            )),
             'mixed' => self::run($payload['action'], $payload['payload']),
             default => throw new InvalidArgumentException("Unknown concurrency action [{$action}]."),
         };
@@ -156,6 +179,28 @@ final class ConcurrencyActions
         }
 
         return ['outcome' => 'settings_changed'];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function attempt(string $successOutcome, Closure $operation): array
+    {
+        try {
+            $operation();
+
+            return ['outcome' => $successOutcome];
+        } catch (ValidationException|CheckoutSessionUnavailableException) {
+            return ['outcome' => 'rejected'];
+        } catch (QueryException $exception) {
+            return match ($exception->errorInfo[1] ?? null) {
+                1213 => ['outcome' => 'deadlock'],
+                1205 => ['outcome' => 'lock_wait_timeout'],
+                default => self::errorOutcome($exception),
+            };
+        } catch (Throwable $exception) {
+            return self::errorOutcome($exception);
+        }
     }
 
     /**

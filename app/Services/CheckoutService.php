@@ -233,7 +233,10 @@ class CheckoutService
             $tax = 0;
 
             foreach ($items as $item) {
-                $variant = $item->variant()->lockForUpdate()->first();
+                // Shared, not exclusive: every ledger insert takes a shared lock on the variant through
+                // its foreign key while holding the balance, which would deadlock with an exclusive
+                // lock taken here before the balance. A shared lock still blocks a price change.
+                $variant = $item->variant()->sharedLock()->first();
                 $product = $variant?->product;
                 $balance = $variant === null
                     ? null

@@ -22,6 +22,12 @@ use Throwable;
 
 class ProductController extends Controller
 {
+    /**
+     * Saving a variant then its stock locks in the opposite order to a stock movement, which can
+     * deadlock while orders settle. Stock movements are short, so a retry resolves it.
+     */
+    private const UPDATE_TRANSACTION_ATTEMPTS = 3;
+
     public function index(Request $request): View
     {
         $validated = $request->validate([
@@ -160,7 +166,7 @@ class ProductController extends Controller
                     $validated['stock_reason'],
                 );
                 $this->persistImages($product, $storedImages);
-            });
+            }, self::UPDATE_TRANSACTION_ATTEMPTS);
         } catch (Throwable $exception) {
             $this->deleteStoredImages($storedImages);
             throw $exception;
