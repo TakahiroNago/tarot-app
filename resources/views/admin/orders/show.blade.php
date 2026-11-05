@@ -76,7 +76,7 @@
                 @foreach ($order->shipments as $shipment)
                     <p class="settings-note">発送 {{ $shipment->status }} / {{ $shipment->carrier_name }} / {{ $shipment->tracking_number }}</p>
                 @endforeach
-                @if ($order->payment_status === 'paid')
+                @if ($canUpdateShipment)
                     @php($shipment = $order->shipments->last())
                     <form class="question-form admin-shipment-form" method="POST" action="{{ route('admin.orders.shipment.update', $order) }}">
                         @csrf
@@ -100,10 +100,13 @@
                     @foreach ($order->items as $item)
                         @if ($item->variant_id !== null)
                             @php($restocked = (int) ($restockedQuantities[$item->variant_id] ?? 0))
-                            @php($remaining = max(0, $item->quantity - $restocked))
+                            @php($sold = (int) ($soldQuantities[$item->variant_id] ?? 0))
+                            @php($remaining = max(0, min($item->quantity, $sold) - $restocked))
                             <div class="return-restock-row">
-                                <p>{{ $item->product_name_snapshot }} / {{ $item->variant_label_snapshot }} — 注文数量 {{ $item->quantity }}、復元済 {{ $restocked }}</p>
-                                @if ($remaining > 0)
+                                <p>{{ $item->product_name_snapshot }} / {{ $item->variant_label_snapshot }} — 注文数量 {{ $item->quantity }}、販売確定 {{ $sold }}、復元済 {{ $restocked }}</p>
+                                @if ($sold < 1)
+                                    <p class="settings-note">販売確定の記録がないため、在庫を戻す操作はできません。</p>
+                                @elseif ($remaining > 0)
                                     <form class="return-restock-form" method="POST" action="{{ route('admin.orders.items.restock', [$order, $item]) }}">
                                         @csrf
                                         <input type="hidden" name="restock_key" value="{{ $restockKeys[$item->id] ?? '' }}">

@@ -17,6 +17,8 @@ use Illuminate\Validation\Rule;
 
 class OrderController extends Controller
 {
+    private const SHIPMENT_UPDATABLE_STATUSES = ['paid', 'processing', 'shipped', 'completed'];
+
     public function index(Request $request): View
     {
         $validated = $request->validate([
@@ -56,10 +58,18 @@ class OrderController extends Controller
             ->select('variant_id', DB::raw('SUM(on_hand_delta) as quantity'))
             ->groupBy('variant_id')
             ->pluck('quantity', 'variant_id');
+        $soldQuantities = InventoryMovement::query()
+            ->where('order_id', $order->id)
+            ->where('movement_type', 'sale')
+            ->select('variant_id', DB::raw('-SUM(on_hand_delta) as quantity'))
+            ->groupBy('variant_id')
+            ->pluck('quantity', 'variant_id');
 
         return view('admin.orders.show', [
             'order' => $order,
+            'canUpdateShipment' => $this->canUpdateShipment($order),
             'restockedQuantities' => $restockedQuantities,
+            'soldQuantities' => $soldQuantities,
             'restockKeys' => $order->items
                 ->mapWithKeys(fn (OrderItem $item): array => [$item->id => bin2hex(random_bytes(32))])
                 ->all(),
@@ -73,11 +83,11 @@ class OrderController extends Controller
             'tracking_number' => ['nullable', 'string', 'max:120'],
             'status' => ['required', Rule::in(['pending', 'shipped', 'delivered'])],
         ]);
-        abort_unless($order->payment_status === 'paid', 422);
+        abort_unless($this->canUpdateShipment($order), 422);
 
         DB::transaction(function () use ($order, $validated): void {
             $lockedOrder = Order::query()->lockForUpdate()->findOrFail($order->id);
-            abort_unless($lockedOrder->payment_status === 'paid', 422);
+            abort_unless($this->canUpdateShipment($lockedOrder), 422);
             $shipment = $lockedOrder->shipments()->latest()->lockForUpdate()->first();
             if ($shipment === null) {
                 $shipment = $lockedOrder->shipments()->create(['status' => 'pending']);
@@ -150,5 +160,14 @@ class OrderController extends Controller
         );
 
         return to_route('admin.orders.show', $order)->with('status', '検品済み返品の在庫を台帳に記録しました。');
+    }
+
+    /**
+     * An allow-list, because payment_review also has a paid payment status but must not ship.
+     */
+    private function canUpdateShipment(Order $order): bool
+    {
+        return $order->payment_status === 'paid'
+            && in_array($order->status, self::SHIPMENT_UPDATABLE_STATUSES, true);
     }
 }
