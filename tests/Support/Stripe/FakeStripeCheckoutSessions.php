@@ -2,6 +2,7 @@
 
 namespace Tests\Support\Stripe;
 
+use Closure;
 use RuntimeException;
 use Stripe\Checkout\Session;
 use Stripe\Exception\ApiConnectionException;
@@ -40,6 +41,15 @@ class FakeStripeCheckoutSessions
     private array $sessions = [];
 
     private int $nextSessionNumber = 1;
+
+    /**
+     * @var array<int, string>
+     */
+    private array $paymentMethods = ['card'];
+
+    private ?Throwable $nextListFailure = null;
+
+    private ?Closure $duringNextCreate = null;
 
     /**
      * The request never reached Stripe, so no idempotency record or session exists.
@@ -92,6 +102,53 @@ class FakeStripeCheckoutSessions
     }
 
     /**
+     * Another request with this key is still running, as Stripe reports with a 409.
+     */
+    public function failWithKeyInUse(): self
+    {
+        $this->queuedFailures[] = [
+            'received' => false,
+            'exception' => UnknownApiErrorException::factory('Fake: key in use.', 409, null, null, null, 'idempotency_key_in_use'),
+        ];
+
+        return $this;
+    }
+
+    public function failWith(Throwable $exception): self
+    {
+        $this->queuedFailures[] = ['received' => false, 'exception' => $exception];
+
+        return $this;
+    }
+
+    /**
+     * @param  array<int, string>  $paymentMethods
+     */
+    public function offering(array $paymentMethods): self
+    {
+        $this->paymentMethods = $paymentMethods;
+
+        return $this;
+    }
+
+    public function failNextList(Throwable $exception): self
+    {
+        $this->nextListFailure = $exception;
+
+        return $this;
+    }
+
+    /**
+     * Run a callback while the next create request is in flight.
+     */
+    public function duringNextCreate(Closure $callback): self
+    {
+        $this->duringNextCreate = $callback;
+
+        return $this;
+    }
+
+    /**
      * @param  array<string, mixed>  $params
      * @param  array<string, mixed>  $options
      */
@@ -99,6 +156,11 @@ class FakeStripeCheckoutSessions
     {
         $idempotencyKey = isset($options['idempotency_key']) ? (string) $options['idempotency_key'] : null;
         $this->createCalls[] = ['params' => $params, 'idempotency_key' => $idempotencyKey];
+
+        if ($this->duringNextCreate !== null) {
+            ($this->duringNextCreate)();
+            $this->duringNextCreate = null;
+        }
 
         if ($idempotencyKey !== null && isset($this->idempotencyRecords[$idempotencyKey])) {
             $record = $this->idempotencyRecords[$idempotencyKey];
@@ -152,6 +214,13 @@ class FakeStripeCheckoutSessions
      */
     public function all(array $params = []): object
     {
+        if ($this->nextListFailure !== null) {
+            $failure = $this->nextListFailure;
+            $this->nextListFailure = null;
+
+            throw $failure;
+        }
+
         $matching = array_filter($this->sessions, function (Session $session) use ($params): bool {
             $created = $params['created'] ?? [];
 
@@ -207,6 +276,7 @@ class FakeStripeCheckoutSessions
             'status' => 'open',
             'payment_status' => 'unpaid',
             'payment_intent' => null,
+            'payment_method_types' => $this->paymentMethods,
             'url' => 'https://checkout.stripe.test/pay/'.$sessionId,
             'created' => now()->timestamp,
             'expires_at' => $params['expires_at'],

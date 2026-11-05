@@ -651,12 +651,15 @@ test('the buyer completion page explains a review', function () {
 });
 
 test('the new columns roll back cleanly', function () {
-    $this->artisan('migrate:rollback', ['--step' => 1, '--force' => true])->assertExitCode(0);
+    $migration = require database_path('migrations/2026_11_05_120000_add_payment_review_to_ec_tables.php');
+
+    $migration->down();
 
     expect(Schema::hasTable('ec_order_events'))->toBeFalse()
         ->and(Schema::hasColumn('ec_orders', 'review_reason'))->toBeFalse()
         ->and(Schema::hasColumn('ec_payments', 'received_amount_minor'))->toBeFalse();
 
-    $this->artisan('migrate', ['--force' => true])->assertExitCode(0);
+    $migration->up();
+
     expect(Schema::hasTable('ec_order_events'))->toBeTrue();
 });

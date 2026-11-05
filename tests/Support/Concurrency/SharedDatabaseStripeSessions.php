@@ -54,6 +54,7 @@ class SharedDatabaseStripeSessions extends FakeStripeCheckoutSessions
             'id' => $record->session_id,
             'object' => 'checkout.session',
             'status' => 'open',
+            'payment_method_types' => ['card'],
             'url' => 'https://checkout.stripe.test/pay/'.$record->session_id,
             'expires_at' => (int) $record->expires_at,
         ]);
