@@ -17,6 +17,12 @@ class AdminOrderAlertMail extends Mailable
 
     public const ALERT_REFUND_REVIEW = 'refund_review';
 
+    public const ALERT_REVIEW_OVERDUE = 'review_overdue';
+
+    public const ALERT_RECONCILE_STUCK = 'reconcile_stuck';
+
+    public const ALERT_UNPAID_COMPLETE = 'unpaid_complete';
+
     public function __construct(
         public Order $order,
         public string $alertType,

@@ -248,7 +248,7 @@ test('an expired or cancelled order keeps the cart and frees it for a new order'
     checkoutWith($this);
 
     $this->artisan('ecommerce:expire-reservations')->assertExitCode(0);
-    $this->travel(31)->minutes();
+    $this->travel(33)->minutes();
     $this->artisan('ecommerce:expire-reservations')->assertExitCode(0);
 
     expect(Order::query()->sole()->status)->toBe('cancelled')
