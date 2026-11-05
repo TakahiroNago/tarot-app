@@ -2,9 +2,6 @@
 
 namespace App\Services;
 
-use App\Jobs\SendOrderConfirmationEmail;
-use App\Models\InventoryBalance;
-use App\Models\InventoryMovement;
 use App\Models\Order;
 use App\Models\Payment;
 use Illuminate\Support\Facades\DB;
@@ -14,7 +11,12 @@ use Stripe\StripeObject;
 
 class EcommercePaymentWebhookService
 {
-    public function __construct(private CheckoutService $checkoutService) {}
+    private const TRANSACTION_ATTEMPTS = 3;
+
+    public function __construct(
+        private CheckoutService $checkoutService,
+        private PaymentSettlementService $settlementService,
+    ) {}
 
     public function handle(Event $event): void
     {
@@ -56,16 +58,15 @@ class EcommercePaymentWebhookService
                 throw new RuntimeException('Stripe Checkout webhook did not include a valid session.');
             }
 
-            $payment = Payment::query()
+            $reference = Payment::query()
                 ->where('provider', 'stripe')
                 ->where('provider_checkout_id', $session->id)
-                ->lockForUpdate()
-                ->first();
-            if (! $payment instanceof Payment) {
+                ->first(['id', 'order_id']);
+            if (! $reference instanceof Payment) {
                 throw new RuntimeException('Stripe Checkout session does not match an ecommerce payment.');
             }
+            [$order, $payment] = $this->lockOrderAndPayment($reference);
 
-            $order = Order::query()->lockForUpdate()->findOrFail($payment->order_id);
             $metadataOrderId = $session->metadata->ec_order_id ?? null;
             $metadataPaymentId = $session->metadata->ec_payment_id ?? null;
             if (
@@ -83,128 +84,34 @@ class EcommercePaymentWebhookService
                 return;
             }
 
-            $paymentStatus = $session->payment_status ?? null;
-            $payment->provider_status = is_string($session->status ?? null) ? $session->status : null;
-            if ($paymentStatus !== 'paid') {
+            if (($session->payment_status ?? null) !== 'paid') {
                 if ($event->type === 'checkout.session.async_payment_succeeded') {
                     throw new RuntimeException('Stripe reported async payment success without paid status.');
                 }
 
+                $payment->provider_status = is_string($session->status ?? null) ? $session->status : null;
                 $payment->save();
                 $this->markProcessed($event->id);
 
                 return;
             }
 
-            if (
-                ($session->amount_total ?? null) !== $payment->amount_minor
-                || strtoupper((string) ($session->currency ?? '')) !== $payment->currency
-                || $payment->currency !== $order->currency
-            ) {
-                $this->markForPaymentReview($order, $payment, $session);
-                $this->markProcessed($event->id);
-
-                return;
-            }
-
-            $this->completePaidOrder($order, $payment, $session);
+            $this->settlementService->applyPaidSession($order, $payment, $session);
             $this->markProcessed($event->id);
-        });
+        }, self::TRANSACTION_ATTEMPTS);
     }
 
-    private function completePaidOrder(Order $order, Payment $payment, StripeObject $session): void
+    /**
+     * The order is always locked before its payment, in every code path, so they cannot deadlock.
+     *
+     * @return array{0: Order, 1: Payment}
+     */
+    private function lockOrderAndPayment(Payment $reference): array
     {
-        if ($order->payment_status === 'paid') {
-            return;
-        }
+        $order = Order::query()->lockForUpdate()->findOrFail($reference->order_id);
+        $payment = Payment::query()->lockForUpdate()->findOrFail($reference->id);
 
-        if ($order->status !== 'pending_payment' || $order->reservation_expires_at === null) {
-            $this->markForPaymentReview($order, $payment, $session);
-
-            return;
-        }
-
-        $items = $order->items()->orderBy('variant_id')->get();
-        $balances = [];
-        foreach ($items as $item) {
-            if ($item->variant_id === null) {
-                $this->markForPaymentReview($order, $payment, $session);
-
-                return;
-            }
-
-            $balance = InventoryBalance::query()
-                ->lockForUpdate()
-                ->find($item->variant_id);
-            if (
-                $balance === null
-                || $balance->reserved < $item->quantity
-                || $balance->on_hand < $item->quantity
-            ) {
-                $this->markForPaymentReview($order, $payment, $session);
-
-                return;
-            }
-            $balances[] = [$item, $balance];
-        }
-
-        foreach ($balances as [$item, $balance]) {
-            $balance->on_hand -= $item->quantity;
-            $balance->reserved -= $item->quantity;
-            $balance->save();
-
-            InventoryMovement::query()->create([
-                'variant_id' => $item->variant_id,
-                'order_id' => $order->id,
-                'movement_type' => 'sale',
-                'on_hand_delta' => -$item->quantity,
-                'reserved_delta' => -$item->quantity,
-                'idempotency_key' => bin2hex(random_bytes(32)),
-                'note' => '注文 '.$order->order_number.' の決済確定',
-            ]);
-        }
-
-        $order->status = 'paid';
-        $order->payment_status = 'paid';
-        $order->paid_at = now();
-        $order->reservation_expires_at = null;
-        $order->save();
-        SendOrderConfirmationEmail::dispatch($order->id)->afterCommit();
-
-        $payment->status = 'succeeded';
-        $payment->provider_status = is_string($session->status ?? null) ? $session->status : 'complete';
-        $payment->provider_payment_id = $this->paymentIntentId($session);
-        $payment->paid_at = now();
-        $payment->save();
-    }
-
-    private function markForPaymentReview(Order $order, Payment $payment, StripeObject $session): void
-    {
-        $order->status = 'payment_review';
-        $order->payment_status = 'paid';
-        $order->paid_at = now();
-        $order->reservation_expires_at = null;
-        $order->save();
-        SendOrderConfirmationEmail::dispatch($order->id)->afterCommit();
-
-        $payment->status = 'succeeded';
-        $payment->provider_status = is_string($session->status ?? null) ? $session->status : 'complete';
-        $payment->provider_payment_id = $this->paymentIntentId($session);
-        $payment->paid_at = now();
-        $payment->save();
-    }
-
-    private function paymentIntentId(StripeObject $session): ?string
-    {
-        $paymentIntent = $session->payment_intent ?? null;
-
-        if (is_string($paymentIntent)) {
-            return $paymentIntent;
-        }
-
-        return is_object($paymentIntent) && is_string($paymentIntent->id ?? null)
-            ? $paymentIntent->id
-            : null;
+        return [$order, $payment];
     }
 
     private function markProcessed(string $eventId): void
@@ -231,48 +138,42 @@ class EcommercePaymentWebhookService
             return;
         }
 
-        $payment = Payment::query()
+        $reference = Payment::query()
             ->where('provider', 'stripe')
             ->where('provider_payment_id', $paymentIntent)
-            ->lockForUpdate()
-            ->first();
-        if (! $payment instanceof Payment) {
+            ->first(['id', 'order_id']);
+        if (! $reference instanceof Payment) {
             throw new RuntimeException('Stripe refund does not match an ecommerce payment.');
         }
+        [$order, $payment] = $this->lockOrderAndPayment($reference);
 
-        $refundStatus = $event->type === 'charge.refunded'
-            ? (($refundOrCharge->refunded ?? false) ? 'succeeded' : 'pending')
-            : ($refundOrCharge->status ?? null);
         $refundedAmount = $event->type === 'charge.refunded'
             ? ($refundOrCharge->amount_refunded ?? null)
             : ($refundOrCharge->amount ?? null);
+        $refundStatus = $event->type === 'charge.refunded'
+            ? $this->chargeRefundStatus($refundOrCharge, $refundedAmount)
+            : ($refundOrCharge->status ?? null);
         $refundCurrency = strtoupper((string) ($refundOrCharge->currency ?? ''));
-        $order = Order::query()->lockForUpdate()->findOrFail($payment->order_id);
 
         if (
             $refundStatus === 'succeeded'
-            && ($refundedAmount !== $payment->amount_minor || $refundCurrency !== $payment->currency)
+            && (
+                $refundedAmount !== $payment->refundableAmount()
+                || $refundCurrency !== ($payment->received_currency ?? $payment->currency)
+            )
         ) {
-            $payment->status = 'refund_review';
-            $payment->provider_status = 'partial_refund_detected';
-            $order->status = 'payment_review';
-            $order->payment_status = 'payment_review';
-            $payment->save();
-            $order->save();
+            $this->settlementService->flagPartialRefund($order, $payment);
 
             return;
         }
 
         if (in_array($refundStatus, ['failed', 'canceled'], true)) {
             if ($order->payment_status === 'refund_pending') {
-                $payment->status = 'succeeded';
-                $payment->provider_status = 'refund_failed';
-                $order->payment_status = 'paid';
-                $order->save();
+                $this->settlementService->revertFailedRefund($order, $payment);
             } else {
                 $payment->provider_status = 'refund_'.$refundStatus;
+                $payment->save();
             }
-            $payment->save();
 
             return;
         }
@@ -284,11 +185,17 @@ class EcommercePaymentWebhookService
             return;
         }
 
-        $payment->status = 'refunded';
-        $payment->provider_status = 'refunded';
-        $payment->save();
-        $order->status = 'refunded';
-        $order->payment_status = 'refunded';
-        $order->save();
+        $this->settlementService->completeRefund($order, $payment);
+    }
+
+    /**
+     * A charge that is not fully refunded but has refunded money was partially refunded, which the
+     * amount comparison in the caller flags for review.
+     */
+    private function chargeRefundStatus(StripeObject $charge, mixed $refundedAmount): string
+    {
+        return ($charge->refunded ?? false) || (is_int($refundedAmount) && $refundedAmount > 0)
+            ? 'succeeded'
+            : 'pending';
     }
 }

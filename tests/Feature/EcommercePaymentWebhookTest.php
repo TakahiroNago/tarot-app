@@ -1,14 +1,15 @@
 <?php
 
+use App\Jobs\SendOrderConfirmationEmail;
+use App\Mail\OrderConfirmationMail;
 use App\Models\InventoryBalance;
 use App\Models\InventoryMovement;
 use App\Models\Order;
 use App\Models\OrderItem;
-use App\Jobs\SendOrderConfirmationEmail;
-use App\Mail\OrderConfirmationMail;
 use App\Models\Payment;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Services\CheckoutService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -208,7 +209,7 @@ test('late successful payment enters review without consuming another order rese
     )->assertOk();
 
     expect($order->fresh()->status)->toBe('payment_review')
-        ->and($order->fresh()->payment_status)->toBe('paid')
+        ->and($order->fresh()->payment_status)->toBe('payment_review')
         ->and($balance->fresh()->on_hand)->toBe(5)
         ->and($balance->fresh()->reserved)->toBe(1)
         ->and(InventoryMovement::query()->where('order_id', $order->id)->where('movement_type', 'sale')->count())->toBe(0);
@@ -308,8 +309,8 @@ test('order confirmation email delivery is idempotent', function () {
     Mail::fake();
     $job = new SendOrderConfirmationEmail($order->id);
 
-    $job->handle(app(App\Services\CheckoutService::class));
-    $job->handle(app(App\Services\CheckoutService::class));
+    $job->handle(app(CheckoutService::class));
+    $job->handle(app(CheckoutService::class));
 
     Mail::assertSent(OrderConfirmationMail::class, 1);
     expect(DB::table('ec_order_emails')->where('order_id', $order->id)->value('status'))->toBe('sent')

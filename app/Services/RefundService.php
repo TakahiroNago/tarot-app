@@ -6,18 +6,20 @@ use App\Models\Order;
 use App\Models\Payment;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
-use Stripe\Refund;
 use Throwable;
 
 class RefundService
 {
-    public function __construct(private StripeBillingService $stripeBillingService) {}
+    public function __construct(
+        private StripeBillingService $stripeBillingService,
+        private PaymentSettlementService $settlementService,
+    ) {}
 
     public function refundFull(Order $order): string
     {
         $payment = DB::transaction(function () use ($order): Payment {
             $lockedOrder = Order::query()->lockForUpdate()->findOrFail($order->id);
-            if (! in_array($lockedOrder->payment_status, ['paid', 'refund_pending'], true)) {
+            if (! in_array($lockedOrder->payment_status, ['paid', 'payment_review', 'refund_pending'], true)) {
                 throw ValidationException::withMessages([
                     'refund' => '全額返金できる決済状態ではありません。',
                 ]);
@@ -50,7 +52,7 @@ class RefundService
             ]);
         }
 
-        if ($refund->amount !== $payment->amount_minor) {
+        if ($refund->amount !== $payment->refundableAmount()) {
             throw ValidationException::withMessages([
                 'refund' => 'Stripeから全額返金ではない応答が返ったため、注文状態を変更しませんでした。',
             ]);
@@ -64,13 +66,15 @@ class RefundService
             }
 
             $status = is_string($refund->status) ? $refund->status : 'unknown';
-            $lockedPayment->provider_status = 'refund_'.$status;
 
             if ($status === 'succeeded') {
-                $lockedPayment->status = 'refunded';
-                $lockedOrder->payment_status = 'refunded';
-                $lockedOrder->status = 'refunded';
-            } elseif (in_array($status, ['pending', 'requires_action'], true)) {
+                $this->settlementService->completeRefund($lockedOrder, $lockedPayment);
+
+                return $status;
+            }
+
+            $lockedPayment->provider_status = 'refund_'.$status;
+            if (in_array($status, ['pending', 'requires_action'], true)) {
                 $lockedPayment->status = 'refund_pending';
                 $lockedOrder->payment_status = 'refund_pending';
             } else {

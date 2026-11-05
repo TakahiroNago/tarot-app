@@ -24,7 +24,7 @@
                     </select>
                     <select class="question-input" name="payment_status" aria-label="決済状態">
                         <option value="">すべての決済状態</option>
-                        @foreach (['pending', 'paid', 'failed', 'cancelled', 'refund_pending', 'refunded'] as $status)
+                        @foreach (['pending', 'paid', 'failed', 'cancelled', 'payment_review', 'refund_pending', 'refund_review', 'refunded'] as $status)
                             <option value="{{ $status }}" @selected($selectedPaymentStatus === $status)>{{ $status }}</option>
                         @endforeach
                     </select>
