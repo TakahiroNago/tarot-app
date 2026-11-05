@@ -245,6 +245,14 @@ class FakeStripeCheckoutSessions
         ]);
     }
 
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    public function replaceForTest(string $sessionId, array $attributes): Session
+    {
+        return $this->replaceSession($sessionId, $attributes);
+    }
+
     public function createCallCount(): int
     {
         return count($this->createCalls);

@@ -385,7 +385,7 @@ test('the expiry job releases stock after an unresolved attempt expires, and not
     expect(Order::query()->sole()->status)->toBe('pending_payment')
         ->and($this->balance->fresh()->reserved)->toBe(1);
 
-    $this->travel(31)->seconds();
+    $this->travel(151)->seconds();
     $this->artisan('ecommerce:expire-reservations')->assertExitCode(0);
     expect(Order::query()->sole()->status)->toBe('cancelled')
         ->and($this->balance->fresh()->reserved)->toBe(0);

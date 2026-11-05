@@ -82,19 +82,15 @@ class StripeCheckoutSessionService
      */
     public function cancelPendingOrder(Order $order): bool
     {
-        $stripe = $this->stripeBillingService->client();
         $payment = $order->payments()->where('provider', 'stripe')->firstOrFail();
 
-        if (
-            $payment->checkout_state === Payment::CHECKOUT_CREATING
-            && $payment->checkout_claimed_at?->isAfter(now()->subSeconds(self::CLAIM_SECONDS))
-        ) {
+        if ($this->hasLiveClaim($payment)) {
             throw new CheckoutSessionUnavailableException(orderStillOpen: true);
         }
 
-        $session = $this->sessionToCloseFor($stripe, $order, $payment);
+        $session = $this->sessionToCloseFor($order, $payment);
         if ($session?->status === 'open') {
-            $session = $this->expireOrFetch($stripe, $session->id);
+            $session = $this->expireOrFetch($session->id);
         }
         if ($session?->status === 'complete') {
             return false;
@@ -116,8 +112,21 @@ class StripeCheckoutSessionService
         return true;
     }
 
-    private function sessionToCloseFor(StripeClient $stripe, Order $order, Payment $payment): ?Session
+    public function hasLiveClaim(Payment $payment): bool
     {
+        return $payment->checkout_state === Payment::CHECKOUT_CREATING
+            && $payment->checkout_claimed_at?->isAfter(now()->subSeconds(self::CLAIM_SECONDS));
+    }
+
+    /**
+     * @return Session|null The session Stripe holds for this payment, or null when none can be paid.
+     *
+     * @throws CheckoutSessionUnavailableException When Stripe's state cannot be confirmed right now.
+     */
+    public function sessionToCloseFor(Order $order, Payment $payment): ?Session
+    {
+        $stripe = $this->stripeBillingService->client();
+
         if (is_string($payment->provider_checkout_id)) {
             try {
                 return $stripe->checkout->sessions->retrieve($payment->provider_checkout_id);
@@ -137,9 +146,13 @@ class StripeCheckoutSessionService
 
     /**
      * The customer may finish paying at the moment of expiry, so a refusal is checked, not assumed.
+     *
+     * @throws CheckoutSessionUnavailableException When Stripe's state cannot be confirmed right now.
      */
-    private function expireOrFetch(StripeClient $stripe, string $sessionId): Session
+    public function expireOrFetch(string $sessionId): Session
     {
+        $stripe = $this->stripeBillingService->client();
+
         try {
             return $stripe->checkout->sessions->expire($sessionId);
         } catch (ApiErrorException) {
@@ -170,9 +183,7 @@ class StripeCheckoutSessionService
                 throw new CheckoutSessionUnavailableException(orderStillOpen: false);
             }
 
-            $isClaimed = $payment->checkout_state === Payment::CHECKOUT_CREATING
-                && $payment->checkout_claimed_at?->isAfter(now()->subSeconds(self::CLAIM_SECONDS));
-            if ($isClaimed || $payment->checkout_state === Payment::CHECKOUT_EXHAUSTED) {
+            if ($this->hasLiveClaim($payment) || $payment->checkout_state === Payment::CHECKOUT_EXHAUSTED) {
                 throw new CheckoutSessionUnavailableException(orderStillOpen: true);
             }
 
