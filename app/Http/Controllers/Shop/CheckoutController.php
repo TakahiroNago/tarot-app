@@ -7,14 +7,14 @@ use App\Models\Order;
 use App\Models\User;
 use App\Services\CartService;
 use App\Services\CheckoutService;
-use App\Services\StripeBillingService;
+use App\Services\CheckoutSessionUnavailableException;
+use App\Services\StripeCheckoutSessionService;
 use Illuminate\Contracts\Database\ConcurrencyErrorDetector;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use Stripe\Exception\ApiErrorException;
 
 class CheckoutController extends Controller
 {
@@ -39,7 +39,7 @@ class CheckoutController extends Controller
         Request $request,
         CartService $cartService,
         CheckoutService $checkoutService,
-        StripeBillingService $stripeBillingService,
+        StripeCheckoutSessionService $checkoutSessionService,
         ConcurrencyErrorDetector $concurrencyErrorDetector,
     ): RedirectResponse {
         $availableCountries = $checkoutService->availableShippingRates()
@@ -85,13 +85,17 @@ class CheckoutController extends Controller
         }
 
         try {
-            $session = $checkoutService->createStripeSession($order, $stripeBillingService);
-        } catch (ApiErrorException $exception) {
-            report($exception);
+            $session = $checkoutSessionService->sessionFor($order);
+        } catch (CheckoutSessionUnavailableException $exception) {
+            if ($exception->orderStillOpen) {
+                return to_route('shop.checkout.index')
+                    ->with('status', '決済の準備状況を確認できませんでした。入力内容と注文情報は保持されています。時間をおいて同じ画面から再試行してください。在庫予約は有効期限まで維持されます。')
+                    ->withInput();
+            }
 
             return to_route('shop.checkout.index')
-                ->with('status', '決済の準備状況を確認できませんでした。入力内容と注文情報は保持されています。時間をおいて同じ画面から再試行してください。在庫予約は有効期限まで維持されます。')
-                ->withInput();
+                ->with('status', '決済を開始できなかったため、ご注文を取り消しました。在庫の予約は解除しています。入力内容をご確認のうえ、もう一度お試しください。')
+                ->withInput($request->except('checkout_key'));
         }
         $cart->items()->delete();
 

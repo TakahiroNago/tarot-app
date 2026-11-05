@@ -19,9 +19,6 @@ use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
-use Stripe\Checkout\Session;
-use Stripe\Exception\ApiErrorException;
-use Throwable;
 
 class CheckoutService
 {
@@ -308,86 +305,6 @@ class CheckoutService
 
             return $order;
         }, self::RESERVATION_TRANSACTION_ATTEMPTS);
-    }
-
-    public function createStripeSession(Order $order, StripeBillingService $stripeBillingService): Session
-    {
-        $payment = $order->payments()->where('provider', 'stripe')->firstOrFail();
-        $stripe = $stripeBillingService->client();
-
-        if (is_string($payment->provider_checkout_id)) {
-            return $stripe->checkout->sessions->retrieve($payment->provider_checkout_id);
-        }
-
-        $order->loadMissing('items');
-        $lineItems = $order->items->map(fn (OrderItem $item): array => [
-            'price_data' => [
-                'currency' => strtolower($item->currency),
-                'product_data' => [
-                    'name' => $item->product_name_snapshot.' - '.$item->variant_label_snapshot,
-                ],
-                'unit_amount' => $item->unit_price_minor,
-            ],
-            'quantity' => $item->quantity,
-        ])->all();
-
-        if ($order->shipping_minor > 0) {
-            $lineItems[] = [
-                'price_data' => [
-                    'currency' => strtolower($order->currency),
-                    'product_data' => ['name' => '送料（'.$order->shipping_method_name.'）'],
-                    'unit_amount' => $order->shipping_minor,
-                ],
-                'quantity' => 1,
-            ];
-        }
-
-        try {
-            $session = $stripe->checkout->sessions->create([
-                'mode' => 'payment',
-                'line_items' => $lineItems,
-                'customer_email' => $order->customer_email,
-                'client_reference_id' => $order->order_number,
-                'metadata' => [
-                    'ec_order_id' => (string) $order->id,
-                    'ec_payment_id' => (string) $payment->id,
-                ],
-                'payment_intent_data' => [
-                    'metadata' => ['ec_order_id' => (string) $order->id],
-                ],
-                'expires_at' => now()->addMinutes(30)->addSeconds(30)->timestamp,
-                'success_url' => route('shop.checkout.success', [
-                    'orderNumber' => $order->order_number,
-                ]).'?session_id={CHECKOUT_SESSION_ID}',
-                'cancel_url' => route('shop.checkout.cancel'),
-            ], [
-                'idempotency_key' => $payment->idempotency_key,
-            ]);
-        } catch (ApiErrorException $exception) {
-            throw $exception;
-        } catch (Throwable $exception) {
-            $this->releaseReservation($order, 'Stripe Checkout セッションを作成できませんでした。');
-
-            throw $exception;
-        }
-
-        if (! is_string($session->url) || $session->url === '' || ! is_int($session->expires_at)) {
-            $this->releaseReservation($order, 'Stripe Checkout の応答が不完全でした。');
-
-            throw new RuntimeException('Stripe Checkout session did not include a URL and expiration.');
-        }
-
-        DB::transaction(function () use ($order, $payment, $session): void {
-            $lockedOrder = Order::query()->lockForUpdate()->findOrFail($order->id);
-            $lockedPayment = Payment::query()->lockForUpdate()->findOrFail($payment->id);
-            $lockedPayment->provider_checkout_id = $session->id;
-            $lockedPayment->provider_status = $session->status;
-            $lockedPayment->save();
-            $lockedOrder->reservation_expires_at = now()->setTimestamp($session->expires_at);
-            $lockedOrder->save();
-        });
-
-        return $session;
     }
 
     public function releaseReservation(Order $order, string $reason): void

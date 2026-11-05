@@ -284,18 +284,18 @@ test('a saved session is reused instead of creating another', function () {
     expectExactlyOneReservation($scenario);
 });
 
-test('an idempotency error from Stripe does not create a second session', function () {
+test('resending after a lost response recovers the same session instead of creating another', function () {
     $sessions = FakeStripeBillingService::install(app())->loseResponseAfterStripeCreatesSession();
     $scenario = reservationScenario();
     $form = reservationForm($scenario['rate']);
 
     $this->actingAs($scenario['user'])->post(route('shop.checkout.store'), $form)->assertRedirect(route('shop.checkout.index'));
     $this->travel(5)->seconds();
-    $this->post(route('shop.checkout.store'), $form)->assertRedirect(route('shop.checkout.index'));
+    $this->post(route('shop.checkout.store'), $form)->assertRedirect('https://checkout.stripe.test/pay/cs_test_fake_1');
 
     expect($sessions->createCallCount())->toBe(2)
         ->and($sessions->sessionCount())->toBe(1)
-        ->and(Payment::query()->sole()->provider_checkout_id)->toBeNull();
+        ->and(Payment::query()->sole()->provider_checkout_id)->toBe('cs_test_fake_1');
     expectExactlyOneReservation($scenario);
 });
 
