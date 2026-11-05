@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\User;
 use App\Services\InventoryService;
+use App\Services\PaymentSettlementService;
 use App\Services\RefundService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -122,6 +123,22 @@ class OrderController extends Controller
         });
 
         return to_route('admin.orders.show', $order)->with('status', '発送状況を更新しました。');
+    }
+
+    public function approveReview(
+        Request $request,
+        Order $order,
+        PaymentSettlementService $settlementService,
+    ): RedirectResponse {
+        $validated = $request->validate([
+            'note' => ['required', 'string', 'max:500'],
+        ]);
+        $actor = $request->user();
+        abort_unless($actor instanceof User, 403);
+
+        $settlementService->approveReview($order, $actor, $validated['note']);
+
+        return to_route('admin.orders.show', $order)->with('status', 'レビューを承認し、販売を確定しました。');
     }
 
     public function refund(Order $order, RefundService $refundService): RedirectResponse

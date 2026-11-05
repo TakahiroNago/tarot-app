@@ -292,7 +292,7 @@ class CheckoutService
                     'movement_type' => 'reservation',
                     'on_hand_delta' => 0,
                     'reserved_delta' => $item->quantity,
-                    'idempotency_key' => bin2hex(random_bytes(32)),
+                    'idempotency_key' => InventoryService::movementKey('reservation', $order->id, $variant->id),
                     'note' => '注文 '.$order->order_number.' の決済期限付き在庫予約',
                 ]);
             }
@@ -417,7 +417,7 @@ class CheckoutService
                     'movement_type' => 'reservation_release',
                     'on_hand_delta' => 0,
                     'reserved_delta' => -$item->quantity,
-                    'idempotency_key' => bin2hex(random_bytes(32)),
+                    'idempotency_key' => InventoryService::movementKey('reservation_release', $lockedOrder->id, $item->variant_id),
                     'note' => $reason,
                 ]);
             }

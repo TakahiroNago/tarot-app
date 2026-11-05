@@ -4,10 +4,12 @@ namespace Tests\Support\Concurrency;
 
 use App\Models\Cart;
 use App\Models\InventoryBalance;
+use App\Models\Order;
 use App\Models\ShippingRate;
 use App\Models\TaxRate;
 use App\Models\User;
 use App\Services\CheckoutService;
+use App\Services\PaymentSettlementService;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -39,6 +41,7 @@ final class ConcurrencyActions
             'reserve-order-with-injected-deadlocks' => self::reserveOrderWithInjectedDeadlocks($payload),
             'http-checkout' => self::httpCheckout($payload),
             'change-shipping-and-tax' => self::changeShippingAndTax($payload),
+            'approve-review' => self::approveReview($payload),
             'mixed' => self::run($payload['action'], $payload['payload']),
             default => throw new InvalidArgumentException("Unknown concurrency action [{$action}]."),
         };
@@ -148,6 +151,31 @@ final class ConcurrencyActions
         }
 
         return ['outcome' => 'settings_changed'];
+    }
+
+    /**
+     * @param  array{order_id: int, actor_id: int}  $payload
+     * @return array<string, mixed>
+     */
+    private static function approveReview(array $payload): array
+    {
+        try {
+            app(PaymentSettlementService::class)->approveReview(
+                Order::query()->findOrFail($payload['order_id']),
+                User::query()->findOrFail($payload['actor_id']),
+                'concurrency test approval',
+            );
+
+            return ['outcome' => 'approved'];
+        } catch (ValidationException) {
+            return ['outcome' => 'rejected'];
+        } catch (QueryException $exception) {
+            return ($exception->errorInfo[1] ?? null) === 1213
+                ? ['outcome' => 'deadlock']
+                : self::errorOutcome($exception);
+        } catch (Throwable $exception) {
+            return self::errorOutcome($exception);
+        }
     }
 
     /**

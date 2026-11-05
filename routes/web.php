@@ -135,6 +135,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'active', 'verified'
     Route::get('/orders', [AdminOrderController::class, 'index'])->name('orders.index');
     Route::get('/orders/{order}', [AdminOrderController::class, 'show'])->name('orders.show');
     Route::patch('/orders/{order}/shipment', [AdminOrderController::class, 'updateShipment'])->name('orders.shipment.update');
+    Route::post('/orders/{order}/review/approve', [AdminOrderController::class, 'approveReview'])->name('orders.review.approve');
     Route::post('/orders/{order}/refund', [AdminOrderController::class, 'refund'])->name('orders.refund');
     Route::post('/orders/{order}/items/{item}/restock', [AdminOrderController::class, 'restock'])->name('orders.items.restock');
     Route::get('/shipping', [AdminShippingSettingsController::class, 'index'])->name('shipping.index');

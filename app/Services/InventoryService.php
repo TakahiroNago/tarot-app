@@ -10,9 +10,58 @@ use App\Models\ProductVariant;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 
 class InventoryService
 {
+    /**
+     * A key that lets the unique ledger index reject a second reservation, release, or sale.
+     */
+    public static function movementKey(string $movementType, int $orderId, int $variantId): string
+    {
+        return hash('sha256', "{$movementType}|{$orderId}|{$variantId}");
+    }
+
+    public function heldReservation(int $orderId, int $variantId): int
+    {
+        return (int) InventoryMovement::query()
+            ->where('order_id', $orderId)
+            ->where('variant_id', $variantId)
+            ->sum('reserved_delta');
+    }
+
+    /**
+     * Release whatever the ledger says this order still holds. The caller must hold the order lock.
+     */
+    public function releaseHeldReservation(Order $order, string $reason): void
+    {
+        $items = $order->items()->whereNotNull('variant_id')->orderBy('variant_id')->get();
+
+        foreach ($items as $item) {
+            $held = $this->heldReservation($order->id, $item->variant_id);
+            if ($held < 1) {
+                continue;
+            }
+
+            $balance = InventoryBalance::query()->lockForUpdate()->findOrFail($item->variant_id);
+            if ($balance->reserved < $held) {
+                throw new RuntimeException('Reserved inventory is inconsistent with the ledger.');
+            }
+
+            $balance->reserved -= $held;
+            $balance->save();
+            InventoryMovement::query()->create([
+                'variant_id' => $item->variant_id,
+                'order_id' => $order->id,
+                'movement_type' => 'reservation_release',
+                'on_hand_delta' => 0,
+                'reserved_delta' => -$held,
+                'idempotency_key' => self::movementKey('reservation_release', $order->id, $item->variant_id),
+                'note' => $reason,
+            ]);
+        }
+    }
+
     public function setOnHand(
         ProductVariant $variant,
         int $quantity,

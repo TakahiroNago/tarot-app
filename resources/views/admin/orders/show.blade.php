@@ -54,6 +54,25 @@
                     <div><dt>注文合計</dt><dd><strong>¥{{ number_format($order->total_minor) }}</strong></dd></div>
                 </dl>
 
+                @if ($order->isUnderReview())
+                    <h2>支払いレビュー</h2>
+                    <dl class="user-details">
+                        <div><dt>理由</dt><dd>{{ $order->review_reason }}</dd></div>
+                        <div><dt>開始日時</dt><dd>{{ $order->review_opened_at?->format('Y-m-d H:i') }}</dd></div>
+                    </dl>
+                    @if ($order->canApproveReview())
+                        <form class="question-form admin-review-form" method="POST" action="{{ route('admin.orders.review.approve', $order) }}">
+                            @csrf
+                            <p class="settings-note">承認すると在庫を確定し、購入者へ注文確定メールを送ります。在庫が不足している場合は承認できません。</p>
+                            <label class="question-label" for="review-note">確認内容</label>
+                            <input class="question-input" id="review-note" name="note" type="text" maxlength="500" value="{{ old('note') }}" required>
+                            <button class="secondary-action" type="submit">確認して販売を確定</button>
+                        </form>
+                    @else
+                        <p class="settings-note">この注文は承認できません。返金で対応してください。</p>
+                    @endif
+                @endif
+
                 <h2>決済参照</h2>
                 @foreach ($order->payments as $payment)
                     <dl class="user-details">
@@ -61,10 +80,13 @@
                         <div><dt>Checkout Session</dt><dd>{{ $payment->provider_checkout_id ?? '—' }}</dd></div>
                         <div><dt>Payment Intent</dt><dd>{{ $payment->provider_payment_id ?? '—' }}</dd></div>
                         <div><dt>決済金額</dt><dd>¥{{ number_format($payment->amount_minor) }}</dd></div>
+                        @if ($payment->received_amount_minor !== null)
+                            <div><dt>受領額</dt><dd>{{ $payment->received_currency }} {{ number_format($payment->received_amount_minor) }}</dd></div>
+                        @endif
                     </dl>
                 @endforeach
 
-                @if (in_array($order->payment_status, ['paid', 'refund_pending'], true) && $order->payments->contains(fn ($payment) => is_string($payment->provider_payment_id)))
+                @if (in_array($order->payment_status, ['paid', 'payment_review', 'refund_pending'], true) && $order->payments->contains(fn ($payment) => is_string($payment->provider_payment_id)))
                     <form class="admin-refund-form" method="POST" action="{{ route('admin.orders.refund', $order) }}">
                         @csrf
                         <p class="settings-note">全額返金のみ。返金後も在庫は自動で戻りません。返品受領・検品後に下の在庫復元操作を行ってください。</p>

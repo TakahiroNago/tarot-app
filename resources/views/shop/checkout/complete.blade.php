@@ -15,6 +15,8 @@
                 <h1>ご注文状況</h1>
                 @if ($order->payment_status === 'paid')
                     <p class="form-notice" role="status">お支払いを確認しました。ご注文ありがとうございます。</p>
+                @elseif ($order->payment_status === 'payment_review')
+                    <p class="form-notice" role="status">お支払いを確認しましたが、ご注文内容の確認が必要なため、発送手続きを保留しています。担当者より改めてご連絡します。</p>
                 @else
                     <p class="form-notice" role="status">決済結果を確認しています。この画面はWebhookによる確定前の状態を表示しています。反映まで少しお待ちください。</p>
                 @endif

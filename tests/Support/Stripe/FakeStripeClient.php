@@ -12,15 +12,21 @@ use Stripe\StripeClient;
  */
 class FakeStripeClient extends StripeClient
 {
+    public FakeStripeRefunds $fakeRefunds;
+
     public function __construct(public FakeStripeCheckoutSessions $fakeCheckoutSessions)
     {
         parent::__construct('sk_test_fake_never_sent');
+        $this->fakeRefunds = new FakeStripeRefunds;
     }
 
     public function __get($name): object
     {
         if ($name === 'checkout') {
             return (object) ['sessions' => $this->fakeCheckoutSessions];
+        }
+        if ($name === 'refunds') {
+            return $this->fakeRefunds;
         }
 
         throw new LogicException("The fake Stripe client does not implement the [{$name}] service.");
