@@ -8,7 +8,9 @@ use App\Models\User;
 use App\Services\CartService;
 use App\Services\CheckoutService;
 use App\Services\StripeBillingService;
+use Illuminate\Contracts\Database\ConcurrencyErrorDetector;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -38,6 +40,7 @@ class CheckoutController extends Controller
         CartService $cartService,
         CheckoutService $checkoutService,
         StripeBillingService $stripeBillingService,
+        ConcurrencyErrorDetector $concurrencyErrorDetector,
     ): RedirectResponse {
         $availableCountries = $checkoutService->availableShippingRates()
             ->pluck('country_code')
@@ -68,7 +71,19 @@ class CheckoutController extends Controller
         }
 
         $cart = $cartService->current($request);
-        $order = $checkoutService->reserveOrder($cart, $validated, $user);
+        try {
+            $order = $checkoutService->reserveOrder($cart, $validated, $user);
+        } catch (QueryException $exception) {
+            if (! $concurrencyErrorDetector->causedByConcurrencyError($exception)) {
+                throw $exception;
+            }
+            report($exception);
+
+            return to_route('shop.checkout.index')
+                ->with('status', 'ご注文が混み合っています。入力内容は保持されていますので、もう一度お試しください。')
+                ->withInput();
+        }
+
         try {
             $session = $checkoutService->createStripeSession($order, $stripeBillingService);
         } catch (ApiErrorException $exception) {

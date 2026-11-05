@@ -13,6 +13,7 @@ use App\Models\ShippingRate;
 use App\Models\TaxRate;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
@@ -25,6 +26,8 @@ use Throwable;
 class CheckoutService
 {
     private const TAX_DENOMINATOR = 10000;
+
+    private const RESERVATION_TRANSACTION_ATTEMPTS = 3;
 
     /**
      * @return Collection<int, ShippingRate>
@@ -57,23 +60,72 @@ class CheckoutService
     {
         $idempotencyKey = hash('sha256', $data['checkout_key']);
 
-        return DB::transaction(function () use ($cart, $data, $user, $idempotencyKey): Order {
-            $existingOrder = Order::query()
-                ->where('idempotency_key', $idempotencyKey)
-                ->lockForUpdate()
-                ->first();
+        $existingOrderId = $this->orderIdForIdempotencyKey($idempotencyKey);
+        if ($existingOrderId !== null) {
+            return $this->resumeExistingOrder($existingOrderId, $user);
+        }
 
-            if ($existingOrder instanceof Order) {
-                abort_unless($existingOrder->user_id === $user?->id, 404);
-                if ($existingOrder->status !== 'pending_payment') {
-                    throw ValidationException::withMessages([
-                        'checkout_key' => 'この注文は決済を再開できません。チェックアウトを開き直してください。',
-                    ]);
-                }
-
-                return $existingOrder;
+        try {
+            return $this->createReservedOrder($cart, $data, $user, $idempotencyKey);
+        } catch (UniqueConstraintViolationException|ValidationException $exception) {
+            if (
+                $exception instanceof UniqueConstraintViolationException
+                && ! $this->isIdempotencyKeyViolation($exception)
+            ) {
+                throw $exception;
             }
 
+            $existingOrderId = $this->orderIdForIdempotencyKey($idempotencyKey);
+            if ($existingOrderId === null) {
+                throw $exception;
+            }
+
+            return $this->resumeExistingOrder($existingOrderId, $user);
+        }
+    }
+
+    /**
+     * Read outside any transaction so a concurrent request's committed order is visible and no
+     * gap lock is taken on the unique index for a key that does not exist yet.
+     */
+    private function orderIdForIdempotencyKey(string $idempotencyKey): ?int
+    {
+        return Order::query()->where('idempotency_key', $idempotencyKey)->value('id');
+    }
+
+    private function resumeExistingOrder(int $orderId, ?User $user): Order
+    {
+        return DB::transaction(function () use ($orderId, $user): Order {
+            $order = Order::query()->lockForUpdate()->findOrFail($orderId);
+            abort_unless($order->user_id === $user?->id, 404);
+            if ($order->status !== 'pending_payment') {
+                throw ValidationException::withMessages([
+                    'checkout_key' => 'この注文は決済を再開できません。チェックアウトを開き直してください。',
+                ]);
+            }
+
+            return $order;
+        }, self::RESERVATION_TRANSACTION_ATTEMPTS);
+    }
+
+    /**
+     * Only the unique index on ec_orders.idempotency_key means another request created this order.
+     * The driver's own message is used because the full exception message also contains bindings.
+     */
+    private function isIdempotencyKeyViolation(UniqueConstraintViolationException $exception): bool
+    {
+        $driverMessage = (string) ($exception->errorInfo[2] ?? '');
+
+        return str_contains($driverMessage, "ec_orders_idempotency_key_unique'")
+            || str_contains($driverMessage, 'ec_orders.idempotency_key');
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function createReservedOrder(Cart $cart, array $data, ?User $user, string $idempotencyKey): Order
+    {
+        return DB::transaction(function () use ($cart, $data, $user, $idempotencyKey): Order {
             $shippingRate = ShippingRate::query()
                 ->with('shippingMethod')
                 ->whereKey($data['shipping_rate_id'])
@@ -81,7 +133,6 @@ class CheckoutService
                 ->where('currency', 'JPY')
                 ->where('is_active', true)
                 ->whereHas('shippingMethod', fn ($query) => $query->where('is_active', true))
-                ->lockForUpdate()
                 ->first();
             if (! $shippingRate instanceof ShippingRate) {
                 throw ValidationException::withMessages([
@@ -96,7 +147,6 @@ class CheckoutService
                 ->where(function ($query): void {
                     $query->whereNull('active_until')->orWhereDate('active_until', '>=', today());
                 })
-                ->lockForUpdate()
                 ->get();
             if ($taxRates->count() !== 1) {
                 throw ValidationException::withMessages([
@@ -257,7 +307,7 @@ class CheckoutService
             ]);
 
             return $order;
-        });
+        }, self::RESERVATION_TRANSACTION_ATTEMPTS);
     }
 
     public function createStripeSession(Order $order, StripeBillingService $stripeBillingService): Session
