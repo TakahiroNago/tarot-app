@@ -5,21 +5,23 @@ namespace App\Http\Controllers\Shop;
 use App\Http\Controllers\Controller;
 use App\Models\CartItem;
 use App\Services\CartService;
+use App\Services\CheckoutService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class CartController extends Controller
 {
-    public function index(Request $request, CartService $cartService): View
+    public function index(Request $request, CartService $cartService, CheckoutService $checkoutService): View
     {
         $cart = $cartService->current($request);
         $cart->load('items.variant.product.images', 'items.variant.inventoryBalance');
         $subtotal = $cart->items->sum(
             fn (CartItem $item): int => $item->variant->price_minor * $item->quantity,
         );
+        $hasPendingOrder = $checkoutService->activeOrderFor($cart) !== null;
 
-        return view('shop.cart.index', compact('cart', 'subtotal'));
+        return view('shop.cart.index', compact('cart', 'subtotal', 'hasPendingOrder'));
     }
 
     public function store(Request $request, CartService $cartService): RedirectResponse

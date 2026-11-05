@@ -56,10 +56,14 @@ class CheckoutService
     public function reserveOrder(Cart $cart, array $data, ?User $user): Order
     {
         $idempotencyKey = hash('sha256', $data['checkout_key']);
+        $fingerprint = $this->checkoutFingerprint(
+            CartItem::query()->where('cart_id', $cart->id)->get(),
+            $data,
+        );
 
-        $existingOrderId = $this->orderIdForIdempotencyKey($idempotencyKey);
+        $existingOrderId = $this->existingOrderId($idempotencyKey, $cart);
         if ($existingOrderId !== null) {
-            return $this->resumeExistingOrder($existingOrderId, $user);
+            return $this->resumeExistingOrder($existingOrderId, $user, $fingerprint);
         }
 
         try {
@@ -67,32 +71,79 @@ class CheckoutService
         } catch (UniqueConstraintViolationException|ValidationException $exception) {
             if (
                 $exception instanceof UniqueConstraintViolationException
-                && ! $this->isIdempotencyKeyViolation($exception)
+                && ! $this->isDuplicateOrderViolation($exception)
             ) {
                 throw $exception;
             }
 
-            $existingOrderId = $this->orderIdForIdempotencyKey($idempotencyKey);
+            $existingOrderId = $this->existingOrderId($idempotencyKey, $cart);
             if ($existingOrderId === null) {
                 throw $exception;
             }
 
-            return $this->resumeExistingOrder($existingOrderId, $user);
+            return $this->resumeExistingOrder($existingOrderId, $user, $fingerprint);
         }
+    }
+
+    public function activeOrderFor(Cart $cart): ?Order
+    {
+        return Order::query()->with('items')->where('active_cart_id', $cart->id)->first();
+    }
+
+    /**
+     * Whether a checkout key belongs to an order that can no longer take payment.
+     */
+    public function checkoutKeyIsClosed(string $checkoutKey): bool
+    {
+        return Order::query()
+            ->where('idempotency_key', hash('sha256', $checkoutKey))
+            ->where('status', '<>', 'pending_payment')
+            ->exists();
+    }
+
+    /**
+     * A keyed HMAC, because the inputs are personal data and an unkeyed hash could be guessed.
+     *
+     * @param  Collection<int, CartItem>  $items
+     * @param  array<string, mixed>  $data
+     */
+    private function checkoutFingerprint(Collection $items, array $data): string
+    {
+        $lines = $items
+            ->map(fn (CartItem $item): array => [(int) $item->variant_id, (int) $item->quantity])
+            ->sortBy(fn (array $line): int => $line[0])
+            ->values()
+            ->all();
+
+        return hash_hmac('sha256', json_encode([
+            'customer_name' => $data['customer_name'],
+            'customer_email' => $data['customer_email'],
+            'customer_phone' => $data['customer_phone'] ?? null,
+            'shipping_recipient' => $data['shipping_recipient'],
+            'shipping_country_code' => $data['shipping_country_code'],
+            'shipping_postal_code' => $data['shipping_postal_code'],
+            'shipping_region' => $data['shipping_region'] ?? null,
+            'shipping_city' => $data['shipping_city'],
+            'shipping_address_line1' => $data['shipping_address_line1'],
+            'shipping_address_line2' => $data['shipping_address_line2'] ?? null,
+            'shipping_rate_id' => (int) $data['shipping_rate_id'],
+            'lines' => $lines,
+        ], JSON_THROW_ON_ERROR), (string) config('app.key'));
     }
 
     /**
      * Read outside any transaction so a concurrent request's committed order is visible and no
      * gap lock is taken on the unique index for a key that does not exist yet.
      */
-    private function orderIdForIdempotencyKey(string $idempotencyKey): ?int
+    private function existingOrderId(string $idempotencyKey, Cart $cart): ?int
     {
-        return Order::query()->where('idempotency_key', $idempotencyKey)->value('id');
+        return Order::query()->where('idempotency_key', $idempotencyKey)->value('id')
+            ?? Order::query()->where('active_cart_id', $cart->id)->value('id');
     }
 
-    private function resumeExistingOrder(int $orderId, ?User $user): Order
+    private function resumeExistingOrder(int $orderId, ?User $user, string $fingerprint): Order
     {
-        return DB::transaction(function () use ($orderId, $user): Order {
+        return DB::transaction(function () use ($orderId, $user, $fingerprint): Order {
             $order = Order::query()->lockForUpdate()->findOrFail($orderId);
             abort_unless($order->user_id === $user?->id, 404);
             if ($order->status !== 'pending_payment') {
@@ -101,20 +152,26 @@ class CheckoutService
                 ]);
             }
 
+            if ($order->checkout_fingerprint !== null && ! hash_equals($order->checkout_fingerprint, $fingerprint)) {
+                throw new CheckoutConflictException;
+            }
+
             return $order;
         }, self::RESERVATION_TRANSACTION_ATTEMPTS);
     }
 
     /**
-     * Only the unique index on ec_orders.idempotency_key means another request created this order.
+     * Only these unique indexes mean another request created this order or holds this cart.
      * The driver's own message is used because the full exception message also contains bindings.
      */
-    private function isIdempotencyKeyViolation(UniqueConstraintViolationException $exception): bool
+    private function isDuplicateOrderViolation(UniqueConstraintViolationException $exception): bool
     {
         $driverMessage = (string) ($exception->errorInfo[2] ?? '');
 
         return str_contains($driverMessage, "ec_orders_idempotency_key_unique'")
-            || str_contains($driverMessage, 'ec_orders.idempotency_key');
+            || str_contains($driverMessage, 'ec_orders.idempotency_key')
+            || str_contains($driverMessage, "ec_orders_active_cart_id_unique'")
+            || str_contains($driverMessage, 'ec_orders.active_cart_id');
     }
 
     /**
@@ -123,6 +180,14 @@ class CheckoutService
     private function createReservedOrder(Cart $cart, array $data, ?User $user, string $idempotencyKey): Order
     {
         return DB::transaction(function () use ($cart, $data, $user, $idempotencyKey): Order {
+            // The first lock in every checkout path, so one cart's requests run one at a time.
+            Cart::query()->lockForUpdate()->findOrFail($cart->id);
+            if (Order::query()->where('active_cart_id', $cart->id)->exists()) {
+                throw ValidationException::withMessages([
+                    'cart' => 'お支払い待ちのご注文があります。',
+                ]);
+            }
+
             $shippingRate = ShippingRate::query()
                 ->with('shippingMethod')
                 ->whereKey($data['shipping_rate_id'])
@@ -219,6 +284,8 @@ class CheckoutService
                 'order_number' => $orderNumber,
                 'user_id' => $user?->id,
                 'idempotency_key' => $idempotencyKey,
+                'checkout_fingerprint' => $this->checkoutFingerprint($items, $data),
+                'active_cart_id' => $cart->id,
                 'status' => 'pending_payment',
                 'payment_status' => 'pending',
                 'customer_name' => $data['customer_name'],
@@ -342,6 +409,7 @@ class CheckoutService
             $lockedOrder->status = 'cancelled';
             $lockedOrder->payment_status = 'failed';
             $lockedOrder->reservation_expires_at = null;
+            $lockedOrder->active_cart_id = null;
             $lockedOrder->save();
 
             $lockedOrder->payments()

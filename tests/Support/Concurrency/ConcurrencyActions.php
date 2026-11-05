@@ -8,6 +8,8 @@ use App\Models\Order;
 use App\Models\ShippingRate;
 use App\Models\TaxRate;
 use App\Models\User;
+use App\Services\CartService;
+use App\Services\CheckoutConflictException;
 use App\Services\CheckoutService;
 use App\Services\PaymentSettlementService;
 use Illuminate\Contracts\Http\Kernel;
@@ -42,6 +44,7 @@ final class ConcurrencyActions
             'http-checkout' => self::httpCheckout($payload),
             'change-shipping-and-tax' => self::changeShippingAndTax($payload),
             'approve-review' => self::approveReview($payload),
+            'add-to-cart' => self::addToCart($payload),
             'mixed' => self::run($payload['action'], $payload['payload']),
             default => throw new InvalidArgumentException("Unknown concurrency action [{$action}]."),
         };
@@ -80,6 +83,8 @@ final class ConcurrencyActions
             );
 
             return ['outcome' => 'reserved', 'order_id' => $order->id];
+        } catch (CheckoutConflictException) {
+            return ['outcome' => 'conflict'];
         } catch (ValidationException) {
             return ['outcome' => 'rejected'];
         } catch (QueryException $exception) {
@@ -151,6 +156,27 @@ final class ConcurrencyActions
         }
 
         return ['outcome' => 'settings_changed'];
+    }
+
+    /**
+     * @param  array{cart_id: int, variant_id: int}  $payload
+     * @return array<string, mixed>
+     */
+    private static function addToCart(array $payload): array
+    {
+        try {
+            app(CartService::class)->add(Cart::query()->findOrFail($payload['cart_id']), $payload['variant_id'], 1);
+
+            return ['outcome' => 'added'];
+        } catch (ValidationException) {
+            return ['outcome' => 'rejected'];
+        } catch (QueryException $exception) {
+            return ($exception->errorInfo[1] ?? null) === 1213
+                ? ['outcome' => 'deadlock']
+                : self::errorOutcome($exception);
+        } catch (Throwable $exception) {
+            return self::errorOutcome($exception);
+        }
     }
 
     /**

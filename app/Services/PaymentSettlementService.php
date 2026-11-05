@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Stripe\StripeObject;
+use Throwable;
 
 /**
  * Moves an order through payment, review, and refund.
@@ -27,7 +28,10 @@ class PaymentSettlementService
 {
     private const APPROVAL_TRANSACTION_ATTEMPTS = 3;
 
-    public function __construct(private InventoryService $inventoryService) {}
+    public function __construct(
+        private InventoryService $inventoryService,
+        private CartService $cartService,
+    ) {}
 
     public function applyPaidSession(Order $order, Payment $payment, StripeObject $session): void
     {
@@ -195,6 +199,7 @@ class PaymentSettlementService
             ]);
         }
 
+        $this->releaseCartAfterCommit($order);
         $order->status = 'paid';
         $order->payment_status = 'paid';
         $order->paid_at = now();
@@ -205,8 +210,30 @@ class PaymentSettlementService
         SendOrderConfirmationEmail::dispatch($order->id)->afterCommit();
     }
 
+    /**
+     * Once money has moved the buyer should not see these items as still to buy. The cart is
+     * changed after the commit because a cart lock must never be taken while holding an order lock.
+     */
+    private function releaseCartAfterCommit(Order $order): void
+    {
+        $cartId = $order->active_cart_id;
+        if ($cartId === null) {
+            return;
+        }
+
+        $order->active_cart_id = null;
+        DB::afterCommit(function () use ($cartId, $order): void {
+            try {
+                $this->cartService->removeOrderedItems($cartId, $order);
+            } catch (Throwable $exception) {
+                report($exception);
+            }
+        });
+    }
+
     private function openReview(Order $order, Payment $payment, StripeObject $session, string $reason): void
     {
+        $this->releaseCartAfterCommit($order);
         $order->paid_at = now();
         $order->reservation_expires_at = null;
         $order->review_reason = $reason;

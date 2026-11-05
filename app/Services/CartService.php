@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Cart;
 use App\Models\CartItem;
 use App\Models\InventoryBalance;
+use App\Models\Order;
 use App\Models\ProductVariant;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -110,6 +111,7 @@ class CartService
                 ]);
             }
 
+            Cart::query()->lockForUpdate()->findOrFail($cart->id);
             $variant = ProductVariant::query()->lockForUpdate()->findOrFail($variantId);
             $balance = InventoryBalance::query()->lockForUpdate()->find($variant->id);
             if (
@@ -158,7 +160,8 @@ class CartService
             ]);
         }
 
-        return DB::transaction(function () use ($item, $quantity): CartItem {
+        return DB::transaction(function () use ($cart, $item, $quantity): CartItem {
+            Cart::query()->lockForUpdate()->findOrFail($cart->id);
             $balance = InventoryBalance::query()->lockForUpdate()->find($item->variant_id);
             if ($balance === null || $quantity > $balance->available()) {
                 throw ValidationException::withMessages([
@@ -177,5 +180,34 @@ class CartService
     {
         abort_unless($item->cart_id === $cart->id, 404);
         $item->delete();
+    }
+
+    /**
+     * Take a paid order's quantities out of its cart, leaving anything added since.
+     */
+    public function removeOrderedItems(int $cartId, Order $order): void
+    {
+        DB::transaction(function () use ($cartId, $order): void {
+            Cart::query()->lockForUpdate()->find($cartId);
+
+            foreach ($order->items()->whereNotNull('variant_id')->orderBy('variant_id')->get() as $orderItem) {
+                $cartItem = CartItem::query()
+                    ->where('cart_id', $cartId)
+                    ->where('variant_id', $orderItem->variant_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($cartItem === null) {
+                    continue;
+                }
+
+                if ($cartItem->quantity > $orderItem->quantity) {
+                    $cartItem->quantity -= $orderItem->quantity;
+                    $cartItem->save();
+                } else {
+                    $cartItem->delete();
+                }
+            }
+        });
     }
 }
