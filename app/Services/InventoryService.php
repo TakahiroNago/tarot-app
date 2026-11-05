@@ -105,6 +105,17 @@ class InventoryService
                 ]);
             }
 
+            $soldQuantity = -(int) InventoryMovement::query()
+                ->where('order_id', $order->id)
+                ->where('variant_id', $item->variant_id)
+                ->where('movement_type', 'sale')
+                ->sum('on_hand_delta');
+            if ($alreadyRestocked + $quantity > $soldQuantity) {
+                throw ValidationException::withMessages([
+                    'quantity' => '販売確定の記録を超える数量は在庫に戻せません。',
+                ]);
+            }
+
             $balance = InventoryBalance::query()->lockForUpdate()->findOrFail($item->variant_id);
             $balance->on_hand += $quantity;
             $balance->save();

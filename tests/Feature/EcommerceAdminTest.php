@@ -150,6 +150,14 @@ test('restocking a returned item requires a refund and is idempotent', function 
         'line_total_minor' => 2000,
         'currency' => 'JPY',
     ]);
+    InventoryMovement::query()->create([
+        'variant_id' => $variant->id,
+        'order_id' => $order->id,
+        'movement_type' => 'sale',
+        'on_hand_delta' => -2,
+        'reserved_delta' => -2,
+        'idempotency_key' => str_repeat('e', 64),
+    ]);
     $form = [
         'quantity' => 1,
         'reason' => '返品受領・検品済み',
