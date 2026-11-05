@@ -16,6 +16,9 @@
                 @if (session('status'))
                     <p class="form-notice" role="status">{{ session('status') }}</p>
                 @endif
+                @if ($hasPendingOrder)
+                    <p class="form-notice" role="status">お支払い待ちのご注文があり、その分の在庫を予約しています。数量を増やせない場合は、<a class="text-link" href="{{ route('shop.checkout.index') }}">お支払い待ちのご注文</a>を取り消すとお試しいただけます。</p>
+                @endif
                 @if ($cart->items->isNotEmpty())
                     <div class="cart-list">
                         @foreach ($cart->items as $item)

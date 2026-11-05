@@ -41,6 +41,12 @@ Route::get('/checkout', [CheckoutController::class, 'index'])->name('shop.checko
 Route::post('/checkout', [CheckoutController::class, 'store'])
     ->middleware('throttle:5,1')
     ->name('shop.checkout.store');
+Route::post('/checkout/pending/resume', [CheckoutController::class, 'resume'])
+    ->middleware('throttle:5,1')
+    ->name('shop.checkout.pending.resume');
+Route::post('/checkout/pending/cancel', [CheckoutController::class, 'cancelPending'])
+    ->middleware('throttle:5,1')
+    ->name('shop.checkout.pending.cancel');
 Route::get('/checkout/complete/{orderNumber}', [CheckoutController::class, 'success'])
     ->where('orderNumber', '[A-Z0-9-]{8,32}')
     ->name('shop.checkout.success');

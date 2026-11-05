@@ -16,7 +16,28 @@
                 @if (session('status'))
                     <p class="form-notice" role="status">{{ session('status') }}</p>
                 @endif
-                @if ($cart->items->isEmpty())
+                @if ($pendingOrder)
+                    <div class="checkout-summary">
+                        <h2>お支払い待ちのご注文</h2>
+                        <p>注文番号：{{ $pendingOrder->order_number }}</p>
+                        @foreach ($pendingOrder->items as $item)
+                            <p>{{ $item->product_name_snapshot }} / {{ $item->variant_label_snapshot }} × {{ $item->quantity }} — ¥{{ number_format($item->line_total_minor) }}</p>
+                        @endforeach
+                        <p class="product-price">合計（税込・送料込）: ¥{{ number_format($pendingOrder->total_minor) }}</p>
+                        @if ($pendingOrder->reservation_expires_at)
+                            <p class="settings-note">在庫の予約期限：{{ $pendingOrder->reservation_expires_at->format('Y年m月d日 H:i') }}</p>
+                        @endif
+                        <p class="settings-note">住所やカートの内容を変更する場合は、このご注文を取り消してから新しくご注文ください。</p>
+                    </div>
+                    <form method="POST" action="{{ route('shop.checkout.pending.resume') }}">
+                        @csrf
+                        <button class="primary-action" type="submit">決済を再開 <span class="action-arrow" aria-hidden="true">→</span></button>
+                    </form>
+                    <form method="POST" action="{{ route('shop.checkout.pending.cancel') }}">
+                        @csrf
+                        <button class="secondary-action" type="submit">このご注文を取り消す</button>
+                    </form>
+                @elseif ($cart->items->isEmpty())
                     <p>カートに商品がありません。</p>
                     <a class="primary-action" href="{{ route('shop.products.index') }}">商品を見る <span class="action-arrow" aria-hidden="true">→</span></a>
                 @elseif ($shippingRates->isEmpty())

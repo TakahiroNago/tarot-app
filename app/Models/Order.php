@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
-    'order_number', 'user_id', 'idempotency_key', 'status', 'payment_status',
+    'order_number', 'user_id', 'idempotency_key', 'checkout_fingerprint', 'active_cart_id', 'status', 'payment_status',
     'customer_name', 'customer_email', 'customer_phone', 'shipping_recipient',
     'shipping_country_code', 'shipping_postal_code', 'shipping_region',
     'shipping_city', 'shipping_address_line1', 'shipping_address_line2',

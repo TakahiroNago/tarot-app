@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Shop;
 
 use App\Http\Controllers\Controller;
+use App\Models\Cart;
 use App\Models\Order;
 use App\Models\User;
 use App\Services\CartService;
+use App\Services\CheckoutConflictException;
 use App\Services\CheckoutService;
 use App\Services\CheckoutSessionUnavailableException;
 use App\Services\StripeCheckoutSessionService;
@@ -14,10 +16,15 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Validation\Rule;
 
 class CheckoutController extends Controller
 {
+    private const NOTICE_STILL_OPEN = '決済の準備状況を確認できませんでした。入力内容と注文情報は保持されています。時間をおいて同じ画面から再試行してください。在庫予約は有効期限まで維持されます。';
+
+    private const NOTICE_CLOSED = '決済を開始できなかったため、ご注文を取り消しました。在庫の予約は解除しています。入力内容をご確認のうえ、もう一度お試しください。';
+
     public function index(Request $request, CartService $cartService, CheckoutService $checkoutService): View
     {
         $cart = $cartService->current($request);
@@ -26,12 +33,18 @@ class CheckoutController extends Controller
         $subtotal = $cart->items->sum(
             fn ($item): int => $item->variant->price_minor * $item->quantity,
         );
+        $pendingOrder = $checkoutService->activeOrderFor($cart);
+
+        if ($pendingOrder instanceof Order) {
+            $request->session()->keep(['_old_input']);
+        }
 
         return view('shop.checkout.index', [
             'cart' => $cart,
             'shippingRates' => $shippingRates,
             'subtotal' => $subtotal,
-            'checkoutKey' => old('checkout_key', bin2hex(random_bytes(32))),
+            'pendingOrder' => $pendingOrder,
+            'checkoutKey' => $this->checkoutKeyFor($request, $cart, $checkoutService),
         ]);
     }
 
@@ -73,6 +86,10 @@ class CheckoutController extends Controller
         $cart = $cartService->current($request);
         try {
             $order = $checkoutService->reserveOrder($cart, $validated, $user);
+        } catch (CheckoutConflictException) {
+            return to_route('shop.checkout.index')
+                ->with('status', 'お支払い待ちのご注文と、入力内容またはカートの内容が異なります。そのまま決済を再開するか、ご注文を取り消してから新しくご注文ください。')
+                ->withInput();
         } catch (QueryException $exception) {
             if (! $concurrencyErrorDetector->causedByConcurrencyError($exception)) {
                 throw $exception;
@@ -84,26 +101,50 @@ class CheckoutController extends Controller
                 ->withInput();
         }
 
+        return $this->redirectToPayment($request, $order, $checkoutService, $checkoutSessionService);
+    }
+
+    public function resume(
+        Request $request,
+        CartService $cartService,
+        CheckoutService $checkoutService,
+        StripeCheckoutSessionService $checkoutSessionService,
+    ): RedirectResponse {
+        $order = $checkoutService->activeOrderFor($cartService->current($request));
+        if (! $order instanceof Order) {
+            return to_route('shop.checkout.index')->with('status', 'お支払い待ちのご注文はありません。');
+        }
+
+        return $this->redirectToPayment($request, $order, $checkoutService, $checkoutSessionService);
+    }
+
+    public function cancelPending(
+        Request $request,
+        CartService $cartService,
+        CheckoutService $checkoutService,
+        StripeCheckoutSessionService $checkoutSessionService,
+    ): RedirectResponse {
+        $input = Arr::except((array) $request->old(), ['checkout_key']);
+        $order = $checkoutService->activeOrderFor($cartService->current($request));
+        if (! $order instanceof Order) {
+            return to_route('shop.checkout.index')->with('status', 'お支払い待ちのご注文はありません。')->withInput($input);
+        }
+
         try {
-            $session = $checkoutSessionService->sessionFor($order);
-        } catch (CheckoutSessionUnavailableException $exception) {
-            if ($exception->orderStillOpen) {
-                return to_route('shop.checkout.index')
-                    ->with('status', '決済の準備状況を確認できませんでした。入力内容と注文情報は保持されています。時間をおいて同じ画面から再試行してください。在庫予約は有効期限まで維持されます。')
-                    ->withInput();
-            }
-
+            $cancelled = $checkoutSessionService->cancelPendingOrder($order);
+        } catch (CheckoutSessionUnavailableException) {
             return to_route('shop.checkout.index')
-                ->with('status', '決済を開始できなかったため、ご注文を取り消しました。在庫の予約は解除しています。入力内容をご確認のうえ、もう一度お試しください。')
-                ->withInput($request->except('checkout_key'));
-        }
-        $cart->items()->delete();
-
-        if (! is_string($session->url) || $session->url === '') {
-            abort(503, '決済ページを準備できませんでした。時間をおいて再度お試しください。');
+                ->with('status', '決済の状況を確認できなかったため、ご注文を取り消せませんでした。時間をおいて再度お試しください。');
         }
 
-        return redirect()->away($session->url);
+        if (! $cancelled) {
+            return to_route('shop.checkout.index')
+                ->with('status', 'このご注文はお支払いが完了している可能性があるため、取り消せませんでした。確認が済むまでお待ちください。');
+        }
+
+        return to_route('shop.checkout.index')
+            ->with('status', 'ご注文を取り消しました。在庫の予約を解除しています。カートの内容はそのまま残っています。')
+            ->withInput($input);
     }
 
     public function success(Request $request, string $orderNumber, CheckoutService $checkoutService): View
@@ -127,5 +168,67 @@ class CheckoutController extends Controller
     {
         return to_route('shop.checkout.index')
             ->with('status', '決済は完了していません。在庫は予約期限まで確保されています。');
+    }
+
+    private function redirectToPayment(
+        Request $request,
+        Order $order,
+        CheckoutService $checkoutService,
+        StripeCheckoutSessionService $checkoutSessionService,
+    ): RedirectResponse {
+        try {
+            $session = $checkoutSessionService->sessionFor($order);
+        } catch (CheckoutSessionUnavailableException $exception) {
+            if ($exception->orderStillOpen) {
+                return to_route('shop.checkout.index')
+                    ->with('status', self::NOTICE_STILL_OPEN)
+                    ->withInput();
+            }
+
+            return to_route('shop.checkout.index')
+                ->with('status', self::NOTICE_CLOSED)
+                ->withInput($request->except('checkout_key'));
+        }
+
+        if ($session->status === 'complete') {
+            return redirect()->to(
+                route('shop.checkout.success', ['orderNumber' => $order->order_number]).'?session_id='.urlencode($session->id),
+            );
+        }
+
+        if ($session->status === 'expired') {
+            $checkoutService->releaseReservation($order, 'Stripe Checkout セッションの有効期限が切れていました。');
+
+            return to_route('shop.checkout.index')
+                ->with('status', self::NOTICE_CLOSED)
+                ->withInput($request->except('checkout_key'));
+        }
+
+        if (! is_string($session->url) || $session->url === '') {
+            abort(503, '決済ページを準備できませんでした。時間をおいて再度お試しください。');
+        }
+
+        return redirect()->away($session->url);
+    }
+
+    /**
+     * The key lives in the session rather than the page, so reloading cannot start a second order.
+     */
+    private function checkoutKeyFor(Request $request, Cart $cart, CheckoutService $checkoutService): string
+    {
+        $sessionKey = 'checkout_key.'.$cart->id;
+        $checkoutKey = old('checkout_key') ?? $request->session()->get($sessionKey);
+
+        if (
+            ! is_string($checkoutKey)
+            || preg_match('/\A[a-f0-9]{64}\z/', $checkoutKey) !== 1
+            || $checkoutService->checkoutKeyIsClosed($checkoutKey)
+        ) {
+            $checkoutKey = bin2hex(random_bytes(32));
+        }
+
+        $request->session()->put($sessionKey, $checkoutKey);
+
+        return $checkoutKey;
     }
 }

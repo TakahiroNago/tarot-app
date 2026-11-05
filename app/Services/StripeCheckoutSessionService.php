@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Order;
+use App\Models\OrderEvent;
 use App\Models\OrderItem;
 use App\Models\Payment;
 use Illuminate\Support\Facades\DB;
@@ -70,6 +71,86 @@ class StripeCheckoutSessionService
         }
 
         return $this->submit($stripe, $order, $payment, $wasResend);
+    }
+
+    /**
+     * Cancel an order awaiting payment, first making sure Stripe can no longer take money for it.
+     *
+     * @return bool False when Stripe shows it was paid, so it must not be cancelled.
+     *
+     * @throws CheckoutSessionUnavailableException When Stripe's state cannot be confirmed right now.
+     */
+    public function cancelPendingOrder(Order $order): bool
+    {
+        $stripe = $this->stripeBillingService->client();
+        $payment = $order->payments()->where('provider', 'stripe')->firstOrFail();
+
+        if (
+            $payment->checkout_state === Payment::CHECKOUT_CREATING
+            && $payment->checkout_claimed_at?->isAfter(now()->subSeconds(self::CLAIM_SECONDS))
+        ) {
+            throw new CheckoutSessionUnavailableException(orderStillOpen: true);
+        }
+
+        $session = $this->sessionToCloseFor($stripe, $order, $payment);
+        if ($session?->status === 'open') {
+            $session = $this->expireOrFetch($stripe, $session->id);
+        }
+        if ($session?->status === 'complete') {
+            return false;
+        }
+
+        $this->checkoutService->releaseReservation($order, '購入者の操作により注文を取り消しました。');
+
+        if ($order->fresh()->status === 'cancelled') {
+            OrderEvent::query()->create([
+                'order_id' => $order->id,
+                'event_type' => 'customer_cancelled',
+                'from_status' => 'pending_payment',
+                'to_status' => 'cancelled',
+                'from_payment_status' => 'pending',
+                'to_payment_status' => 'failed',
+            ]);
+        }
+
+        return true;
+    }
+
+    private function sessionToCloseFor(StripeClient $stripe, Order $order, Payment $payment): ?Session
+    {
+        if (is_string($payment->provider_checkout_id)) {
+            try {
+                return $stripe->checkout->sessions->retrieve($payment->provider_checkout_id);
+            } catch (ApiErrorException $exception) {
+                report($exception);
+
+                throw new CheckoutSessionUnavailableException(orderStillOpen: true);
+            }
+        }
+
+        if ($payment->checkout_state === Payment::CHECKOUT_NOT_STARTED) {
+            return null;
+        }
+
+        return $this->findExistingSession($stripe, $order, $payment);
+    }
+
+    /**
+     * The customer may finish paying at the moment of expiry, so a refusal is checked, not assumed.
+     */
+    private function expireOrFetch(StripeClient $stripe, string $sessionId): Session
+    {
+        try {
+            return $stripe->checkout->sessions->expire($sessionId);
+        } catch (ApiErrorException) {
+            try {
+                return $stripe->checkout->sessions->retrieve($sessionId);
+            } catch (ApiErrorException $exception) {
+                report($exception);
+
+                throw new CheckoutSessionUnavailableException(orderStillOpen: true);
+            }
+        }
     }
 
     /**

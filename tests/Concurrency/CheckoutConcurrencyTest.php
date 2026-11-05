@@ -78,6 +78,64 @@ test('the same key from eight requests resolves to one order', function (int $st
         ->and(ConcurrencyHarness::inventoryInvariantViolations())->toBe([]);
 })->with(['plentiful stock' => 100, 'last unit' => 1]);
 
+test('two tabs with different keys and the same details share one order', function () {
+    $rate = CheckoutScenario::shippingRate();
+    $variant = CheckoutScenario::stockedVariant(100);
+    $cart = CheckoutScenario::guestCart($variant);
+    $payloads = array_map(
+        fn (int $index): array => CheckoutScenario::reservePayload($cart, $rate, "tab-{$index}"),
+        range(0, 7),
+    );
+
+    $results = ConcurrencyHarness::run('reserve-order', $payloads);
+
+    expect(CheckoutScenario::outcomeCounts($results, 'same cart, different keys'))->toBe(CheckoutScenario::expectedCounts(['reserved' => 8]))
+        ->and(array_values(array_unique(array_column($results, 'order_id'))))->toBe([Order::query()->sole()->id])
+        ->and(InventoryBalance::query()->findOrFail($variant->id)->reserved)->toBe(1)
+        ->and(CheckoutScenario::orderViolations())->toBe([])
+        ->and(ConcurrencyHarness::inventoryInvariantViolations())->toBe([]);
+});
+
+test('two tabs with different details get one order and a conflict for the rest', function () {
+    $rate = CheckoutScenario::shippingRate();
+    $variant = CheckoutScenario::stockedVariant(100);
+    $cart = CheckoutScenario::guestCart($variant);
+    $payloads = array_map(function (int $index) use ($cart, $rate): array {
+        $payload = CheckoutScenario::reservePayload($cart, $rate, "edited-tab-{$index}");
+        $payload['data']['shipping_address_line1'] = "住所{$index}";
+
+        return $payload;
+    }, range(0, 7));
+
+    $counts = CheckoutScenario::outcomeCounts(ConcurrencyHarness::run('reserve-order', $payloads), 'same cart, different details');
+
+    expect($counts['reserved'])->toBe(1)
+        ->and($counts['conflict'])->toBe(7)
+        ->and($counts['rejected'] + $counts['deadlock'] + $counts['error'])->toBe(0)
+        ->and(Order::query()->count())->toBe(1)
+        ->and(InventoryBalance::query()->findOrFail($variant->id)->reserved)->toBe(1)
+        ->and(ConcurrencyHarness::inventoryInvariantViolations())->toBe([]);
+});
+
+test('editing a cart while checking out it does not deadlock', function () {
+    $rate = CheckoutScenario::shippingRate();
+    $variant = CheckoutScenario::stockedVariant(100);
+    $cart = CheckoutScenario::guestCart($variant);
+    $reserve = ['action' => 'reserve-order', 'payload' => CheckoutScenario::reservePayload($cart, $rate, 'cart-race')];
+    $add = ['action' => 'add-to-cart', 'payload' => ['cart_id' => $cart->id, 'variant_id' => $variant->id]];
+
+    $counts = CheckoutScenario::outcomeCounts(
+        ConcurrencyHarness::run('mixed', [$reserve, $add, $reserve, $add, $reserve, $add, $reserve, $add]),
+        'cart edits racing checkout',
+    );
+
+    expect($counts['deadlock'])->toBe(0)
+        ->and($counts['error'])->toBe(0)
+        ->and(Order::query()->count())->toBe(1)
+        ->and(InventoryBalance::query()->findOrFail($variant->id)->reserved)->toBe(Order::query()->sole()->items()->sole()->quantity)
+        ->and(ConcurrencyHarness::inventoryInvariantViolations())->toBe([]);
+});
+
 test('orders placed alongside existing orders do not deadlock', function (int $existingOrders) {
     CheckoutScenario::seedExistingOrders($existingOrders);
     $rate = CheckoutScenario::shippingRate();
