@@ -53,11 +53,12 @@ Route::post('/checkout/pending/cancel', [CheckoutController::class, 'cancelPendi
     ->middleware('throttle:5,1')
     ->name('shop.checkout.pending.cancel');
 Route::get('/checkout/complete/{orderNumber}', [CheckoutController::class, 'success'])
+    ->middleware('sensitive')
     ->where('orderNumber', '[A-Z0-9-]{8,32}')
     ->name('shop.checkout.success');
 Route::get('/checkout/cancelled', [CheckoutController::class, 'cancel'])->name('shop.checkout.cancel');
 Route::get('/orders/guest/{orderNumber}', [OrderController::class, 'guestShow'])
-    ->middleware(['signed', 'throttle:30,1'])
+    ->middleware(['sensitive', 'signed:relative', 'throttle:30,1'])
     ->where('orderNumber', '[A-Z0-9-]{8,32}')
     ->name('shop.orders.guest-show');
 

@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsureActiveUser;
 use App\Http\Middleware\EnsureAdmin;
+use App\Http\Middleware\ProtectSensitivePage;
 use App\Http\Middleware\RequireVerifiedEmailForAuthenticated;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -20,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'active' => EnsureActiveUser::class,
             'admin' => EnsureAdmin::class,
+            'sensitive' => ProtectSensitivePage::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

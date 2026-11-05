@@ -67,6 +67,7 @@ test('guest order details require a signed unexpired order link', function () {
         'shop.orders.guest-show',
         $expiresAt,
         ['orderNumber' => $order->order_number],
+        false,
     );
     parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
     $order->guest_access_token_hash = hash('sha256', $query['signature']);

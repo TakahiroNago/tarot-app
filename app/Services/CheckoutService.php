@@ -13,6 +13,7 @@ use App\Models\Payment;
 use App\Models\ShippingRate;
 use App\Models\TaxRate;
 use App\Models\User;
+use DateTimeInterface;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
@@ -438,12 +439,8 @@ class CheckoutService
             ]);
 
             if ($guestAccessExpiresAt !== null) {
-                $guestOrderUrl = URL::temporarySignedRoute(
-                    'shop.orders.guest-show',
-                    $guestAccessExpiresAt,
-                    ['orderNumber' => $order->order_number],
-                );
-                parse_str((string) parse_url($guestOrderUrl, PHP_URL_QUERY), $signatureParameters);
+                $guestOrderPath = $this->signedGuestOrderPath($order->order_number, $guestAccessExpiresAt);
+                parse_str((string) parse_url($guestOrderPath, PHP_URL_QUERY), $signatureParameters);
                 $signature = $signatureParameters['signature'] ?? null;
                 if (! is_string($signature)) {
                     throw new RuntimeException('Could not generate the signed guest order URL.');
@@ -560,10 +557,19 @@ class CheckoutService
     {
         abort_unless($order->user_id === null && $order->guest_access_expires_at?->isFuture(), 404);
 
+        return url($this->signedGuestOrderPath($order->order_number, $order->guest_access_expires_at));
+    }
+
+    /**
+     * Signs the path alone, so a link written by a queue worker still opens on the public host.
+     */
+    private function signedGuestOrderPath(string $orderNumber, DateTimeInterface $expiresAt): string
+    {
         return URL::temporarySignedRoute(
             'shop.orders.guest-show',
-            $order->guest_access_expires_at,
-            ['orderNumber' => $order->order_number],
+            $expiresAt,
+            ['orderNumber' => $orderNumber],
+            false,
         );
     }
 
