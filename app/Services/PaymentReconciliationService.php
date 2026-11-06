@@ -142,7 +142,7 @@ class PaymentReconciliationService
         $payment = $this->paymentFor($order);
 
         try {
-            $session = $this->stripeBillingService->client()->checkout->sessions->retrieve($payment->provider_checkout_id);
+            $session = $this->stripeBillingService->ecommerceClient()->checkout->sessions->retrieve($payment->provider_checkout_id);
         } catch (ApiErrorException $exception) {
             report($exception);
 
@@ -201,7 +201,7 @@ class PaymentReconciliationService
         }
 
         try {
-            $refunds = $this->stripeBillingService->client()->refunds->all([
+            $refunds = $this->stripeBillingService->ecommerceClient()->refunds->all([
                 'payment_intent' => $payment->provider_payment_id,
                 'limit' => 100,
             ])->data;

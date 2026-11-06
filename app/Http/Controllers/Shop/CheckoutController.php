@@ -112,7 +112,7 @@ class CheckoutController extends Controller
 
         $user = $request->user();
         abort_unless($user === null || $user instanceof User, 403);
-        $stripeSecret = config('services.stripe.secret');
+        $stripeSecret = config('services.stripe.ecommerce_secret');
         if (! is_string($stripeSecret) || $stripeSecret === '') {
             return to_route('shop.checkout.index')
                 ->with('status', '決済サービスが準備中のため、注文を確定できません。時間をおいて再度お試しください。')

@@ -297,7 +297,7 @@ test('an event type the service does not handle is ignored', function () {
 });
 
 test('an event from the wrong Stripe mode changes nothing', function (string $secret, bool $livemode) {
-    config(['services.stripe.secret' => $secret]);
+    config(['services.stripe.ecommerce_secret' => $secret]);
     $this->payment->update(['provider_checkout_id' => 'cs_saved']);
 
     $sent = sendStripeEvent($this, 'checkout.session.completed', matchingSession($this, 'cs_saved'), ['livemode' => $livemode]);
@@ -313,7 +313,7 @@ test('an event from the wrong Stripe mode changes nothing', function (string $se
 ]);
 
 test('an event from the matching Stripe mode is applied', function (string $secret, bool $livemode) {
-    config(['services.stripe.secret' => $secret]);
+    config(['services.stripe.ecommerce_secret' => $secret]);
     $this->payment->update(['provider_checkout_id' => 'cs_saved']);
 
     sendStripeEvent($this, 'checkout.session.completed', matchingSession($this, 'cs_saved'), ['livemode' => $livemode])['response']->assertOk();

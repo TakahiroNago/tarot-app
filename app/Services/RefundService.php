@@ -39,7 +39,7 @@ class RefundService
         });
 
         try {
-            $refund = $this->stripeBillingService->client()->refunds->create([
+            $refund = $this->stripeBillingService->ecommerceClient()->refunds->create([
                 'payment_intent' => $payment->provider_payment_id,
             ], [
                 'idempotency_key' => 'ec-full-refund-'.$payment->id,

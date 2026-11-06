@@ -53,7 +53,7 @@ class StripeCheckoutSessionService
      */
     public function sessionFor(Order $order): Session
     {
-        $stripe = $this->stripeBillingService->client();
+        $stripe = $this->stripeBillingService->ecommerceClient();
         [$payment, $wasResend] = $this->claim($order);
 
         if (is_string($payment->provider_checkout_id)) {
@@ -125,7 +125,7 @@ class StripeCheckoutSessionService
      */
     public function sessionToCloseFor(Order $order, Payment $payment): ?Session
     {
-        $stripe = $this->stripeBillingService->client();
+        $stripe = $this->stripeBillingService->ecommerceClient();
 
         if (is_string($payment->provider_checkout_id)) {
             try {
@@ -151,7 +151,7 @@ class StripeCheckoutSessionService
      */
     public function expireOrFetch(string $sessionId): Session
     {
-        $stripe = $this->stripeBillingService->client();
+        $stripe = $this->stripeBillingService->ecommerceClient();
 
         try {
             return $stripe->checkout->sessions->expire($sessionId);
