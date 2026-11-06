@@ -18,6 +18,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Patterns are unanchored regular expressions unless written like this, and the framework
+        // skips the check in the local and testing environments.
+        $middleware->trustHosts(at: ['^iroca\.art-full-stack\.com$'], subdomains: false);
         $middleware->validateCsrfTokens(except: ['stripe/webhook', 'stripe/ecommerce/webhook']);
         $middleware->appendToGroup('web', RequireVerifiedEmailForAuthenticated::class);
         $middleware->alias([
