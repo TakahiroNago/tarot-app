@@ -90,6 +90,8 @@
                     <form class="admin-refund-form" method="POST" action="{{ route('admin.orders.refund', $order) }}">
                         @csrf
                         <p class="settings-note">全額返金のみ。返金後も在庫は自動で戻りません。返品受領・検品後に下の在庫復元操作を行ってください。</p>
+                        <label class="question-label" for="refund-note">返金理由</label>
+                        <input class="question-input" id="refund-note" name="refund_note" type="text" maxlength="500" value="{{ old('refund_note') }}" required>
                         <button class="danger-action" type="submit">Stripeで全額返金</button>
                     </form>
                 @endif
@@ -143,6 +145,19 @@
                         @endif
                     @endforeach
                 @endif
+
+                <h2>操作履歴</h2>
+                @forelse ($order->events as $event)
+                    <p class="settings-note">
+                        {{ $event->created_at->format('Y-m-d H:i') }} / {{ $event->event_type }} / {{ $event->actor?->email ?? '自動処理または削除済みユーザー' }}
+                        / 注文 {{ $event->from_status }} → {{ $event->to_status }}
+                        / 決済 {{ $event->from_payment_status }} → {{ $event->to_payment_status }}
+                        @if ($event->reason) / {{ $event->reason }} @endif
+                        @if ($event->note) / {{ $event->note }} @endif
+                    </p>
+                @empty
+                    <p class="settings-note">操作履歴はありません。</p>
+                @endforelse
 
                 <a class="text-link" href="{{ route('admin.orders.index') }}">注文一覧に戻る</a>
             </section>

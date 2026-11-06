@@ -366,7 +366,7 @@ test('refunding a mismatched payment returns what was received and releases the 
     $scenario = reviewOrder();
     payOrder($this, $scenario, ['amount_total' => 1]);
 
-    $status = app(RefundService::class)->refundFull($scenario['order']);
+    $status = app(RefundService::class)->refundFull($scenario['order'], User::factory()->admin()->create(), '返金理由');
 
     $order = $scenario['order']->fresh();
     expect($status)->toBe('succeeded')
@@ -398,7 +398,7 @@ test('a refunded review order has no sale, so it cannot be restocked', function 
     fakeRefunds()->willReturn('succeeded', 1);
     $scenario = reviewOrder();
     payOrder($this, $scenario, ['amount_total' => 1]);
-    app(RefundService::class)->refundFull($scenario['order']);
+    app(RefundService::class)->refundFull($scenario['order'], User::factory()->admin()->create(), '返金理由');
 
     $this->actingAs(User::factory()->admin()->create())
         ->post(route('admin.orders.items.restock', [$scenario['order'], $scenario['item']]), [
@@ -416,7 +416,7 @@ test('a review refund waits for the webhook, and a failure returns it to review'
     $scenario = reviewOrder(['status' => 'cancelled', 'payment_status' => 'failed', 'reservation_expires_at' => null], reserved: false);
     payOrder($this, $scenario);
 
-    expect(app(RefundService::class)->refundFull($scenario['order']))->toBe('pending')
+    expect(app(RefundService::class)->refundFull($scenario['order'], User::factory()->admin()->create(), '返金理由'))->toBe('pending')
         ->and($scenario['order']->fresh()->payment_status)->toBe('refund_pending')
         ->and($scenario['order']->fresh()->status)->toBe('payment_review');
 
@@ -445,7 +445,7 @@ test('a failed refund of a settled order returns it to paid', function () {
     fakeRefunds()->willReturn('pending', 1500);
     $scenario = reviewOrder();
     payOrder($this, $scenario);
-    app(RefundService::class)->refundFull($scenario['order']);
+    app(RefundService::class)->refundFull($scenario['order'], User::factory()->admin()->create(), '返金理由');
 
     reviewWebhook($this, 'refund.updated', [
         'object' => 'refund',
@@ -465,7 +465,7 @@ test('refunding a settled order keeps its stock and notifies the buyer', functio
     $scenario = reviewOrder();
     payOrder($this, $scenario);
 
-    app(RefundService::class)->refundFull($scenario['order']);
+    app(RefundService::class)->refundFull($scenario['order'], User::factory()->admin()->create(), '返金理由');
 
     expect($scenario['order']->fresh()->status)->toBe('refunded')
         ->and($scenario['balance']->fresh()->on_hand)->toBe(4);
@@ -477,7 +477,7 @@ test('a refund response smaller than the amount received is rejected', function 
     $scenario = reviewOrder();
     payOrder($this, $scenario);
 
-    expect(fn () => app(RefundService::class)->refundFull($scenario['order']))
+    expect(fn () => app(RefundService::class)->refundFull($scenario['order'], User::factory()->admin()->create(), '返金理由'))
         ->toThrow(ValidationException::class);
 
     expect($scenario['order']->fresh()->status)->toBe('paid');
@@ -487,7 +487,7 @@ test('payment events after a refund cannot reopen the order', function () {
     fakeRefunds()->willReturn('succeeded', 1500);
     $scenario = reviewOrder();
     payOrder($this, $scenario);
-    app(RefundService::class)->refundFull($scenario['order']);
+    app(RefundService::class)->refundFull($scenario['order'], User::factory()->admin()->create(), '返金理由');
 
     reviewWebhook($this, 'checkout.session.async_payment_succeeded', paidSessionFor($scenario['order'], $scenario['payment']))->assertOk();
 
