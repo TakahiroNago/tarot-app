@@ -2,8 +2,10 @@
 
 use App\Http\Middleware\EnsureActiveUser;
 use App\Http\Middleware\EnsureAdmin;
+use App\Http\Middleware\EnsureEcommerceEnabled;
 use App\Http\Middleware\ProtectSensitivePage;
 use App\Http\Middleware\RequireVerifiedEmailForAuthenticated;
+use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -21,8 +23,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'active' => EnsureActiveUser::class,
             'admin' => EnsureAdmin::class,
+            'ecommerce' => EnsureEcommerceEnabled::class,
             'sensitive' => ProtectSensitivePage::class,
         ]);
+        $middleware->prependToPriorityList(AuthenticatesRequests::class, EnsureEcommerceEnabled::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

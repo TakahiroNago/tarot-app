@@ -33,7 +33,7 @@ class CheckoutService
      */
     public function availableShippingRates(): Collection
     {
-        $today = today()->toDateString();
+        $today = $this->taxDate();
         $taxableCountries = TaxRate::query()
             ->where('is_active', true)
             ->whereDate('active_from', '<=', $today)
@@ -207,12 +207,13 @@ class CheckoutService
      */
     private function taxRateFor(array $data): TaxRate
     {
+        $today = $this->taxDate();
         $taxRates = TaxRate::query()
             ->where('country_code', $data['shipping_country_code'])
             ->where('is_active', true)
-            ->whereDate('active_from', '<=', today())
-            ->where(function ($query): void {
-                $query->whereNull('active_until')->orWhereDate('active_until', '>=', today());
+            ->whereDate('active_from', '<=', $today)
+            ->where(function ($query) use ($today): void {
+                $query->whereNull('active_until')->orWhereDate('active_until', '>=', $today);
             })
             ->get();
 
@@ -558,6 +559,14 @@ class CheckoutService
         abort_unless($order->user_id === null && $order->guest_access_expires_at?->isFuture(), 404);
 
         return url($this->signedGuestOrderPath($order->order_number, $order->guest_access_expires_at));
+    }
+
+    /**
+     * Today's date where tax rates change, which can differ from the application's own date.
+     */
+    private function taxDate(): string
+    {
+        return now(config('ecommerce.tax_timezone'))->toDateString();
     }
 
     /**

@@ -5,8 +5,10 @@
         <span class="brand-caption">TAROT JOURNAL</span>
     </a>
     <nav class="account-navigation" aria-label="アカウント">
-        <a href="{{ route('shop.products.index') }}">商品</a>
-        <a href="{{ route('shop.cart.index') }}">カート</a>
+        @if (config('ecommerce.enabled'))
+            <a href="{{ route('shop.products.index') }}">商品</a>
+            <a href="{{ route('shop.cart.index') }}">カート</a>
+        @endif
         @auth
             @if (isset($creditSummary))
                 <a
@@ -44,7 +46,9 @@
                     </div>
                     <a class="account-popover-link" href="{{ route('readings.index') }}">占い履歴</a>
                     <a class="account-popover-link" href="{{ route('account.settings.edit') }}">アカウント設定</a>
-                    <a class="account-popover-link" href="{{ route('account.orders.index') }}">注文履歴</a>
+                    @if (config('ecommerce.enabled'))
+                        <a class="account-popover-link" href="{{ route('account.orders.index') }}">注文履歴</a>
+                    @endif
                     @if (auth()->user()->isAdmin())
                         <a class="account-popover-link" href="{{ route('admin.users.index') }}">ユーザー管理</a>
                         <a class="account-popover-link" href="{{ route('admin.products.index') }}">商品管理</a>

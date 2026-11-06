@@ -44,5 +44,6 @@
         <env name="SESSION_DRIVER" value="array" force="true"/>
         <env name="STRIPE_SECRET" value="" force="true"/>
         <env name="EC_STRIPE_SECRET" value="" force="true"/>
+        <env name="EC_ENABLED" value="true" force="true"/>
     </php>
 </phpunit>
