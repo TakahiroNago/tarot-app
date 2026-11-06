@@ -10,6 +10,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Mail\Mailable;
+use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Throwable;
@@ -19,7 +20,13 @@ use Throwable;
  */
 abstract class SendOrderEmail implements ShouldBeUnique, ShouldQueue
 {
-    use Queueable;
+    use InteractsWithQueue, Queueable;
+
+    private const CLAIM_MINUTES = 10;
+
+    private const CLAIMED = 0;
+
+    private const ALREADY_SENT = -1;
 
     public int $uniqueFor = 600;
 
@@ -52,7 +59,17 @@ abstract class SendOrderEmail implements ShouldBeUnique, ShouldQueue
     {
         $order = Order::query()->with('items')->findOrFail($this->orderId);
 
-        if (! $this->shouldSend($order) || ! $this->claim()) {
+        if (! $this->shouldSend($order)) {
+            return;
+        }
+
+        $claim = $this->claim();
+        if ($claim === self::ALREADY_SENT) {
+            return;
+        }
+        if ($claim !== self::CLAIMED) {
+            $this->release($claim);
+
             return;
         }
 
@@ -80,9 +97,14 @@ abstract class SendOrderEmail implements ShouldBeUnique, ShouldQueue
         ]);
     }
 
-    private function claim(): bool
+    /**
+     * @return int The claim result, or how many seconds another attempt's claim has left. A worker
+     *             that died mid-send leaves that claim behind, so this job must come back after it
+     *             lapses rather than end as if the email had gone out.
+     */
+    private function claim(): int
     {
-        return DB::transaction(function (): bool {
+        return DB::transaction(function (): int {
             $email = $this->emailRecord()->lockForUpdate()->first();
 
             if ($email === null) {
@@ -95,10 +117,10 @@ abstract class SendOrderEmail implements ShouldBeUnique, ShouldQueue
             }
 
             if ($email->status === 'sent') {
-                return false;
+                return self::ALREADY_SENT;
             }
-            if ($email->status === 'sending' && $email->updated_at?->isAfter(now()->subMinutes(10))) {
-                return false;
+            if ($email->status === 'sending' && $email->updated_at?->isAfter(now()->subMinutes(self::CLAIM_MINUTES))) {
+                return (int) ceil(now()->diffInSeconds($email->updated_at->copy()->addMinutes(self::CLAIM_MINUTES))) + 1;
             }
 
             $email->status = 'sending';
@@ -106,7 +128,7 @@ abstract class SendOrderEmail implements ShouldBeUnique, ShouldQueue
             $email->failure_reason = null;
             $email->save();
 
-            return true;
+            return self::CLAIMED;
         });
     }
 

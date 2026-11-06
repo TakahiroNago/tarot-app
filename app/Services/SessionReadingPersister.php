@@ -5,9 +5,9 @@ namespace App\Services;
 use App\Models\Product;
 use App\Models\TarotReading;
 use App\Models\User;
-use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 use UnexpectedValueException;
 
 class SessionReadingPersister
@@ -58,9 +58,10 @@ class SessionReadingPersister
             if (array_key_exists('recommended_product_id', $reading)) {
                 $recommendationProductId = $reading['recommended_product_id'];
                 if ($recommendationProductId !== null && (! is_int($recommendationProductId) || $recommendationProductId < 1)) {
-                    throw new UnexpectedValueException('Session tarot reading recommendation has an invalid format.');
+                    report(new UnexpectedValueException('Session tarot reading recommendation has an invalid format.'));
+                } else {
+                    $recommendationProductIds[count($readings)] = $recommendationProductId;
                 }
-                $recommendationProductIds[count($readings)] = $recommendationProductId;
             }
             if ($hasCategory) {
                 $persistedReading['category'] = $reading['category'];
@@ -84,7 +85,7 @@ class SessionReadingPersister
                         'product_id' => $productStillExists ? $productId : null,
                         'selected_at' => now(),
                     ]);
-                } catch (QueryException $exception) {
+                } catch (Throwable $exception) {
                     report($exception);
                 }
             }

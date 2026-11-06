@@ -614,7 +614,7 @@ test('the admin page offers approval only when it is allowed', function () {
 
     $this->actingAs($admin)->get(route('admin.orders.show', $late['order']))
         ->assertOk()
-        ->assertSee('late_payment')
+        ->assertSee('予約解放後の支払い')
         ->assertSee(route('admin.orders.review.approve', $late['order']))
         ->assertSee(route('admin.orders.refund', $late['order']))
         ->assertDontSee(route('admin.orders.shipment.update', $late['order']));

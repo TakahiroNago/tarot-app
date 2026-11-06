@@ -21,4 +21,3 @@ test('verified users and guests can open public pages', function () {
     $this->get('/tarot')->assertOk();
     $this->actingAs(User::factory()->create())->get('/tarot')->assertOk();
 });
-

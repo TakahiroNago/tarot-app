@@ -37,7 +37,7 @@
 
 **タスク**
 
-- EC商品/variant/category/image/inventory/cart/order/payment/shipment関連のmigrationとモデル/Policyを設計・実装。
+- EC商品/variant/category/image/inventory/cart/order/payment/shipment関連のmigrationとモデルを設計・実装。認可はController検証とし、Policyは導入しない（決定済み）。
 - 外部キー、unique、CHECK対応、index、soft delete、注文スナップショットをレビュー。
 - 既存Stripe WebhookとEC決済の責任分界を分離。DB transactionでの副作用、event idempotencyを確立。
 - 開発/CI用のmigrationとseed/factoryを準備（既存データを破壊しない）。
@@ -45,7 +45,7 @@
 **テスト**
 
 - schema FK/unique/index、商品とvariant関係、カスケード/NULL化、User削除後の注文保持。
-- Admin/Policy認可、guest cart token所有確認。
+- Admin認可、guest cart token所有確認。
 - migration fresh適用と既存DBからのupgradeを別々に検証。
 - 既存認証、タロット、Stripeクレジット購入関連テストの回帰。
 
@@ -151,6 +151,32 @@
 - rollbackだけで注文/外部決済が失われない移行計画、バックアップからの復元確認、Webhook再処理手順、問い合わせ体制を承認。
 - 本番相当環境で決済テストモードの購入から発送までを完了。
 - 監視期間の重大な売越し、二重請求、状態不一致、個人情報露出が0件である。
+
+## 修正計画の結果
+
+レビュー結果に基づく修正（Phase 0〜12）は実装済み。上記の当初フェーズとは番号が異なる。
+
+| 修正Phase | 内容 |
+|---|---|
+| 0 | テスト基盤（Stripeフェイク、MySQL並行テスト） |
+| 1〜2 | 未確定注文の発送/在庫戻し禁止、`payment_review`の分離 |
+| 3〜4 | Stripeセッションの再試行、注文の同一性とカート |
+| 5〜6 | Webhook照合、Webhook未着時の定期照合 |
+| 7 | 並行シナリオ、在庫CHECK制約 |
+| 8〜9 | 注文確認画面、ゲスト注文URLとページ保護 |
+| 10〜11 | 停止ユーザーの購入禁止、操作履歴、推薦候補なしの固定 |
+| 12 | メール再試行、推薦エラーの隔離、カート掃除、日本語表示、表示時刻 |
+
+EC用のStripeキーはタロット用から分離済み（`EC_STRIPE_SECRET`）。
+
+### 公開前に残る作業
+
+- 特定商取引法ページの差し替えと、確認画面の表示項目・同意文の法務確認。規約の版は記録していない。
+- 本番環境の確認：MySQLバージョン（CHECK制約は8.0.16以上で有効）、スケジューラー、キューワーカー、信頼プロキシ。
+- 本番の環境変数：`EC_STRIPE_SECRET`、`EC_STRIPE_WEBHOOK_SECRET`、公開URLの`APP_URL`、`MAIL_MAILER`。
+- 本番Stripe：事業者情報、Webhookエンドポイントの登録（6イベント）、Linkの無効化、3Dセキュア、チャージバック通知の受信先。
+- 運用手順書（本番デプロイ、照合、返金、チャージバック）の作成。
+- 冒頭の「公開前の未決事項」の決定。
 
 ## リリースブロッカー
 

@@ -32,8 +32,8 @@
                                 @foreach ($orders as $order)
                                     <tr>
                                         <td>{{ $order->order_number }}</td>
-                                        <td>{{ $order->created_at->format('Y年m月d日') }}</td>
-                                        <td>{{ $order->status }}</td>
+                                        <td>{{ \App\Support\DisplayTime::format($order->created_at, 'Y年m月d日') }}</td>
+                                        <td>{{ \App\Support\OrderStatusLabel::order($order->status) }}</td>
                                         <td>¥{{ number_format($order->total_minor) }}</td>
                                         <td><a class="secondary-action" href="{{ route('account.orders.show', $order) }}">詳細</a></td>
                                     </tr>

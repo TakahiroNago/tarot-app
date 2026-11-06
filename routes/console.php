@@ -10,3 +10,4 @@ Artisan::command('inspire', function () {
 
 Schedule::command('ecommerce:expire-reservations')->everyMinute()->withoutOverlapping(10);
 Schedule::command('ecommerce:audit-inventory')->dailyAt('03:00')->withoutOverlapping(60);
+Schedule::command('ecommerce:prune-carts')->dailyAt('03:30')->withoutOverlapping(60);

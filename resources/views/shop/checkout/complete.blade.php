@@ -22,8 +22,8 @@
                 @endif
                 <dl class="user-details">
                     <div><dt>注文番号</dt><dd>{{ $order->order_number }}</dd></div>
-                    <div><dt>注文状態</dt><dd>{{ $order->status }}</dd></div>
-                    <div><dt>決済状態</dt><dd>{{ $order->payment_status }}</dd></div>
+                    <div><dt>注文状態</dt><dd>{{ \App\Support\OrderStatusLabel::order($order->status) }}</dd></div>
+                    <div><dt>決済状態</dt><dd>{{ \App\Support\OrderStatusLabel::payment($order->payment_status) }}</dd></div>
                     <div><dt>合計</dt><dd>¥{{ number_format($order->total_minor) }}</dd></div>
                 </dl>
                 @if (is_string($guestOrderUrl))
