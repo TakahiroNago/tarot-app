@@ -42,8 +42,12 @@
 
                 <h2>配送先</h2>
                 <dl class="user-details">
-                    <div><dt>宛名</dt><dd>{{ $order->shipping_recipient }}</dd></div>
-                    <div><dt>住所</dt><dd>{{ $order->shipping_country_code }} {{ $order->shipping_postal_code }} {{ $order->shipping_region }} {{ $order->shipping_city }} {{ $order->shipping_address_line1 }} {{ $order->shipping_address_line2 }}</dd></div>
+                    @if ($showsFullAddress)
+                        <div><dt>宛名</dt><dd>{{ $order->shipping_recipient }}</dd></div>
+                        <div><dt>住所</dt><dd>{{ $order->shipping_country_code }} {{ $order->shipping_postal_code }} {{ $order->shipping_region }} {{ $order->shipping_city }} {{ $order->shipping_address_line1 }} {{ $order->shipping_address_line2 }}</dd></div>
+                    @else
+                        <div><dt>配送先の地域</dt><dd>{{ $order->shipping_country_code }} {{ $order->shipping_region }} {{ $order->shipping_city }}</dd></div>
+                    @endif
                     <div><dt>配送方法</dt><dd>{{ $order->shipping_method_name }}</dd></div>
                     @foreach ($order->shipments as $shipment)
                         <div><dt>発送状況</dt><dd>{{ \App\Support\OrderStatusLabel::shipment($shipment->status) }} @if ($shipment->carrier_name) / {{ $shipment->carrier_name }} @endif @if ($shipment->tracking_number) / {{ $shipment->tracking_number }} @endif</dd></div>
@@ -51,7 +55,7 @@
                 </dl>
                 @if ($order->user_id !== null)
                     <a class="text-link" href="{{ route('account.orders.index') }}">購入履歴に戻る</a>
-                @else
+                @elseif (config('ecommerce.enabled'))
                     <a class="text-link" href="{{ route('shop.products.index') }}">ショップに戻る</a>
                 @endif
             </section>

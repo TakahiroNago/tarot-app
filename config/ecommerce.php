@@ -9,7 +9,8 @@ return [
     |
     | Off unless explicitly turned on, and any value that is not clearly "on"
     | keeps the shop closed. Stripe webhooks, scheduled reconciliation and the
-    | admin pages keep working while closed, so orders already paid still settle.
+    | admin pages keep working while closed, so orders already paid still settle,
+    | and customers can still see their payment result and their own orders.
     |
     */
 

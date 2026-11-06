@@ -15,7 +15,9 @@
                 <h1>購入履歴</h1>
                 @if ($orders->isEmpty())
                     <p class="history-empty">購入履歴はありません。</p>
-                    <a class="primary-action" href="{{ route('shop.products.index') }}">商品を見る <span class="action-arrow" aria-hidden="true">→</span></a>
+                    @if (config('ecommerce.enabled'))
+                        <a class="primary-action" href="{{ route('shop.products.index') }}">商品を見る <span class="action-arrow" aria-hidden="true">→</span></a>
+                    @endif
                 @else
                     <div class="admin-table-wrap">
                         <table class="admin-table">

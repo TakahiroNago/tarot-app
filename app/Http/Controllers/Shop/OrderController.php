@@ -29,10 +29,10 @@ class OrderController extends Controller
         abort_unless($user instanceof User, 403);
 
         $order = $user->orders()
-            ->with(['items', 'payments', 'shipments'])
+            ->with(['items', 'shipments'])
             ->findOrFail($order->id);
 
-        return view('account.orders.show', compact('order'));
+        return view('account.orders.show', ['order' => $order, 'showsFullAddress' => true]);
     }
 
     public function guestShow(Request $request, string $orderNumber): View
@@ -51,8 +51,9 @@ class OrderController extends Controller
             404,
         );
 
-        $order->load(['items', 'payments', 'shipments']);
+        $order->load(['items', 'shipments']);
 
-        return view('account.orders.show', compact('order'));
+        // The link travels by mail and can be forwarded, so it shows no name or exact address.
+        return view('account.orders.show', ['order' => $order, 'showsFullAddress' => false]);
     }
 }

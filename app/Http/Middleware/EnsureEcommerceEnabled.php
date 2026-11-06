@@ -7,8 +7,9 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Answers as if the shop did not exist while it is closed. It runs before authentication and route
- * model binding, so a closed shop neither reveals its pages nor queries its tables.
+ * Answers as if the shop's selling pages did not exist while it is closed. It runs before
+ * authentication and route model binding, so a closed shop neither reveals them nor queries its
+ * tables. Pages that show a customer's existing order are deliberately not behind this.
  */
 class EnsureEcommerceEnabled
 {

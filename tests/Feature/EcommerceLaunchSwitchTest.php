@@ -18,7 +18,6 @@ use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\URL;
 use OpenAI\Laravel\Facades\OpenAI;
 use OpenAI\Responses\Chat\CreateResponse;
 use Stripe\WebhookSignature;
@@ -120,7 +119,7 @@ test('the switch stays closed unless it is clearly on', function (bool $expected
     }
 })->with(switchEnvValues());
 
-test('every public shop route is behind the switch', function () {
+test('only the pages showing an existing order are outside the switch', function () {
     $publicShopRoutes = collect(Route::getRoutes()->getRoutes())->filter(function (RoutingRoute $route): bool {
         $controller = (string) $route->getActionName();
 
@@ -129,12 +128,18 @@ test('every public shop route is behind the switch', function () {
 
     $unprotected = $publicShopRoutes
         ->reject(fn (RoutingRoute $route): bool => in_array('ecommerce', $route->gatherMiddleware(), true))
-        ->map(fn (RoutingRoute $route): string => $route->uri())
+        ->map(fn (RoutingRoute $route): ?string => $route->getName())
+        ->sort()
         ->values()
         ->all();
 
     expect($publicShopRoutes->count())->toBeGreaterThanOrEqual(17)
-        ->and($unprotected)->toBe([]);
+        ->and($unprotected)->toBe([
+            'account.orders.index',
+            'account.orders.show',
+            'shop.checkout.success',
+            'shop.orders.guest-show',
+        ]);
 });
 
 test('nothing outside the shop is behind the switch', function () {
@@ -148,7 +153,7 @@ test('nothing outside the shop is behind the switch', function () {
     expect($outsideTheShop)->toBe([]);
 });
 
-test('a closed shop answers 404 on every route, for anyone', function (string $method, Closure $url, Closure $actor) {
+test('a closed shop answers 404 on every selling route, for anyone', function (string $method, Closure $url, Closure $actor) {
     $user = User::factory()->create();
     $product = switchProduct();
     $cart = Cart::query()->create(['user_id' => $user->id]);
@@ -179,23 +184,12 @@ test('a closed shop answers 404 on every route, for anyone', function (string $m
     'place order' => ['POST', fn () => route('shop.checkout.store')],
     'resume payment' => ['POST', fn () => route('shop.checkout.pending.resume')],
     'cancel pending order' => ['POST', fn () => route('shop.checkout.pending.cancel')],
-    'payment result' => ['GET', fn ($product, $item, Order $order) => route('shop.checkout.success', ['orderNumber' => $order->order_number]).'?session_id=cs_'.$order->order_number],
     'payment cancelled' => ['GET', fn () => route('shop.checkout.cancel')],
-    'order history' => ['GET', fn () => route('account.orders.index')],
-    'order detail' => ['GET', fn ($product, $item, Order $order) => route('account.orders.show', $order)],
 ])->with([
     'guest' => [fn () => null],
     'member' => [fn (User $user) => $user],
     'admin' => [fn () => User::factory()->admin()->create()],
 ]);
-
-test('a valid guest order link also answers 404 while closed', function () {
-    $order = switchOrder(['guest_access_expires_at' => now()->addDay()]);
-    closeShop();
-    $url = URL::temporarySignedRoute('shop.orders.guest-show', now()->addDay(), ['orderNumber' => $order->order_number], false);
-
-    $this->get($url)->assertNotFound();
-});
 
 test('a suspended user is not logged out by a closed shop', function () {
     closeShop();
@@ -280,6 +274,47 @@ test('site navigation hides the shop while closed', function () {
             ->assertDontSee(route('shop.cart.index'))
             ->assertDontSee(route('account.orders.index'));
     }
+});
+
+test('while closed, the order history menu appears only for members with orders', function () {
+    $withOrder = User::factory()->create();
+    switchOrder(['user_id' => $withOrder->id]);
+    $withoutOrder = User::factory()->create();
+    closeShop();
+
+    $this->actingAs($withOrder)->get(route('home'))
+        ->assertOk()
+        ->assertSee(route('account.orders.index'))
+        ->assertDontSee(route('shop.products.index'))
+        ->assertDontSee(route('shop.cart.index'));
+
+    $this->actingAs($withoutOrder)->get(route('home'))
+        ->assertOk()
+        ->assertDontSee(route('account.orders.index'));
+});
+
+test('another member\'s order does not make the menu appear', function () {
+    switchOrder(['user_id' => User::factory()->create()->id]);
+    switchOrder();
+    closeShop();
+
+    $this->actingAs(User::factory()->create())->get(route('home'))
+        ->assertOk()
+        ->assertDontSee(route('account.orders.index'));
+});
+
+test('the site header survives the order table being unavailable', function () {
+    $user = User::factory()->create();
+    closeShop();
+    Schema::rename('ec_orders', 'ec_orders_missing');
+
+    try {
+        $response = $this->actingAs($user)->get(route('home'));
+    } finally {
+        Schema::rename('ec_orders_missing', 'ec_orders');
+    }
+
+    $response->assertOk()->assertDontSee(route('account.orders.index'));
 });
 
 test('site navigation shows the shop while open', function () {

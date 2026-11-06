@@ -55,16 +55,19 @@ Route::middleware('ecommerce')->group(function () {
             ->middleware('throttle:5,1')
             ->name('shop.checkout.pending.cancel');
     });
-    Route::get('/checkout/complete/{orderNumber}', [CheckoutController::class, 'success'])
-        ->middleware('sensitive')
-        ->where('orderNumber', '[A-Z0-9-]{8,32}')
-        ->name('shop.checkout.success');
     Route::get('/checkout/cancelled', [CheckoutController::class, 'cancel'])->name('shop.checkout.cancel');
-    Route::get('/orders/guest/{orderNumber}', [OrderController::class, 'guestShow'])
-        ->middleware(['sensitive', 'signed:relative', 'throttle:30,1'])
-        ->where('orderNumber', '[A-Z0-9-]{8,32}')
-        ->name('shop.orders.guest-show');
 });
+
+// Pages showing an existing order stay open while the shop is closed, so a customer can still see
+// what they paid for. Each one shows only an order the visitor can prove is theirs.
+Route::get('/checkout/complete/{orderNumber}', [CheckoutController::class, 'success'])
+    ->middleware(['sensitive', 'throttle:30,1'])
+    ->where('orderNumber', '[A-Z0-9-]{8,32}')
+    ->name('shop.checkout.success');
+Route::get('/orders/guest/{orderNumber}', [OrderController::class, 'guestShow'])
+    ->middleware(['sensitive', 'signed:relative', 'throttle:30,1'])
+    ->where('orderNumber', '[A-Z0-9-]{8,32}')
+    ->name('shop.orders.guest-show');
 
 Route::post('/tarot/draw', [TarotController::class, 'draw'])->name('tarot.draw');
 Route::post('/tarot/daily', [TarotController::class, 'daily'])->middleware('auth')->name('tarot.daily');
@@ -136,10 +139,8 @@ Route::middleware(['auth', 'active', 'verified'])->prefix('account')->name('acco
     Route::get('/settings', [AccountSettingsController::class, 'edit'])->name('settings.edit');
     Route::put('/settings', [AccountSettingsController::class, 'update'])->name('settings.update');
     Route::delete('/settings', [AccountSettingsController::class, 'destroy'])->name('settings.destroy');
-    Route::middleware('ecommerce')->group(function () {
-        Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
-        Route::get('/orders/{order}', [OrderController::class, 'show'])->name('orders.show');
-    });
+    Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
+    Route::get('/orders/{order}', [OrderController::class, 'show'])->middleware('sensitive')->name('orders.show');
 });
 
 Route::prefix('admin')->name('admin.')->middleware(['auth', 'active', 'verified', 'admin'])->group(function () {
