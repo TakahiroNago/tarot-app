@@ -44,7 +44,7 @@ beforeEach(function () {
         'services.stripe.ecommerce_webhook_secret' => 'whsec_reconcile_test',
     ]);
     $this->sessions = FakeStripeBillingService::install(app());
-    $this->refunds = app(StripeBillingService::class)->client()->fakeRefunds;
+    $this->refunds = app(StripeBillingService::class)->ecommerceClient()->fakeRefunds;
 
     $this->user = User::factory()->create();
     $this->cart = Cart::query()->create(['user_id' => $this->user->id]);
@@ -476,7 +476,7 @@ test('both jobs are scheduled', function () {
 
 test('the service resolves without a configured Stripe key for orders that never reached Stripe', function () {
     app()->forgetInstance(StripeBillingService::class);
-    config(['services.stripe.secret' => null]);
+    config(['services.stripe.ecommerce_secret' => null]);
     $order = Order::query()->create([
         'order_number' => 'ECNOTSTARTED01',
         'idempotency_key' => str_repeat('d', 64),

@@ -269,7 +269,8 @@ test('checkout remains unavailable until shipping and tax rules are configured',
 });
 
 test('checkout does not reserve stock when Stripe is not configured', function () {
-    config()->set('services.stripe.secret', null);
+    config()->set('services.stripe.ecommerce_secret', null);
+    config()->set('services.stripe.secret', 'sk_test_tarot_account_key');
 
     $user = User::factory()->create();
     $cart = Cart::query()->create(['user_id' => $user->id]);

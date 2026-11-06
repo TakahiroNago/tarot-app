@@ -48,8 +48,9 @@ return [
     'stripe' => [
         'secret' => env('STRIPE_SECRET'),
         'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+        'ecommerce_secret' => env('EC_STRIPE_SECRET'),
         'ecommerce_webhook_secret' => env('EC_STRIPE_WEBHOOK_SECRET'),
-        'ca_bundle' => env('STRIPE_CA_BUNDLE', ini_get('curl.cainfo') ?: null),
+        'ca_bundle' => env('STRIPE_CA_BUNDLE') ?: (ini_get('curl.cainfo') ?: null),
     ],
 
 ];

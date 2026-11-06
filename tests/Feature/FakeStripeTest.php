@@ -125,13 +125,13 @@ test('sessions can be retrieved, listed, paid, and expired', function () {
 test('the fake client refuses services it does not implement', function () {
     FakeStripeBillingService::install(app());
 
-    expect(fn () => app(StripeBillingService::class)->client()->customers)->toThrow(LogicException::class);
+    expect(fn () => app(StripeBillingService::class)->ecommerceClient()->customers)->toThrow(LogicException::class);
 });
 
 test('the fake client refuses every SDK route to the HTTP layer', function (Closure $call) {
     FakeStripeBillingService::install(app());
 
-    expect(fn () => $call(app(StripeBillingService::class)->client()))->toThrow(LogicException::class);
+    expect(fn () => $call(app(StripeBillingService::class)->ecommerceClient()))->toThrow(LogicException::class);
 })->with([
     'getService' => [fn (StripeClient $client) => $client->getService('customers')],
     'request' => [fn (StripeClient $client) => $client->request('get', '/v1/customers', [], [])],

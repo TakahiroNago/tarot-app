@@ -158,7 +158,7 @@ function fakeRefunds(): FakeStripeRefunds
 {
     FakeStripeBillingService::install(app());
 
-    return app(StripeBillingService::class)->client()->fakeRefunds;
+    return app(StripeBillingService::class)->ecommerceClient()->fakeRefunds;
 }
 
 /**

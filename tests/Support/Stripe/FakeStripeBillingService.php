@@ -22,12 +22,12 @@ class FakeStripeBillingService extends StripeBillingService
     {
         $sessions ??= new FakeStripeCheckoutSessions;
         $app->instance(StripeBillingService::class, new self(new FakeStripeClient($sessions)));
-        $app['config']->set('services.stripe.secret', 'sk_test_fake_never_sent');
+        $app['config']->set('services.stripe.ecommerce_secret', 'sk_test_fake_never_sent');
 
         return $sessions;
     }
 
-    public function client(): StripeClient
+    public function ecommerceClient(): StripeClient
     {
         return $this->fakeClient;
     }

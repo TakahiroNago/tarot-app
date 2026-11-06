@@ -12,13 +12,19 @@ use Stripe\Stripe;
 use Stripe\StripeClient;
 
 /**
- * Stripe foundation kept for future one-time payments (EC). Subscription plans have been removed.
+ * Reaches two separate Stripe accounts: the shop's, and the one holding tarot customers.
+ *
+ * Subscription plans have been removed.
  */
 class StripeBillingService
 {
-    public function client(): StripeClient
+    /**
+     * Orders, sessions and refunds exist only in the shop's account, so a missing key
+     * must stop the shop rather than fall back to the tarot account.
+     */
+    public function ecommerceClient(): StripeClient
     {
-        return $this->stripe();
+        return $this->clientFor(config('services.stripe.ecommerce_secret'), 'The ecommerce Stripe secret key is not configured.');
     }
 
     public function handleWebhook(Event $event): void
@@ -86,9 +92,13 @@ class StripeBillingService
 
     private function stripe(): StripeClient
     {
-        $secret = config('services.stripe.secret');
+        return $this->clientFor(config('services.stripe.secret'), 'Stripe secret key is not configured.');
+    }
+
+    private function clientFor(mixed $secret, string $missingKeyMessage): StripeClient
+    {
         if (! is_string($secret) || $secret === '') {
-            throw new RuntimeException('Stripe secret key is not configured.');
+            throw new RuntimeException($missingKeyMessage);
         }
 
         $caBundle = config('services.stripe.ca_bundle');

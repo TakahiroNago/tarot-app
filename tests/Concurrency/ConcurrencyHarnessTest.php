@@ -51,7 +51,8 @@ test('the suite is connected to the disposable InnoDB database and did not load 
         ->and(strtolower($server->engine))->toBe('innodb')
         ->and(strtolower($tableEngine->engine))->toBe('innodb')
         ->and(env('CONCURRENCY_ENV_FILE_SENTINEL'))->toBeNull()
-        ->and(config('services.stripe.secret'))->toBeEmpty();
+        ->and(config('services.stripe.secret'))->toBeEmpty()
+        ->and(config('services.stripe.ecommerce_secret'))->toBeEmpty();
 });
 
 test('the schema is not rebuilt when unknown tables exist without the marker', function () {

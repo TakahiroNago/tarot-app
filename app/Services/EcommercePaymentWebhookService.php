@@ -80,7 +80,7 @@ class EcommercePaymentWebhookService
      */
     private function isFromTheWrongStripeMode(Event $event): bool
     {
-        $secret = config('services.stripe.secret');
+        $secret = config('services.stripe.ecommerce_secret');
         if (! is_string($secret) || preg_match('/\A[a-z]+_(live|test)_/', $secret, $matches) !== 1) {
             return false;
         }
@@ -239,7 +239,7 @@ class EcommercePaymentWebhookService
     {
         DB::afterCommit(function () use ($sessionId): void {
             try {
-                $this->stripeBillingService->client()->checkout->sessions->expire($sessionId);
+                $this->stripeBillingService->ecommerceClient()->checkout->sessions->expire($sessionId);
             } catch (Throwable $exception) {
                 report($exception);
             }

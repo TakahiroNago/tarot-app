@@ -49,3 +49,18 @@ test('signed webhook events are recorded once', function () {
 
     expect(DB::table('stripe_webhook_events')->where('stripe_event_id', 'evt_test_once')->count())->toBe(1);
 });
+
+test('the CA bundle setting chooses the certificates used for Stripe', function (string $configured, ?string $expected) {
+    $_ENV['STRIPE_CA_BUNDLE'] = $_SERVER['STRIPE_CA_BUNDLE'] = $configured;
+
+    try {
+        $caBundle = (require config_path('services.php'))['stripe']['ca_bundle'];
+    } finally {
+        unset($_ENV['STRIPE_CA_BUNDLE'], $_SERVER['STRIPE_CA_BUNDLE']);
+    }
+
+    expect($caBundle)->toBe($expected);
+})->with([
+    'an empty value uses the PHP setting' => ['', ini_get('curl.cainfo') ?: null],
+    'an explicit path wins' => ['C:\\certificates\\custom.pem', 'C:\\certificates\\custom.pem'],
+]);
