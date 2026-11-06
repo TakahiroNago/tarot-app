@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Database\Factories\InventoryBalanceFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -10,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable(['variant_id', 'on_hand', 'reserved'])]
 class InventoryBalance extends Model
 {
-    /** @use HasFactory<\Database\Factories\InventoryBalanceFactory> */
+    /** @use HasFactory<InventoryBalanceFactory> */
     use HasFactory;
 
     protected $table = 'ec_inventory_balances';

@@ -15,9 +15,9 @@
                 <h1>注文詳細</h1>
                 <dl class="user-details">
                     <div><dt>注文番号</dt><dd>{{ $order->order_number }}</dd></div>
-                    <div><dt>注文日</dt><dd>{{ $order->created_at->format('Y年m月d日 H:i') }}</dd></div>
-                    <div><dt>注文状態</dt><dd>{{ $order->status }}</dd></div>
-                    <div><dt>決済状態</dt><dd>{{ $order->payment_status }}</dd></div>
+                    <div><dt>注文日</dt><dd>{{ \App\Support\DisplayTime::format($order->created_at, 'Y年m月d日 H:i') }}</dd></div>
+                    <div><dt>注文状態</dt><dd>{{ \App\Support\OrderStatusLabel::order($order->status) }}</dd></div>
+                    <div><dt>決済状態</dt><dd>{{ \App\Support\OrderStatusLabel::payment($order->payment_status) }}</dd></div>
                 </dl>
 
                 <h2>注文商品</h2>
@@ -46,7 +46,7 @@
                     <div><dt>住所</dt><dd>{{ $order->shipping_country_code }} {{ $order->shipping_postal_code }} {{ $order->shipping_region }} {{ $order->shipping_city }} {{ $order->shipping_address_line1 }} {{ $order->shipping_address_line2 }}</dd></div>
                     <div><dt>配送方法</dt><dd>{{ $order->shipping_method_name }}</dd></div>
                     @foreach ($order->shipments as $shipment)
-                        <div><dt>発送状況</dt><dd>{{ $shipment->status }} @if ($shipment->carrier_name) / {{ $shipment->carrier_name }} @endif @if ($shipment->tracking_number) / {{ $shipment->tracking_number }} @endif</dd></div>
+                        <div><dt>発送状況</dt><dd>{{ \App\Support\OrderStatusLabel::shipment($shipment->status) }} @if ($shipment->carrier_name) / {{ $shipment->carrier_name }} @endif @if ($shipment->tracking_number) / {{ $shipment->tracking_number }} @endif</dd></div>
                     @endforeach
                 </dl>
                 @if ($order->user_id !== null)

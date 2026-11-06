@@ -85,7 +85,7 @@ erDiagram
 
 | テーブル | 主な列・制約案 | 用途/注意 |
 |---|---|---|
-| `tarot_reading_product_recommendations` | id, tarot_reading_id unique FK, product_id FK, selected_at, timestamps | ログインユーザーの1結果に対する推薦を固定。タロット本体にEC列を追加しない。参照中商品は物理削除しない |
+| `tarot_reading_product_recommendations` | id, tarot_reading_id unique FK, product_id nullable FK, selected_at, timestamps | ログインユーザーの1結果に対する推薦を固定。`product_id`がNULLの行は「評価済みで候補なし」を表し、後から商品が増えても結果を変えない。DBエラー時は行を作らず次回再評価する。タロット本体にEC列を追加しない。参照中商品は物理削除しない |
 
 ゲスト結果は現状DBに保存せず、sessionに保存している。ゲスト推薦も同じ商品を示すには、選択IDをセッション結果に含め、共有URL用Cacheにも最小限の推薦IDを同時に保持する。共有Cacheは既存の30日期限に従い、推薦情報欠落/無効でも占いを表示する。
 

@@ -6,15 +6,19 @@ use App\Models\Product;
 use App\Models\TarotReading;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 use UnexpectedValueException;
 
+/**
+ * A recommendation is an extra on a reading the customer has already paid a credit for, so a failure
+ * here is reported and never reaches the caller, where it could stop the reading or refund the credit.
+ */
 class ProductRecommendationService
 {
     /**
      * A reading is checked once. Having no candidate is recorded too, so the result does not change
-     * later, while a database error records nothing and the next view checks again.
+     * later, while an error records nothing and the next view checks again.
      */
     public function forReading(TarotReading $reading): ?Product
     {
@@ -36,7 +40,7 @@ class ProductRecommendationService
 
                 return $this->findById($product?->id);
             });
-        } catch (QueryException $exception) {
+        } catch (Throwable $exception) {
             report($exception);
 
             return null;
@@ -54,7 +58,9 @@ class ProductRecommendationService
                 return null;
             }
             if (! is_int($productId) || $productId < 1) {
-                throw new UnexpectedValueException('Session product recommendation has an invalid format.');
+                report(new UnexpectedValueException('Session product recommendation has an invalid format.'));
+
+                return null;
             }
 
             return $this->findById($productId);
@@ -62,7 +68,7 @@ class ProductRecommendationService
 
         try {
             $product = $this->eligibleProducts()->inRandomOrder()->first();
-        } catch (QueryException $exception) {
+        } catch (Throwable $exception) {
             report($exception);
 
             return null;
@@ -85,7 +91,7 @@ class ProductRecommendationService
                     'variants' => fn (HasMany $query) => $query->where('is_active', true)->orderBy('id'),
                 ])
                 ->find($productId);
-        } catch (QueryException $exception) {
+        } catch (Throwable $exception) {
             report($exception);
 
             return null;

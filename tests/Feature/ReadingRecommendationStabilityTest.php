@@ -7,8 +7,10 @@ use App\Models\TarotReading;
 use App\Models\TarotReadingProductRecommendation;
 use App\Models\User;
 use App\Services\ProductRecommendationService;
+use App\Services\ReadingCreditService;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Schema;
 use OpenAI\Laravel\Facades\OpenAI;
@@ -166,6 +168,118 @@ test('a reading still appears when the recommendation cannot be checked', functi
     });
 
     expect($user->tarotReadings()->count())->toBe(1);
+});
+
+test('any recommendation failure leaves the reading on screen and the credit spent', function () {
+    fakeReadingResponses();
+    recommendableProduct();
+    $user = User::factory()->create();
+    $credits = app(ReadingCreditService::class);
+    $before = $credits->balance($user)['total'];
+    Product::retrieved(fn () => throw new RuntimeException('recommendation broke'));
+
+    $this->actingAs($user)
+        ->post(route('tarot.draw'), ['question' => 'A question?'])
+        ->assertOk()
+        ->assertViewHas('interpretation', 'An interpretation.')
+        ->assertViewHas('recommendedProduct', null);
+
+    expect($credits->balance($user)['total'])->toBe($before - 1)
+        ->and($user->tarotReadings()->count())->toBe(1);
+});
+
+test('any recommendation failure leaves a guest reading on screen and the trial spent', function () {
+    fakeReadingResponses();
+    recommendableProduct();
+    Product::retrieved(fn () => throw new RuntimeException('recommendation broke'));
+
+    $this->post(route('tarot.draw'), ['question' => 'A question?'])
+        ->assertOk()
+        ->assertViewHas('interpretation', 'An interpretation.')
+        ->assertViewHas('recommendedProduct', null);
+
+    expect(session('tarot_readings'))->toHaveCount(1);
+});
+
+test('broken recommendation data in a guest session does not stop the reading page', function () {
+    $this->withSession(['tarot_readings' => [sessionReading(['recommended_product_id' => 'not-a-number'])]])
+        ->get(route('readings.show', 'session-0'))
+        ->assertOk()
+        ->assertSee('A reading before registration.')
+        ->assertViewHas('recommendedProduct', null);
+});
+
+test('broken recommendation data does not stop a guest from registering', function () {
+    $product = recommendableProduct();
+
+    $user = registerWithSessionReading($this, sessionReading(['recommended_product_id' => 'not-a-number']));
+
+    $reading = $user->tarotReadings()->sole();
+    expect($reading->productRecommendation()->exists())->toBeFalse()
+        ->and(app(ProductRecommendationService::class)->forReading($reading)->is($product))->toBeTrue();
+});
+
+test('broken recommendation data does not stop a shared reading', function () {
+    $token = str_repeat('a', 64);
+    Cache::put('public_reading_share:'.hash('sha256', $token), sessionReading(['recommended_product_id' => 'not-a-number']), now()->addDay());
+
+    $this->get(route('readings.share', ['token' => $token]))
+        ->assertOk()
+        ->assertSee('A reading before registration.')
+        ->assertViewHas('recommendedProduct', null);
+});
+
+test('a shared reading with a broken reading itself is still refused', function () {
+    $token = str_repeat('b', 64);
+    Cache::put('public_reading_share:'.hash('sha256', $token), ['question' => 'Only a question'], now()->addDay());
+
+    $this->get(route('readings.share', ['token' => $token]))->assertServerError();
+});
+
+test('an unavailable product shows its name without its image', function (array $attributes, bool $softDeleted) {
+    $product = Product::factory()->create($attributes);
+    $product->images()->create(['storage_disk' => 'public', 'path' => 'products/hidden.jpg', 'sort_order' => 0]);
+    if ($softDeleted) {
+        $product->delete();
+    }
+    $reading = savedReading();
+    $reading->productRecommendation()->create(['product_id' => $product->id, 'selected_at' => now()]);
+
+    $this->actingAs($reading->user)
+        ->get(route('readings.show', $reading->id))
+        ->assertOk()
+        ->assertSee($product->name)
+        ->assertSee('この商品は現在ご購入いただけません。')
+        ->assertDontSee('products/hidden.jpg');
+})->with([
+    'archived' => [['status' => 'archived'], false],
+    'draft' => [['status' => 'draft'], false],
+    'deleted' => [['status' => 'published'], true],
+]);
+
+test('an available product shows its image', function () {
+    $product = Product::factory()->create(['status' => 'published']);
+    $product->images()->create(['storage_disk' => 'public', 'path' => 'products/shown.jpg', 'sort_order' => 0]);
+    $reading = savedReading();
+    $reading->productRecommendation()->create(['product_id' => $product->id, 'selected_at' => now()]);
+
+    $this->actingAs($reading->user)
+        ->get(route('readings.show', $reading->id))
+        ->assertOk()
+        ->assertSee('products/shown.jpg');
+});
+
+test('an image that cannot be located does not stop the reading page', function () {
+    $product = Product::factory()->create(['status' => 'published']);
+    $product->images()->create(['storage_disk' => 'no_such_disk', 'path' => 'products/lost.jpg', 'sort_order' => 0]);
+    $reading = savedReading();
+    $reading->productRecommendation()->create(['product_id' => $product->id, 'selected_at' => now()]);
+
+    $this->actingAs($reading->user)
+        ->get(route('readings.show', $reading->id))
+        ->assertOk()
+        ->assertSee($product->name)
+        ->assertDontSee('products/lost.jpg');
 });
 
 test('registering keeps a guest reading that had no candidate empty', function () {

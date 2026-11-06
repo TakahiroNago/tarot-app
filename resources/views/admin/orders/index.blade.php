@@ -18,14 +18,14 @@
                     <input class="question-input" id="order-search" name="search" type="search" value="{{ $search }}" placeholder="注文番号">
                     <select class="question-input" name="status" aria-label="注文状態">
                         <option value="">すべての注文状態</option>
-                        @foreach (['pending_payment', 'paid', 'processing', 'shipped', 'completed', 'cancelled', 'payment_review', 'refund_pending', 'refunded'] as $status)
-                            <option value="{{ $status }}" @selected($selectedStatus === $status)>{{ $status }}</option>
+                        @foreach (\App\Support\OrderStatusLabel::ORDER as $status => $statusLabel)
+                            <option value="{{ $status }}" @selected($selectedStatus === $status)>{{ $statusLabel }}</option>
                         @endforeach
                     </select>
                     <select class="question-input" name="payment_status" aria-label="決済状態">
                         <option value="">すべての決済状態</option>
-                        @foreach (['pending', 'paid', 'failed', 'cancelled', 'payment_review', 'refund_pending', 'refund_review', 'refunded'] as $status)
-                            <option value="{{ $status }}" @selected($selectedPaymentStatus === $status)>{{ $status }}</option>
+                        @foreach (\App\Support\OrderStatusLabel::PAYMENT as $status => $statusLabel)
+                            <option value="{{ $status }}" @selected($selectedPaymentStatus === $status)>{{ $statusLabel }}</option>
                         @endforeach
                     </select>
                     <button class="secondary-action" type="submit">絞り込み</button>
@@ -39,10 +39,10 @@
                             @forelse ($orders as $order)
                                 <tr>
                                     <td>{{ $order->order_number }}</td>
-                                    <td>{{ $order->created_at->format('Y-m-d H:i') }}</td>
+                                    <td>{{ \App\Support\DisplayTime::format($order->created_at, 'Y-m-d H:i') }}</td>
                                     <td>{{ $order->user_id === null ? 'ゲスト' : '会員' }}</td>
-                                    <td>{{ $order->status }}</td>
-                                    <td>{{ $order->payment_status }}</td>
+                                    <td>{{ \App\Support\OrderStatusLabel::order($order->status) }}</td>
+                                    <td>{{ \App\Support\OrderStatusLabel::payment($order->payment_status) }}</td>
                                     <td>{{ $order->items_count }}</td>
                                     <td>¥{{ number_format($order->total_minor) }}</td>
                                     <td><a class="table-link" href="{{ route('admin.orders.show', $order) }}">詳細</a></td>

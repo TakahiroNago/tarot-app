@@ -41,20 +41,21 @@ class PublicReadingShareService
             || ! is_string($reading['question'] ?? null)
             || ! is_string($reading['card'] ?? null)
             || ! is_string($reading['interpretation'] ?? null)
-            || (
-                array_key_exists('recommended_product_id', $reading)
-                && $reading['recommended_product_id'] !== null
-                && ! is_int($reading['recommended_product_id'])
-            )
         ) {
             throw new UnexpectedValueException('Cached public tarot reading has an invalid format.');
+        }
+
+        $productId = $reading['recommended_product_id'] ?? null;
+        if ($productId !== null && ! is_int($productId)) {
+            report(new UnexpectedValueException('Cached public tarot reading has an invalid recommendation.'));
+            $productId = null;
         }
 
         return [
             'question' => $reading['question'],
             'card' => $reading['card'],
             'interpretation' => $reading['interpretation'],
-            'recommended_product_id' => $reading['recommended_product_id'] ?? null,
+            'recommended_product_id' => $productId,
         ];
     }
 

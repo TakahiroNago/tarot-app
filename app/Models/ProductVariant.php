@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Database\Factories\ProductVariantFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 #[Fillable(['product_id', 'sku', 'label', 'options', 'price_minor', 'currency', 'is_active'])]
 class ProductVariant extends Model
 {
-    /** @use HasFactory<\Database\Factories\ProductVariantFactory> */
+    /** @use HasFactory<ProductVariantFactory> */
     use HasFactory;
 
     protected $table = 'ec_product_variants';

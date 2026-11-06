@@ -25,7 +25,7 @@
                         @endforeach
                         <p class="product-price">合計（税込・送料込）: ¥{{ number_format($pendingOrder->total_minor) }}</p>
                         @if ($pendingOrder->reservation_expires_at)
-                            <p class="settings-note">在庫の予約期限：{{ $pendingOrder->reservation_expires_at->format('Y年m月d日 H:i') }}</p>
+                            <p class="settings-note">在庫の予約期限：{{ \App\Support\DisplayTime::format($pendingOrder->reservation_expires_at, 'Y年m月d日 H:i') }}</p>
                         @endif
                         <p class="settings-note">住所やカートの内容を変更する場合は、このご注文を取り消してから新しくご注文ください。</p>
                     </div>

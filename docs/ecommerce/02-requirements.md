@@ -32,11 +32,11 @@
 
 - 商品販売状態：`draft` / `published` / `archived`等。具体的な表示語はUIで決定。
 - 在庫状態：入荷総数（on_hand）と予約数（reserved）を区別。販売可能数は`on_hand - reserved`。
-- 注文状態：`pending_payment`、`paid`、`processing`、`shipped`、`completed`、`cancelled`等の候補。
-- 決済状態：`pending`、`authorized`、`paid`、`failed`、`cancelled`、`refunded`、`partially_refunded`等の候補。
-- 配送状態：未発送、発送準備中、発送済、配送完了、返送等の候補。
+- 注文状態：`pending_payment`、`paid`、`processing`、`shipped`、`completed`、`cancelled`、`payment_review`、`refund_pending`、`refunded`。
+- 決済状態：`pending`、`paid`、`failed`、`cancelled`、`payment_review`、`refund_pending`、`refund_review`、`refunded`。部分返金は提供せず、検知時は`refund_review`にする。
+- 配送状態：`pending`、`shipped`、`delivered`。
 
-注文、決済、配送を単一statusに押し込まない。許可遷移、取消/返金と在庫の関係はプロバイダー決定後に確定する。
+注文、決済、配送を単一statusに押し込まない。画面には内部の値を出さず、`App\Support\OrderStatusLabel`の日本語表示を使う。時刻の保存と日付の区切りは`APP_TIMEZONE`に従い、注文画面の表示だけ`APP_DISPLAY_TIMEZONE`（既定は日本時間）に変換する。
 
 ## 非機能要件
 

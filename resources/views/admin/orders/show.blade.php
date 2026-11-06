@@ -21,9 +21,9 @@
                 @endif
 
                 <dl class="user-details">
-                    <div><dt>注文日時</dt><dd>{{ $order->created_at->format('Y-m-d H:i') }}</dd></div>
-                    <div><dt>注文状態</dt><dd>{{ $order->status }}</dd></div>
-                    <div><dt>決済状態</dt><dd>{{ $order->payment_status }}</dd></div>
+                    <div><dt>注文日時</dt><dd>{{ \App\Support\DisplayTime::format($order->created_at, 'Y-m-d H:i') }}</dd></div>
+                    <div><dt>注文状態</dt><dd>{{ \App\Support\OrderStatusLabel::order($order->status) }}</dd></div>
+                    <div><dt>決済状態</dt><dd>{{ \App\Support\OrderStatusLabel::payment($order->payment_status) }}</dd></div>
                     <div><dt>購入者</dt><dd>{{ $order->customer_name }} / {{ $order->customer_email }} @if ($order->customer_phone) / {{ $order->customer_phone }} @endif</dd></div>
                     <div><dt>配送先</dt><dd>{{ $order->shipping_recipient }}<br>{{ $order->shipping_country_code }} {{ $order->shipping_postal_code }} {{ $order->shipping_region }} {{ $order->shipping_city }} {{ $order->shipping_address_line1 }} {{ $order->shipping_address_line2 }}</dd></div>
                     <div><dt>配送方法</dt><dd>{{ $order->shipping_method_name }}</dd></div>
@@ -57,8 +57,8 @@
                 @if ($order->isUnderReview())
                     <h2>支払いレビュー</h2>
                     <dl class="user-details">
-                        <div><dt>理由</dt><dd>{{ $order->review_reason }}</dd></div>
-                        <div><dt>開始日時</dt><dd>{{ $order->review_opened_at?->format('Y-m-d H:i') }}</dd></div>
+                        <div><dt>理由</dt><dd>{{ \App\Support\OrderStatusLabel::reason($order->review_reason) }}</dd></div>
+                        <div><dt>開始日時</dt><dd>{{ \App\Support\DisplayTime::format($order->review_opened_at, 'Y-m-d H:i') }}</dd></div>
                     </dl>
                     @if ($order->canApproveReview())
                         <form class="question-form admin-review-form" method="POST" action="{{ route('admin.orders.review.approve', $order) }}">
@@ -98,7 +98,7 @@
 
                 <h2>発送・追跡</h2>
                 @foreach ($order->shipments as $shipment)
-                    <p class="settings-note">発送 {{ $shipment->status }} / {{ $shipment->carrier_name }} / {{ $shipment->tracking_number }}</p>
+                    <p class="settings-note">発送 {{ \App\Support\OrderStatusLabel::shipment($shipment->status) }} / {{ $shipment->carrier_name }} / {{ $shipment->tracking_number }}</p>
                 @endforeach
                 @if ($canUpdateShipment)
                     @php($shipment = $order->shipments->last())
@@ -111,8 +111,8 @@
                         <input class="question-input" id="tracking-number" name="tracking_number" type="text" maxlength="120" value="{{ old('tracking_number', $shipment?->tracking_number) }}">
                         <label class="question-label" for="shipment-status">発送状態</label>
                         <select class="question-input" id="shipment-status" name="status" required>
-                            @foreach (['pending', 'shipped', 'delivered'] as $status)
-                                <option value="{{ $status }}" @selected(old('status', $shipment?->status ?? 'pending') === $status)>{{ $status }}</option>
+                            @foreach (\App\Support\OrderStatusLabel::SHIPMENT as $status => $statusLabel)
+                                <option value="{{ $status }}" @selected(old('status', $shipment?->status ?? 'pending') === $status)>{{ $statusLabel }}</option>
                             @endforeach
                         </select>
                         <button class="secondary-action" type="submit">発送情報を更新</button>
@@ -149,10 +149,10 @@
                 <h2>操作履歴</h2>
                 @forelse ($order->events as $event)
                     <p class="settings-note">
-                        {{ $event->created_at->format('Y-m-d H:i') }} / {{ $event->event_type }} / {{ $event->actor?->email ?? '自動処理または削除済みユーザー' }}
-                        / 注文 {{ $event->from_status }} → {{ $event->to_status }}
-                        / 決済 {{ $event->from_payment_status }} → {{ $event->to_payment_status }}
-                        @if ($event->reason) / {{ $event->reason }} @endif
+                        {{ \App\Support\DisplayTime::format($event->created_at, 'Y-m-d H:i') }} / {{ \App\Support\OrderStatusLabel::event($event->event_type) }} / {{ $event->actor?->email ?? '自動処理または削除済みユーザー' }}
+                        / 注文 {{ $event->from_status ? \App\Support\OrderStatusLabel::order($event->from_status) : '—' }} → {{ $event->to_status ? \App\Support\OrderStatusLabel::order($event->to_status) : '—' }}
+                        / 決済 {{ $event->from_payment_status ? \App\Support\OrderStatusLabel::payment($event->from_payment_status) : '—' }} → {{ $event->to_payment_status ? \App\Support\OrderStatusLabel::payment($event->to_payment_status) : '—' }}
+                        @if ($event->reason) / {{ \App\Support\OrderStatusLabel::reason($event->reason) }} @endif
                         @if ($event->note) / {{ $event->note }} @endif
                     </p>
                 @empty

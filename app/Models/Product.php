@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Database\Factories\ProductFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,7 +13,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 #[Fillable(['slug', 'name', 'description', 'status', 'reading_recommendable'])]
 class Product extends Model
 {
-    /** @use HasFactory<\Database\Factories\ProductFactory> */
+    /** @use HasFactory<ProductFactory> */
     use HasFactory, SoftDeletes;
 
     protected $table = 'ec_products';
