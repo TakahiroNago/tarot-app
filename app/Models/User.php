@@ -67,4 +67,12 @@ class User extends Authenticatable implements HasLocalePreference, MustVerifyEma
     {
         return $this->hasMany(Order::class);
     }
+
+    /**
+     * Asked by the site header on every page, which must not fail because of the shop's tables.
+     */
+    public function hasOrders(): bool
+    {
+        return rescue(fn (): bool => $this->orders()->exists(), false);
+    }
 }

@@ -46,7 +46,7 @@
                     </div>
                     <a class="account-popover-link" href="{{ route('readings.index') }}">占い履歴</a>
                     <a class="account-popover-link" href="{{ route('account.settings.edit') }}">アカウント設定</a>
-                    @if (config('ecommerce.enabled'))
+                    @if (config('ecommerce.enabled') || auth()->user()->hasOrders())
                         <a class="account-popover-link" href="{{ route('account.orders.index') }}">注文履歴</a>
                     @endif
                     @if (auth()->user()->isAdmin())

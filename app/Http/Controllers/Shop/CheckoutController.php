@@ -195,7 +195,9 @@ class CheckoutController extends Controller
                 ->where('provider', 'stripe')
                 ->where('provider_checkout_id', $sessionId))
             ->firstOrFail();
-        $guestOrderUrl = $order->user_id === null && $order->payment_status === 'paid'
+        $guestOrderUrl = $order->user_id === null
+            && $order->payment_status === 'paid'
+            && $order->guest_access_expires_at?->isFuture()
             ? $checkoutService->guestOrderUrl($order)
             : null;
 
