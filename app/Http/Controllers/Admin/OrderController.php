@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\InventoryMovement;
 use App\Models\Order;
+use App\Models\OrderEvent;
 use App\Models\OrderItem;
 use App\Models\User;
 use App\Services\InventoryService;
@@ -52,7 +53,13 @@ class OrderController extends Controller
 
     public function show(Order $order): View
     {
-        $order->load(['items', 'payments', 'shipments', 'inventoryMovements']);
+        $order->load([
+            'items',
+            'payments',
+            'shipments',
+            'inventoryMovements',
+            'events' => fn ($query) => $query->with('actor')->orderBy('id'),
+        ]);
         $restockedQuantities = InventoryMovement::query()
             ->where('order_id', $order->id)
             ->where('movement_type', 'return_restock')
@@ -85,8 +92,10 @@ class OrderController extends Controller
             'status' => ['required', Rule::in(['pending', 'shipped', 'delivered'])],
         ]);
         abort_unless($this->canUpdateShipment($order), 422);
+        $actor = $request->user();
+        abort_unless($actor instanceof User, 403);
 
-        DB::transaction(function () use ($order, $validated): void {
+        DB::transaction(function () use ($order, $validated, $actor): void {
             $lockedOrder = Order::query()->lockForUpdate()->findOrFail($order->id);
             abort_unless($this->canUpdateShipment($lockedOrder), 422);
             $shipment = $lockedOrder->shipments()->latest()->lockForUpdate()->first();
@@ -112,14 +121,35 @@ class OrderController extends Controller
                 'delivered_at' => $validated['status'] === 'delivered'
                     ? ($shipment->delivered_at ?? now())
                     : null,
-            ])->save();
+            ]);
+            $changedDetails = array_keys(array_intersect_key(
+                $shipment->getDirty(),
+                array_flip(['carrier_name', 'tracking_number']),
+            ));
+            $shipment->save();
 
+            $fromStatus = $lockedOrder->status;
             $lockedOrder->status = match ($validated['status']) {
                 'pending' => 'processing',
                 'shipped' => 'shipped',
                 'delivered' => 'completed',
             };
             $lockedOrder->save();
+
+            if ($fromStatus === $lockedOrder->status && $currentStatus === $shipment->status && $changedDetails === []) {
+                return;
+            }
+
+            OrderEvent::query()->create([
+                'order_id' => $lockedOrder->id,
+                'actor_user_id' => $actor->id,
+                'event_type' => 'shipment_updated',
+                'from_status' => $fromStatus,
+                'to_status' => $lockedOrder->status,
+                'from_payment_status' => $lockedOrder->payment_status,
+                'to_payment_status' => $lockedOrder->payment_status,
+                'note' => $this->shipmentChangeNote($currentStatus, $shipment->status, $changedDetails),
+            ]);
         });
 
         return to_route('admin.orders.show', $order)->with('status', '発送状況を更新しました。');
@@ -141,9 +171,18 @@ class OrderController extends Controller
         return to_route('admin.orders.show', $order)->with('status', 'レビューを承認し、販売を確定しました。');
     }
 
-    public function refund(Order $order, RefundService $refundService): RedirectResponse
+    public function refund(Request $request, Order $order, RefundService $refundService): RedirectResponse
     {
-        $status = $refundService->refundFull($order);
+        $validated = $request->validate([
+            'refund_note' => ['required', 'string', 'max:500'],
+        ], [
+            'refund_note.required' => '返金理由を入力してください。',
+            'refund_note.max' => '返金理由は500文字以内で入力してください。',
+        ]);
+        $actor = $request->user();
+        abort_unless($actor instanceof User, 403);
+
+        $status = $refundService->refundFull($order, $actor, $validated['refund_note']);
         $message = match ($status) {
             'succeeded' => 'Stripeで全額返金しました。在庫は返品受領・検品後に別途戻してください。',
             'pending', 'requires_action' => '返金処理を開始しました。確定Webhookを待っています。在庫は自動で戻していません。',
@@ -177,6 +216,19 @@ class OrderController extends Controller
         );
 
         return to_route('admin.orders.show', $order)->with('status', '検品済み返品の在庫を台帳に記録しました。');
+    }
+
+    /**
+     * Names the details that changed but not their values, so the history stays free of delivery
+     * data that later anonymization would otherwise have to find here too.
+     *
+     * @param  list<string>  $changedDetails
+     */
+    private function shipmentChangeNote(string $fromStatus, string $toStatus, array $changedDetails): string
+    {
+        $note = "shipment {$fromStatus} -> {$toStatus}";
+
+        return $changedDetails === [] ? $note : $note.'; changed: '.implode(', ', $changedDetails);
     }
 
     /**
