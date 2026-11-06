@@ -74,7 +74,7 @@ class SessionReadingPersister
         if ($readings !== []) {
             $savedReadings = DB::transaction(fn () => $user->tarotReadings()->createMany($readings));
             foreach ($savedReadings as $index => $savedReading) {
-                if (! array_key_exists($index, $recommendationProductIds)) {
+                if (! config('ecommerce.enabled') || ! array_key_exists($index, $recommendationProductIds)) {
                     continue;
                 }
 

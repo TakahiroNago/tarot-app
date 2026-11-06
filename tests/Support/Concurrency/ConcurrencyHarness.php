@@ -211,6 +211,7 @@ final class ConcurrencyHarness
                 'DB_SOCKET' => '',
                 'STRIPE_SECRET' => '',
                 'EC_STRIPE_SECRET' => '',
+                'EC_ENABLED' => 'true',
                 'CACHE_STORE' => 'array',
                 'SESSION_DRIVER' => 'array',
                 'QUEUE_CONNECTION' => 'sync',

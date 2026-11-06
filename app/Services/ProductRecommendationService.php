@@ -13,6 +13,9 @@ use UnexpectedValueException;
 /**
  * A recommendation is an extra on a reading the customer has already paid a credit for, so a failure
  * here is reported and never reaches the caller, where it could stop the reading or refund the credit.
+ *
+ * While the shop is closed nothing is chosen, recorded or shown, and the shop's tables are not read,
+ * so a reading made then is checked when it is next viewed after the shop opens.
  */
 class ProductRecommendationService
 {
@@ -22,6 +25,10 @@ class ProductRecommendationService
      */
     public function forReading(TarotReading $reading): ?Product
     {
+        if (! config('ecommerce.enabled')) {
+            return null;
+        }
+
         try {
             return DB::transaction(function () use ($reading): ?Product {
                 $lockedReading = TarotReading::query()->lockForUpdate()->findOrFail($reading->id);
@@ -52,6 +59,10 @@ class ProductRecommendationService
      */
     public function forSession(array &$reading): ?Product
     {
+        if (! config('ecommerce.enabled')) {
+            return null;
+        }
+
         if (array_key_exists('recommended_product_id', $reading)) {
             $productId = $reading['recommended_product_id'];
             if ($productId === null) {
@@ -80,7 +91,7 @@ class ProductRecommendationService
 
     public function findById(?int $productId): ?Product
     {
-        if ($productId === null) {
+        if ($productId === null || ! config('ecommerce.enabled')) {
             return null;
         }
 

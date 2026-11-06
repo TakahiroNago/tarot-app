@@ -31,38 +31,40 @@ Route::get('/', function () {
 
 Route::get('/tarot', [TarotController::class, 'index'])->name('tarot');
 
-Route::get('/shop/products', [ShopProductController::class, 'index'])->name('shop.products.index');
-Route::get('/shop/products/{product:slug}', [ShopProductController::class, 'show'])->name('shop.products.show');
-Route::middleware('active')->group(function () {
-    Route::get('/cart', [CartController::class, 'index'])->name('shop.cart.index');
-    Route::post('/cart/items', [CartController::class, 'store'])->name('shop.cart.store');
-    Route::patch('/cart/items/{item}', [CartController::class, 'update'])->name('shop.cart.update');
-    Route::delete('/cart/items/{item}', [CartController::class, 'destroy'])->name('shop.cart.destroy');
-    Route::get('/checkout', [CheckoutController::class, 'index'])->name('shop.checkout.index');
-    Route::get('/checkout/confirm', [CheckoutController::class, 'showConfirm']);
-    Route::post('/checkout/confirm', [CheckoutController::class, 'confirm'])
-        ->middleware('throttle:30,1')
-        ->name('shop.checkout.confirm');
-    Route::post('/checkout/edit', [CheckoutController::class, 'edit'])->name('shop.checkout.edit');
-    Route::post('/checkout', [CheckoutController::class, 'store'])
-        ->middleware('throttle:5,1')
-        ->name('shop.checkout.store');
-    Route::post('/checkout/pending/resume', [CheckoutController::class, 'resume'])
-        ->middleware('throttle:5,1')
-        ->name('shop.checkout.pending.resume');
-    Route::post('/checkout/pending/cancel', [CheckoutController::class, 'cancelPending'])
-        ->middleware('throttle:5,1')
-        ->name('shop.checkout.pending.cancel');
+Route::middleware('ecommerce')->group(function () {
+    Route::get('/shop/products', [ShopProductController::class, 'index'])->name('shop.products.index');
+    Route::get('/shop/products/{product:slug}', [ShopProductController::class, 'show'])->name('shop.products.show');
+    Route::middleware('active')->group(function () {
+        Route::get('/cart', [CartController::class, 'index'])->name('shop.cart.index');
+        Route::post('/cart/items', [CartController::class, 'store'])->name('shop.cart.store');
+        Route::patch('/cart/items/{item}', [CartController::class, 'update'])->name('shop.cart.update');
+        Route::delete('/cart/items/{item}', [CartController::class, 'destroy'])->name('shop.cart.destroy');
+        Route::get('/checkout', [CheckoutController::class, 'index'])->name('shop.checkout.index');
+        Route::get('/checkout/confirm', [CheckoutController::class, 'showConfirm']);
+        Route::post('/checkout/confirm', [CheckoutController::class, 'confirm'])
+            ->middleware('throttle:30,1')
+            ->name('shop.checkout.confirm');
+        Route::post('/checkout/edit', [CheckoutController::class, 'edit'])->name('shop.checkout.edit');
+        Route::post('/checkout', [CheckoutController::class, 'store'])
+            ->middleware('throttle:5,1')
+            ->name('shop.checkout.store');
+        Route::post('/checkout/pending/resume', [CheckoutController::class, 'resume'])
+            ->middleware('throttle:5,1')
+            ->name('shop.checkout.pending.resume');
+        Route::post('/checkout/pending/cancel', [CheckoutController::class, 'cancelPending'])
+            ->middleware('throttle:5,1')
+            ->name('shop.checkout.pending.cancel');
+    });
+    Route::get('/checkout/complete/{orderNumber}', [CheckoutController::class, 'success'])
+        ->middleware('sensitive')
+        ->where('orderNumber', '[A-Z0-9-]{8,32}')
+        ->name('shop.checkout.success');
+    Route::get('/checkout/cancelled', [CheckoutController::class, 'cancel'])->name('shop.checkout.cancel');
+    Route::get('/orders/guest/{orderNumber}', [OrderController::class, 'guestShow'])
+        ->middleware(['sensitive', 'signed:relative', 'throttle:30,1'])
+        ->where('orderNumber', '[A-Z0-9-]{8,32}')
+        ->name('shop.orders.guest-show');
 });
-Route::get('/checkout/complete/{orderNumber}', [CheckoutController::class, 'success'])
-    ->middleware('sensitive')
-    ->where('orderNumber', '[A-Z0-9-]{8,32}')
-    ->name('shop.checkout.success');
-Route::get('/checkout/cancelled', [CheckoutController::class, 'cancel'])->name('shop.checkout.cancel');
-Route::get('/orders/guest/{orderNumber}', [OrderController::class, 'guestShow'])
-    ->middleware(['sensitive', 'signed:relative', 'throttle:30,1'])
-    ->where('orderNumber', '[A-Z0-9-]{8,32}')
-    ->name('shop.orders.guest-show');
 
 Route::post('/tarot/draw', [TarotController::class, 'draw'])->name('tarot.draw');
 Route::post('/tarot/daily', [TarotController::class, 'daily'])->middleware('auth')->name('tarot.daily');
@@ -134,8 +136,10 @@ Route::middleware(['auth', 'active', 'verified'])->prefix('account')->name('acco
     Route::get('/settings', [AccountSettingsController::class, 'edit'])->name('settings.edit');
     Route::put('/settings', [AccountSettingsController::class, 'update'])->name('settings.update');
     Route::delete('/settings', [AccountSettingsController::class, 'destroy'])->name('settings.destroy');
-    Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
-    Route::get('/orders/{order}', [OrderController::class, 'show'])->name('orders.show');
+    Route::middleware('ecommerce')->group(function () {
+        Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
+        Route::get('/orders/{order}', [OrderController::class, 'show'])->name('orders.show');
+    });
 });
 
 Route::prefix('admin')->name('admin.')->middleware(['auth', 'active', 'verified', 'admin'])->group(function () {

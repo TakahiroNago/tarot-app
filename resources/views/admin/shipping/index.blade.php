@@ -100,6 +100,7 @@
 
                 <section class="shipping-admin-section">
                     <h2>国別税ルール</h2>
+                    <p class="settings-note">有効期間は日本時間の日付で判定します。開始日の0時に切り替わり、終了日の24時まで有効です。</p>
                     <p class="settings-note">税率はbasis pointで入力します（例: 10%は1000）。適用義務と税額計算は専門家が確認した値のみ登録してください。商品明細ごとに税込価格から税額を逆算し、1円未満を四捨五入します。</p>
                     <form class="tax-rate-create" method="POST" action="{{ route('admin.shipping.tax-rates.store') }}">
                         @csrf
