@@ -12,28 +12,29 @@ use UnexpectedValueException;
 
 class ProductRecommendationService
 {
+    /**
+     * A reading is checked once. Having no candidate is recorded too, so the result does not change
+     * later, while a database error records nothing and the next view checks again.
+     */
     public function forReading(TarotReading $reading): ?Product
     {
         try {
             return DB::transaction(function () use ($reading): ?Product {
                 $lockedReading = TarotReading::query()->lockForUpdate()->findOrFail($reading->id);
-                $existingProductId = $lockedReading->productRecommendation()->value('product_id');
+                $existingRecommendation = $lockedReading->productRecommendation()->first();
 
-                if ($existingProductId !== null) {
-                    return $this->findById((int) $existingProductId);
+                if ($existingRecommendation !== null) {
+                    return $this->findById($existingRecommendation->product_id);
                 }
 
                 $product = $this->eligibleProducts()->inRandomOrder()->first();
-                if (! $product instanceof Product) {
-                    return null;
-                }
 
                 $lockedReading->productRecommendation()->create([
-                    'product_id' => $product->id,
+                    'product_id' => $product?->id,
                     'selected_at' => now(),
                 ]);
 
-                return $this->findById($product->id);
+                return $this->findById($product?->id);
             });
         } catch (QueryException $exception) {
             report($exception);
@@ -63,7 +64,6 @@ class ProductRecommendationService
             $product = $this->eligibleProducts()->inRandomOrder()->first();
         } catch (QueryException $exception) {
             report($exception);
-            $reading['recommended_product_id'] = null;
 
             return null;
         }

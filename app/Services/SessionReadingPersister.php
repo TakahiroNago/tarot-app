@@ -55,15 +55,13 @@ class SessionReadingPersister
                 'card' => $reading['card'],
                 'interpretation' => $reading['interpretation'],
             ];
-            $recommendationProductId = $reading['recommended_product_id'] ?? null;
-            if (
-                array_key_exists('recommended_product_id', $reading)
-                && $recommendationProductId !== null
-                && (! is_int($recommendationProductId) || $recommendationProductId < 1)
-            ) {
-                throw new UnexpectedValueException('Session tarot reading recommendation has an invalid format.');
+            if (array_key_exists('recommended_product_id', $reading)) {
+                $recommendationProductId = $reading['recommended_product_id'];
+                if ($recommendationProductId !== null && (! is_int($recommendationProductId) || $recommendationProductId < 1)) {
+                    throw new UnexpectedValueException('Session tarot reading recommendation has an invalid format.');
+                }
+                $recommendationProductIds[count($readings)] = $recommendationProductId;
             }
-            $recommendationProductIds[] = $recommendationProductId;
             if ($hasCategory) {
                 $persistedReading['category'] = $reading['category'];
                 $persistedReading['summary'] = $reading['summary'];
@@ -75,18 +73,19 @@ class SessionReadingPersister
         if ($readings !== []) {
             $savedReadings = DB::transaction(fn () => $user->tarotReadings()->createMany($readings));
             foreach ($savedReadings as $index => $savedReading) {
-                $productId = $recommendationProductIds[$index] ?? null;
-                if (is_int($productId)) {
-                    try {
-                        if (Product::withTrashed()->whereKey($productId)->exists()) {
-                            $savedReading->productRecommendation()->create([
-                                'product_id' => $productId,
-                                'selected_at' => now(),
-                            ]);
-                        }
-                    } catch (QueryException $exception) {
-                        report($exception);
-                    }
+                if (! array_key_exists($index, $recommendationProductIds)) {
+                    continue;
+                }
+
+                $productId = $recommendationProductIds[$index];
+                try {
+                    $productStillExists = $productId !== null && Product::withTrashed()->whereKey($productId)->exists();
+                    $savedReading->productRecommendation()->create([
+                        'product_id' => $productStillExists ? $productId : null,
+                        'selected_at' => now(),
+                    ]);
+                } catch (QueryException $exception) {
+                    report($exception);
                 }
             }
         }
