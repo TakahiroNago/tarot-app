@@ -10,6 +10,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 class RegisteredUserController extends Controller
 {
@@ -34,11 +35,21 @@ class RegisteredUserController extends Controller
             'is_active' => true,
         ]);
 
-        event(new Registered($user));
+        $verificationMailFailed = false;
+
+        try {
+            event(new Registered($user));
+        } catch (TransportExceptionInterface $exception) {
+            report($exception);
+            $verificationMailFailed = true;
+        }
+
         Auth::login($user);
         $request->session()->regenerate();
         $sessionReadingPersister->persist($user, $request);
 
-        return redirect()->route('verification.notice');
+        $redirect = redirect()->route('verification.notice');
+
+        return $verificationMailFailed ? $redirect->with('status', 'verification-link-failed') : $redirect;
     }
 }

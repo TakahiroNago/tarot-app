@@ -24,6 +24,7 @@ use App\Http\Controllers\TarotController;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 Route::get('/', function () {
     return view('welcome');
@@ -112,7 +113,13 @@ Route::middleware(['auth', 'active'])->group(function () {
             return redirect()->route('home');
         }
 
-        $request->user()->sendEmailVerificationNotification();
+        try {
+            $request->user()->sendEmailVerificationNotification();
+        } catch (TransportExceptionInterface $exception) {
+            report($exception);
+
+            return back()->with('status', 'verification-link-failed');
+        }
 
         return back()->with('status', 'verification-link-sent');
     })->middleware('throttle:6,1')->name('verification.send');
