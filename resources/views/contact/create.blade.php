@@ -18,6 +18,7 @@
                 @if (session('status'))
                     <p class="form-notice" role="status">{{ session('status') }}</p>
                 @endif
+                @error('contact')<p class="form-error" role="alert">{{ $message }}</p>@enderror
 
                 <form class="question-form" method="POST" action="{{ route('contact.store') }}">
                     @csrf

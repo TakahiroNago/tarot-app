@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 class UserController extends Controller
 {
@@ -136,7 +137,15 @@ class UserController extends Controller
     public function sendPasswordReset(Request $request, User $user): RedirectResponse
     {
         $this->administrator($request);
-        Password::sendResetLink(['email' => $user->email]);
+        try {
+            Password::sendResetLink(['email' => $user->email]);
+        } catch (TransportExceptionInterface $exception) {
+            report($exception);
+
+            return back()->withErrors([
+                'user' => 'パスワード再設定メールを送信できませんでした。時間をおいて再度お試しください。',
+            ]);
+        }
 
         return back()->with('status', 'パスワード再設定の案内をメールで送信しました。');
     }

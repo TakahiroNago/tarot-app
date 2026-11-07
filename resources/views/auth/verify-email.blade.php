@@ -16,6 +16,8 @@
                 <p class="page-description">登録を完了するため、メールに記載された確認リンクを開いてください。</p>
                 @if (session('status') === 'verification-link-sent')
                     <p class="form-notice" role="status">確認メールを再送しました。受信トレイをご確認ください。</p>
+                @elseif (session('status') === 'verification-link-failed')
+                    <p class="form-error" role="alert">確認メールを送信できませんでした。時間をおいて「確認メールを再送する」を押してください。</p>
                 @endif
                 <form class="question-form" method="POST" action="{{ route('verification.send') }}">
                     @csrf
