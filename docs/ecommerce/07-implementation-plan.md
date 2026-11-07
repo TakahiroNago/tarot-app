@@ -172,7 +172,7 @@ EC用のStripeキーはタロット用から分離済み（`EC_STRIPE_SECRET`）
 ### 公開前に残る作業
 
 - 特定商取引法ページの差し替えと、確認画面の表示項目・同意文の法務確認。規約の版は記録していない。
-- 本番環境の対応：最新コードの配備ほか（`08-vps-deployment-design.md`の16章）。メール送信（Gmail SMTP）、スケジューラー、キューワーカー、Cloudflare経由の接続元IPの復元は適用済み。MySQLは8.0.46で、CHECK制約が有効な8.0.16以上。
+- 本番環境の対応：テストモードのStripeでの通しテストほか（`08-vps-deployment-design.md`の16章）。メール送信（Gmail SMTP）、スケジューラー、キューワーカー、Cloudflare経由の接続元IPの復元、`c83a327`の配備は適用済み。MySQLは8.0.46で、CHECK制約が有効な8.0.16以上。
 - 本番の環境変数：`EC_ENABLED`、`EC_STRIPE_SECRET`、`EC_STRIPE_WEBHOOK_SECRET`、公開URLの`APP_URL`、`MAIL_MAILER`。
 - 公開の切り替え：`EC_ENABLED`の既定は非公開で、`true`以外は非公開のまま。`config:cache`を使う環境では、変更後に作り直すまで反映されない。非公開時も管理画面、EC用Webhook、定期照合は動作し、支払い済みの注文を反映できる。支払い完了後の画面、注文履歴、ゲストリンクも開ける。公開ストレージの商品画像はアプリを通らないため、ファイル名を知っていれば取得できる。
 - 本番Stripe：事業者情報、Webhookエンドポイントの登録（6イベント）、Linkの無効化、3Dセキュア、チャージバック通知の受信先。
