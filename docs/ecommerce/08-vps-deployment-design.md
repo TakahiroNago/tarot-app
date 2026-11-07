@@ -24,11 +24,11 @@ Stripe ─Webhook→                    ├→ PHP-FPM ec（画面、Webhook、�
                                     └→ PHP-FPM ZENのプール             → MySQL `zen`
 
 root cron（毎日2:30）→ 暗号化バックアップ → Cloudflare R2
-未設定：キューワーカー、スケジューラー（7章）
+systemd：キューワーカー、スケジューラー（毎分）→ MySQL `ec`（7章）
 ```
 
 - VPS、OS、Nginx本体、PHP-FPM本体、MySQLサーバーをZENと共有する。どれかを再起動、更新、設定変更すると両方に影響する。
-- メモリはZENと共有するので、以前の2GB向けの配分は使わない。ワーカーの追加後に`free -m`で実測する。
+- メモリはZENと共有するので、以前の2GB向けの配分は使わない。ワーカー追加後の実測は7章。
 
 ## 3. OSの初期設定
 
@@ -42,7 +42,7 @@ root cron（毎日2:30）→ 暗号化バックアップ → Cloudflare R2
 |---|---|
 | `iroca` | HTTPをHTTPSへ転送。Let's Encrypt証明書 |
 | `zen` | 変更しない |
-| `default` | 未知のHostを444で拒否 |
+| `default` | 80番のみ。未知のHostを444で拒否 |
 
 変更はIROCA専用の設定に限り、`nginx -t`のあとで`systemctl reload nginx`を実行する。
 
@@ -52,8 +52,8 @@ root cron（毎日2:30）→ 暗号化バックアップ → Cloudflare R2
 
 | 層 | 内容 |
 |---|---|
-| Nginx | `default`サイトが未知のHostを拒否する |
-| アプリ | `bootstrap/app.php`の`trustHosts`が`iroca.art-full-stack.com`のみ許可（サブドメインも不可） |
+| Nginx | 80番は`default`サイトが未知のHostを444で拒否する。**443番には既定サーバーがなく、最初に読み込まれる`iroca`が未知のHostも受ける** |
+| アプリ | `bootstrap/app.php`の`trustHosts`が`iroca.art-full-stack.com`のみ許可（サブドメインも不可）。443番はここで拒否する |
 | リンク生成 | 本番環境では`APP_URL`をルートURLに固定し、`https`を強制する |
 
 **`APP_ENV=local`では`trustHosts`が無効になる。** 本番は`production`であることを確認済み。
@@ -63,9 +63,14 @@ VPS上で確認した結果（2026年11月7日、Cloudflareを通さない`127.0
 | 要求 | 結果 |
 |---|---|
 | 正規のHostで`/up` | 200 |
-| 正規のSNIに偽のHost（443番） | **400** |
+| 正規のSNIに偽のHostで`/up` | 400 |
+| 正規のSNIに偽のHostで`/forgot-password` | 400 |
+| 偽のSNIと偽のHostで`/up` | 400（Symfonyのエラー画面） |
+| 未知のSNIに返る証明書 | `iroca`の証明書 |
 
-偽のHostは拒否できている。ただし`default`サイトの444ではないので、応答元がNginxかLaravelか、どのサイトに届いたかは未確認（16章）。
+偽のHostは拒否できており、再設定リンクの偽装は起きない。400はLaravelの応答で、信頼しないHostの例外を400に変換し、400用の画面がないのでSymfonyのエラー画面になる。
+
+未知のHostはPHPまで届き、`ec`プールのワーカーを使う。443番に既定サーバーを追加（`ssl_reject_handshake on`、Nginx 1.19.4以降）すればNginxで止められるが、ZENと共有する443番の設定に影響するので、使い捨てのコンテナで検証してから判断する（案、未適用）。
 
 ### 接続元IPの復元（案、未適用）
 
@@ -87,7 +92,7 @@ real_ip_header CF-Connecting-IP;
 
 `/etc/php/8.4/fpm/pool.d/ec.conf`：ユーザー`ec-deploy`、ソケット`/run/php/php8.4-fpm-ec.sock`、`pm=ondemand`、`pm.max_children=5`、`pm.max_requests=500`、`clear_env=yes`。
 
-**占いと決済Webhookが同じプールを使う。** 占いはOpenAIを呼ぶ間ワーカーを占有する（既定の待ち時間は1回30秒で、1回の占いに2回呼ぶ）。占いが5件重なると、WebhookもWebの画面も待たされる。Webhookを取りこぼした場合は定期照合で回復するが、それにはスケジューラーが必要（7章）。公開前に、占い専用プールの要否を負荷から判断する。
+**占いと決済Webhookが同じプールを使う。** 占いはOpenAIを呼ぶ間ワーカーを占有する（既定の待ち時間は1回30秒で、1回の占いに2回呼ぶ）。占いが5件重なると、WebhookもWebの画面も待たされる。Webhookを取りこぼした場合は定期照合で回復する。定期照合は7章のとおり動いている。公開前に、占い専用プールの要否を負荷から判断する。
 
 変更後は`php-fpm8.4 -tt`で確認する。ZENのプールは変更しない。
 
@@ -99,15 +104,11 @@ real_ip_header CF-Connecting-IP;
 - `log_error_verbosity`が既定の2だと、デッドロックの記録はエラーログに残らない。InnoDBの`lock_deadlocks`カウンタでは確認できる。本番の値は未確認で、サーバー全体の設定なので変更しない。
 - DROP、TRUNCATE、初期化、SQLインポート、権限変更は、対象DBを確認し、明示の承認を得てから行う。
 
-## 7. キューとスケジューラー（案、未設定）
+## 7. キューとスケジューラー
 
-**2026年11月7日の確認では、サービス、timer、`ec-deploy`のcronのいずれも存在しない。** このままでは次の処理が動かない。
+2026年11月7日に適用した。`/etc/systemd/system/`に次の3ファイルを置き、`iroca-queue.service`と`iroca-schedule.timer`を有効にしている。
 
-- 確認メールなどのキュー処理
-- Webhookを取りこぼした注文の定期照合。注文は`pending_payment`のまま残る
-- 期限切れの在庫予約の解放、在庫監査、カート掃除
-
-`/etc/systemd/system/iroca-queue.service`
+`iroca-queue.service`
 
 ```ini
 [Unit]
@@ -116,21 +117,74 @@ After=mysql.service
 
 [Service]
 User=ec-deploy
+Group=ec-deploy
 WorkingDirectory=/var/www/ec
 ExecStart=/usr/bin/php artisan queue:work database --sleep=3 --tries=3 --timeout=60 --max-time=3600 --memory=128
 Restart=always
 RestartSec=5
 MemoryMax=192M
+NoNewPrivileges=true
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-`iroca-schedule.service`（`Type=oneshot`、`WorkingDirectory=/var/www/ec`、`ExecStart=/usr/bin/php artisan schedule:run`、`User=ec-deploy`）と`iroca-schedule.timer`（`OnCalendar=minutely`、`AccuracySec=1s`）。
+`iroca-schedule.service`
 
-- 適用前に`php artisan config:show queue.default`が`database`であることを確認する。
+```ini
+[Unit]
+Description=iroca scheduler run
+After=mysql.service
+
+[Service]
+Type=oneshot
+User=ec-deploy
+Group=ec-deploy
+WorkingDirectory=/var/www/ec
+ExecStart=/usr/bin/php artisan schedule:run
+TimeoutStartSec=15min
+MemoryMax=256M
+NoNewPrivileges=true
+```
+
+`iroca-schedule.timer`
+
+```ini
+[Unit]
+Description=Run the iroca scheduler every minute
+
+[Timer]
+OnCalendar=minutely
+AccuracySec=1s
+Unit=iroca-schedule.service
+
+[Install]
+WantedBy=timers.target
+```
+
+適用直後の確認結果。
+
+| 項目 | 結果 |
+|---|---|
+| ワーカー | 動作中、再起動0回、メモリ約34MB、実行ユーザー`ec-deploy` |
+| タイマー | 動作中。適用後の16:32の実行で定期照合が成功 |
+| `laravel.log` | 変化なし |
+| IROCAの`/up`、ZENの`/` | 適用前と同じ（200、302） |
+| サーバー全体のメモリ | 利用可能 約2.8GB、スワップ未使用 |
+
+未確認の項目。
+
+- ワーカーによる実際のジョブ処理（メール設定のあとで確認する）
+- 在庫監査（03:00）とカート掃除（03:30）の実行
+- VPS再起動後の自動起動
+
+運用上の注意。
+
 - 実行内容は定期照合（毎分）、在庫監査（03:00）、カート掃除（03:30）。時刻は`APP_TIMEZONE`に従う。
-- 停止に気づけるよう、どちらも監視対象にする。
+- ワーカーは起動時のコードと設定を持ち続ける。`.env`の変更や配備のあとは`php artisan queue:restart`を実行する。
+- 停止しても通知は届かない。監視の対象に加える（16章）。
+
+元に戻すには、`systemctl disable --now iroca-queue.service iroca-schedule.timer`で止めて3ファイルを削除し、`systemctl daemon-reload`を実行する。
 
 ## 8. SSL
 
@@ -152,7 +206,9 @@ SESSION_COOKIE=iroca-session
 SESSION_DOMAIN=null                       # 親ドメインへCookieを渡さない
 ```
 
-ほかに`APP_KEY`、`DB_PASSWORD`、`EC_STRIPE_SECRET`、`EC_STRIPE_WEBHOOK_SECRET`、`OPENAI_API_KEY`、`GOOGLE_*`、`MAIL_*`、`CONTACT_EMAIL`が必要。メール送信は未確認。
+ほかに`APP_KEY`、`DB_PASSWORD`、`EC_STRIPE_SECRET`、`EC_STRIPE_WEBHOOK_SECRET`、`OPENAI_API_KEY`、`GOOGLE_*`、`MAIL_*`、`CONTACT_EMAIL`が必要。
+
+**2026年11月7日時点で`mail.default`は`log`で、メールは送信されない。** 会員登録の確認やパスワード再設定のメールも届かず、本文がログに残る。この時点の利用者は0人。
 
 ### `APP_TIMEZONE`は`Asia/Tokyo`（2026年11月7日に決定）
 
@@ -273,12 +329,11 @@ Actionはコミットのハッシュで固定する。
 
 優先順に並べる。
 
-1. キューワーカーとスケジューラーの設定（7章）
+1. メール送信の設定と疎通確認、ワーカーのジョブ処理の確認（7、9章）
 2. 接続元IPの復元（4章）
-3. 偽のHostへの400の応答元の確認（4章）
-4. メール送信の設定と疎通確認
-5. テストモードのStripeで通しテスト（Webhook、照合、返金、メール）
-6. `.env`の保管と復旧手順、バックアップのcron実行の確認、復元の練習（11、12章）
-7. `deploy-ec`の確認と、配備・戻し方の手順（10、12章）
-8. 負荷の実測、占い専用プールの判断（5章）
-9. 法務・販売条件が揃ったら本番Stripeへ切り替え、`EC_ENABLED=true`
+3. テストモードのStripeで通しテスト（Webhook、照合、返金、メール）
+4. `.env`の保管と復旧手順、バックアップのcron実行の確認、復元の練習（11、12章）
+5. `deploy-ec`の確認と、配備・戻し方の手順（10、12章）
+6. ワーカーとタイマーの監視、再起動後の自動起動の確認（7章）
+7. 負荷の実測、占い専用プールの判断、443番の既定サーバーの判断（4、5章）
+8. 法務・販売条件が揃ったら本番Stripeへ切り替え、`EC_ENABLED=true`
