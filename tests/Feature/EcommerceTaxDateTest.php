@@ -117,6 +117,7 @@ test('an order cannot use a rate that ended at midnight in Japan', function () {
 test('the date is taken in Japan whatever timezone the application runs in', function () {
     jpTaxRate(800, '2020-01-01', '2030-03-31');
     jpTaxRate(1000, '2030-04-01');
+    $originalTimezone = date_default_timezone_get();
     config(['app.timezone' => 'America/New_York']);
     date_default_timezone_set('America/New_York');
 
@@ -128,17 +129,17 @@ test('the date is taken in Japan whatever timezone the application runs in', fun
             ->assertOk()
             ->assertSee('¥200');
     } finally {
-        date_default_timezone_set('UTC');
+        date_default_timezone_set($originalTimezone);
     }
 });
 
-test('the application itself keeps its date and time in UTC', function () {
+test('the application itself keeps its date and time in Japan', function () {
     jpTaxRate(1000, '2020-01-01');
     $this->travelTo(Carbon::parse('2030-03-31 15:00:00', 'UTC'));
 
     app(CheckoutService::class)->availableShippingRates();
 
-    expect(config('app.timezone'))->toBe('UTC')
-        ->and(today()->toDateString())->toBe('2030-03-31')
-        ->and(date_default_timezone_get())->toBe('UTC');
+    expect(config('app.timezone'))->toBe('Asia/Tokyo')
+        ->and(today()->toDateString())->toBe('2030-04-01')
+        ->and(date_default_timezone_get())->toBe('Asia/Tokyo');
 });

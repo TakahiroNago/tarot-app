@@ -6,6 +6,7 @@ use App\Models\ProductVariant;
 use App\Models\User;
 use App\Services\ReadingCreditService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Schema;
 use OpenAI\Laravel\Facades\OpenAI;
 use OpenAI\Resources\Chat;
@@ -236,6 +237,31 @@ test('authenticated users can draw one daily reading per day without spending a 
         ->sole()
         ->daily_reading_date->toDateString())->toBe(now()->toDateString());
     expect($user->refresh()->daily_credits)->toBe(3);
+});
+
+test('the daily reading changes at midnight in Japan', function () {
+    $this->travelTo(Carbon::parse('2030-03-31 14:59:58', 'UTC'));
+    $user = User::factory()->create();
+    $user->forceFill(['email_verified_at' => now()])->save();
+    OpenAI::fake([
+        CreateResponse::fake([
+            'choices' => [['message' => ['content' => '{"interpretation":"3月のメッセージです。","category":"その他","summary":"3月の要約です。"}']]],
+        ]),
+        CreateResponse::fake([
+            'choices' => [['message' => ['content' => '{"interpretation":"4月のメッセージです。","category":"その他","summary":"4月の要約です。"}']]],
+        ]),
+    ]);
+
+    $this->actingAs($user)->post(route('tarot.daily'))
+        ->assertViewHas('interpretation', '3月のメッセージです。');
+
+    $this->travelTo(Carbon::parse('2030-03-31 14:59:59', 'UTC'));
+    $this->post(route('tarot.daily'))
+        ->assertViewHas('interpretation', '3月のメッセージです。');
+
+    $this->travelTo(Carbon::parse('2030-03-31 15:00:00', 'UTC'));
+    $this->post(route('tarot.daily'))
+        ->assertViewHas('interpretation', '4月のメッセージです。');
 });
 
 test('guest readings stay in the same session and are not written to the database', function () {

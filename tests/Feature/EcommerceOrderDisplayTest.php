@@ -106,17 +106,18 @@ test('order pages show times in the display timezone', function () {
     $user = User::factory()->create();
     $admin = User::factory()->admin()->create();
     $order = displayedOrder(['user_id' => $user->id]);
-    $order->forceFill(['created_at' => Carbon::parse('2026-01-01 16:30:00', 'UTC')])->save();
+    $order->forceFill(['created_at' => Carbon::parse('2026-01-02 01:30:00')])->save();
     OrderEvent::query()->create(['order_id' => $order->id, 'event_type' => 'refund_requested'])
-        ->forceFill(['created_at' => Carbon::parse('2026-01-01 17:45:00', 'UTC')])->save();
+        ->forceFill(['created_at' => Carbon::parse('2026-01-02 02:45:00')])->save();
+    config(['app.display_timezone' => 'America/New_York']);
 
-    $this->actingAs($user)->get(route('account.orders.index'))->assertSee('2026年01月02日');
-    $this->get(route('account.orders.show', $order))->assertSee('2026年01月02日 01:30');
+    $this->actingAs($user)->get(route('account.orders.index'))->assertSee('2026年01月01日');
+    $this->get(route('account.orders.show', $order))->assertSee('2026年01月01日 11:30');
 
-    $this->actingAs($admin)->get(route('admin.orders.index'))->assertSee('2026-01-02 01:30');
+    $this->actingAs($admin)->get(route('admin.orders.index'))->assertSee('2026-01-01 11:30');
     $this->get(route('admin.orders.show', $order))
-        ->assertSee('2026-01-02 01:30')
-        ->assertSee('2026-01-02 02:45');
+        ->assertSee('2026-01-01 11:30')
+        ->assertSee('2026-01-01 12:45');
 });
 
 test('the reservation deadline on checkout is shown in the display timezone', function () {
@@ -127,10 +128,11 @@ test('the reservation deadline on checkout is shown in the display timezone', fu
         'status' => 'pending_payment',
         'payment_status' => 'pending',
         'active_cart_id' => $cart->id,
-        'reservation_expires_at' => Carbon::parse('2030-03-01 15:10:00', 'UTC'),
+        'reservation_expires_at' => Carbon::parse('2030-03-02 00:10:00'),
     ]);
+    config(['app.display_timezone' => 'America/New_York']);
 
-    $this->actingAs($user)->get(route('shop.checkout.index'))->assertSee('2030年03月02日 00:10');
+    $this->actingAs($user)->get(route('shop.checkout.index'))->assertSee('2030年03月01日 10:10');
 });
 
 test('formatting for display leaves the stored time untouched', function () {
@@ -142,8 +144,8 @@ test('formatting for display leaves the stored time untouched', function () {
         ->and(DisplayTime::format(null, 'H:i'))->toBe('');
 });
 
-test('the display timezone does not change how the application stores time', function () {
-    expect(config('app.timezone'))->toBe('UTC')
+test('the application stores and displays time in Japan', function () {
+    expect(config('app.timezone'))->toBe('Asia/Tokyo')
         ->and(config('app.display_timezone'))->toBe('Asia/Tokyo');
 });
 

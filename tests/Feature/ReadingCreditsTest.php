@@ -4,6 +4,7 @@ use App\Models\User;
 use App\Services\GuestTrialCreditService;
 use App\Services\ReadingCreditService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use OpenAI\Laravel\Facades\OpenAI;
 use OpenAI\Responses\Chat\CreateResponse;
@@ -91,6 +92,20 @@ test('free members receive three readings per day without carrying unused credit
         ->assertSee('<strong>3</strong> 回', false)
         ->assertDontSee('今日の残り')
         ->assertDontSee('購入クレジット');
+    expect($user->fresh()->daily_credits)->toBe(3);
+});
+
+test('daily credits come back at midnight in Japan', function () {
+    $this->travelTo(Carbon::parse('2030-03-31 14:59:59', 'UTC'));
+    $user = User::factory()->create();
+    $user->forceFill(['daily_credits' => 0, 'daily_credits_refreshed_at' => now()->toDateString()])->save();
+    $creditService = app(ReadingCreditService::class);
+
+    $creditService->balance($user);
+    expect($user->fresh()->daily_credits)->toBe(0);
+
+    $this->travelTo(Carbon::parse('2030-03-31 15:00:00', 'UTC'));
+    $creditService->balance($user);
     expect($user->fresh()->daily_credits)->toBe(3);
 });
 
