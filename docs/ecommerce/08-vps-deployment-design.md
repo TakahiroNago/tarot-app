@@ -236,6 +236,7 @@ performance_schema = OFF
 innodb_buffer_pool_size = 384M
 innodb_redo_log_capacity = 128M
 innodb_print_all_deadlocks = ON
+log_error_verbosity = 3
 max_connections = 30
 table_open_cache = 400
 tmp_table_size = 16M
@@ -245,6 +246,7 @@ character_set_server = utf8mb4
 collation_server = utf8mb4_0900_ai_ci
 ```
 
+- デッドロックの記録はNoteなので、`log_error_verbosity`が既定の2ではエラーログに残らない。
 - `max_connections`はFPM 9、ワーカー1、スケジューラー、バックアップ、管理の合計に余裕を持たせた値。
 - DBユーザーは用途別に分ける。
 
@@ -317,9 +319,10 @@ MAIL_MAILER=（送信サービス）
 ### CI：PRごとに自動実行（`.github/workflows/ci.yml`）
 
 1. PHP 8.4をセットアップし、`composer install`、`vendor/bin/pint --test`
-2. `vendor/bin/pest`（SQLite）
-3. `mysql:8.4`を`docker run`で`127.0.0.1:33307`に起動し、`vendor/bin/pest -c phpunit.mysql.xml`
-4. Node 22で`npm ci && npm run build`
+2. Node 22で`npm ci && npm run build`（機能テストがViteのマニフェストを使うので、テストより先に行う）
+3. 使い捨ての`APP_KEY`を生成し、`vendor/bin/pest`（SQLite）
+4. `mysql:8.4`を`docker run`で`127.0.0.1:33307`に起動し、`vendor/bin/pest -c phpunit.mysql.xml`
+5. InnoDBの`lock_deadlocks`カウンタが0であることを確認する（アプリが再試行するので、テストが成功してもデッドロックが起きている場合がある）
 
 Actionはコミットのハッシュで固定する。
 
@@ -412,7 +415,7 @@ migrationは旧コードでも動く形（追加中心）にする。
 
 ## 14. EC停止中の動作（確認済み）
 
-テストと実サーバーでの確認結果。
+テストとローカルで起動したアプリでの確認結果。VPSでは未確認。
 
 | 項目 | 動作 |
 |---|---|
