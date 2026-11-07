@@ -19,9 +19,10 @@ use Symfony\Component\Process\Process;
  *     -e MYSQL_ROOT_PASSWORD=concurrency-root -e MYSQL_DATABASE=tarot_ec_concurrency_test \
  *     -e MYSQL_USER=concurrency -e MYSQL_PASSWORD=concurrency \
  *     -p 127.0.0.1:33307:3306 --tmpfs /var/lib/mysql \
- *     mysql:8.4 --innodb-print-all-deadlocks=ON --log-error-verbosity=3
+ *     mysql:8.0.46 --innodb-print-all-deadlocks=ON --log-error-verbosity=3
  *
- * Deadlock records are notes, so the default verbosity leaves them out of the server log.
+ * The version matches production. Deadlock records are notes, so the default verbosity leaves
+ * them out of the server log.
  *
  * Run the suite with `vendor/bin/pest -c phpunit.mysql.xml`, then stop the container with
  * `docker stop tarot-ec-concurrency-test`.
