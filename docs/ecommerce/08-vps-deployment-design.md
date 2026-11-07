@@ -13,7 +13,7 @@
 | 配置先 | `/var/www/ec`（所有者`ec-deploy`）。リリースディレクトリは使っていない |
 | アプリ | このリポジトリ一式。タロット機能も公開し、ECは`EC_ENABLED`で別に制御する |
 | ミドルウェア | Nginx、PHP 8.4（FPM）、**MySQL 8.0.46** |
-| 配備済みコミット | `b702ec4`（migration 24件、テーブル34個） |
+| 配備済みコミット | `c83a327`（2026年11月7日、migration 24件、テーブル34個） |
 | 時刻 | OSと`APP_TIMEZONE`は日本時間（`Asia/Tokyo`、9章） |
 
 ## 2. 全体構成
@@ -236,7 +236,6 @@ CONTACT_EMAIL=artfullstack@gmail.com      # 問い合わせと管理者通知の
 - 送信元はGmailのアドレスになる。Gmailは認証したアカウント以外のFromを書き換える。
 - 問い合わせは送信元と宛先が同じアドレスになり、Reply-Toに訪問者のアドレスが入る。
 - 適用時の疎通確認で、直接送信とワーカー経由の送信の2通が届き、問い合わせの返信先も正しかった。それまでは`log`で送信されず、利用者は0人だった。
-- 配備中のコード（`b702ec4`）には、下記の送信失敗時の対処とタイムアウトがまだ入っていない。
 - 会員登録、確認メールの再送、パスワード再設定（本人、管理者）、問い合わせは、リクエストの中で送る。送信に失敗したら例外をログに残し、画面にエラーを出す。500エラーにはしない。会員登録は完了し、確認メールは再送ボタンで送り直せる。問い合わせは入力内容を残す。
 - パスワード再設定は送信に失敗したときだけエラーを出すので、その間は登録の有無が分かる。
 - 注文メールと管理者通知はキューで送り、30秒後と120秒後に再試行する（計3回）。
@@ -262,13 +261,23 @@ Actionはコミットのハッシュで固定する。
 
 ### 配備
 
-`/usr/local/sbin/deploy-ec`があるが、内容とGitHub Actionsとの連携は未確認。自動配備のワークフローはリポジトリにない。使う前に内容を確認し、少なくとも次を満たすようにする。
+配備スクリプトはない（2026年11月7日に確認。`/usr/local/sbin/deploy-ec`は存在しなかった）。自動配備のワークフローもリポジトリにない。`/var/www/ec`は`main`を追うGitの作業ツリーで、リポジトリは公開なので認証なしで取得できる。
 
-- 配備前にバックアップを取得する。
-- `php artisan migrate --force`のあとで`php artisan optimize`を実行する。
-- FPMの再読み込みはZENにも影響するので、方法を確認する。
-- `php artisan queue:restart`を実行する（7章の適用後）。
-- `https://iroca.art-full-stack.com/up`を確認する。
+2026年11月7日に`b702ec4`から`c83a327`へ手作業で配備した。migration、`composer.lock`、`package-lock.json`、CSS、JSに差分がなかったので、取得と次の3つで済んだ。
+
+```bash
+cd /var/www/ec
+sudo -u ec-deploy git fetch origin
+sudo -u ec-deploy git status --porcelain            # 何も出ないこと
+sudo -u ec-deploy git merge --ff-only origin/main
+sudo -u ec-deploy php artisan optimize
+sudo -u ec-deploy php artisan queue:restart
+```
+
+確認：IROCAの`/up`は200、ZENの`/`は302。`mail.mailers.smtp.timeout`は10、`app.timezone`は`Asia/Tokyo`、未実行のmigrationは0。ワーカーは配備の時刻に起動し直した。
+
+- PHP-FPMのopcacheは`validate_timestamps`が既定（有効、2秒）なので、FPMの再読み込みは不要。ZENにも影響しない。
+- migration、依存パッケージ、画面のビルドを含む配備では、次も必要になる。配備前のバックアップ、`composer install --no-dev`、`npm ci && npm run build`、`php artisan migrate --force`。これらを含む手順書かスクリプトを用意する（16章）。
 
 `APP_KEY`は再生成しない。migrationは旧コードでも動く形（追加中心）にする。
 
@@ -293,7 +302,7 @@ Actionはコミットのハッシュで固定する。
 | 状況 | 対応 |
 |---|---|
 | 購入を今すぐ止めたい | `.env`を`EC_ENABLED=false`にして`php artisan optimize`を実行する。FPMの再読み込みが必要な場合はZENへの影響を確認する |
-| 配備後に不具合 | 手順は未整備。`deploy-ec`の確認後に決める |
+| 配備後に不具合 | migrationを含まない配備なら、`git reset --keep <前のコミット>`、`php artisan optimize`、`php artisan queue:restart`。migrationを含む場合は下の行 |
 | migrationに問題 | 修正版を前進で配備する。`migrate:rollback`は検証済みの場合のみ |
 | データ破損 | 下記のDB復元 |
 | VPS全損 | 新しいVPSに構築し、下記のDB復元。**ZENの復旧も同時に必要** |
@@ -363,11 +372,32 @@ Actionはコミットのハッシュで固定する。
 
 優先順に並べる。
 
-メール送信、ワーカーの処理、接続元IPの復元は確認済み（4、7、9章）。
+メール送信、ワーカーの処理、接続元IPの復元、最新コード（`c83a327`）の配備、テストモードのStripeでの通しテストは確認済み（4、7、9、10章、下記）。
 
-1. `deploy-ec`の確認と、配備・戻し方の手順。送信失敗時の対処を含む最新のコードを配備する（9、10、12章）
-2. テストモードのStripeで通しテスト（Webhook、照合、返金、メール）
-3. `.env`の保管と復旧手順、バックアップのcron実行の確認、復元の練習（11、12章）
-4. ワーカーとタイマーの監視、再起動後の自動起動の確認、Cloudflareの範囲の確認（4、7章）
-5. 負荷の実測、占い専用プールの判断、443番の既定サーバーの判断（4、5章）
-6. 法務・販売条件が揃ったら本番Stripeへ切り替え、`EC_ENABLED=true`
+1. `.env`の保管と復旧手順、バックアップのcron実行の確認、復元の練習（11、12章）
+2. migrationやビルドを含む配備の手順書かスクリプト（10、12章）
+3. ワーカーとタイマーの監視、再起動後の自動起動の確認、Cloudflareの範囲の確認、`artfullstack@gmail.com`に届く不達通知の確認（4、7、9章）
+4. 負荷の実測、占い専用プールの判断、443番の既定サーバーの判断（4、5章）
+5. 法務・販売条件が揃ったら本番Stripeへ切り替え、`EC_ENABLED=true`
+
+### テストモードのStripeでの通しテスト（2026年11月7日）
+
+EC用のサンドボックスのキーと、Webhookの送信先（`https://iroca.art-full-stack.com/stripe/ecommerce/webhook`、6イベント）を本番の`.env`に設定した。管理者は会員登録と確認メールのあとで`users:promote-admin`で設定した。テスト商品（在庫3）、国内の送料（500円）、税ルール（JP、10%、送料は非課税）を管理画面で登録した。購入の操作をする間だけ`EC_ENABLED=true`にして、終了後に`false`へ戻した。
+
+| # | 内容 | 結果 |
+|---|---|---|
+| 準備 | `stripe trigger checkout.session.completed` | VPSまで届いて200。IROCAの目印がない決済なので`ignored`（通知なし）。Cloudflareの遮断なし |
+| S1 | 会員がカード`4242…`で購入 | `paid`。注文確認メールが届いた。注文履歴に表示 |
+| S2 | ゲストが3Dセキュアのカード`4000 0027 6000 3184`で購入 | `paid`。注文確認メールを送信し、ゲスト用リンクで注文を表示できた |
+| S3 | カード`4000 0000 0000 0002`で拒否されたあと、`stripe checkout sessions expire`で期限切れ | `checkout.session.expired`を処理し、注文は`cancelled`、決済は`failed`。確保した在庫が戻った |
+| S4 | 管理画面からS1を全額返金 | `charge.refunded`と`refund.updated`を処理し、`refunded`。返金のメールが届いた |
+
+終了時の在庫は`on_hand=1 reserved=0`（2個販売、返金しても在庫は戻さない設計どおり）。失敗したジョブは0件。
+
+分かったこと。
+
+- S2でテスト用に入力した`test@gmail.com`は実在せず、Gmailの不達通知が`artfullstack@gmail.com`に届いた。アプリはSMTPの送信成功で「送信済み」と記録するので、不達は送信元の受信トレイでしか分からない。テストでは受け取れるアドレス（`+`付きのアドレスなど）を使う。
+- 税ルールの「送料を課税対象にする」は既定でオフ。オフのままだと、税額は商品分だけになる（1,000円の商品と500円の送料で91円）。本番の値は税の確認後に決める（07の未決事項2）。
+- 支払い待ちの注文は、Webhookが来なくても、予約の期限（30分）の2分後に毎分の定期処理が支払い画面を期限切れにして在庫を戻す。今回はWebhookの経路を確認した。
+- Stripe CLIには複数のサンドボックスが登録されている。実行前に`stripe login list`でEC用が選ばれていることを確認し、`stripe switch`で切り替える。
+- テストの注文3件とWebhookの記録は本番DBに残る。本番Stripeへ切り替える前に、未完了のテスト注文がないことを確認する。テスト商品は`archived`にする。
