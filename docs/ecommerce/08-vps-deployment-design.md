@@ -14,7 +14,7 @@
 | アプリ | このリポジトリ一式。タロット機能も公開し、ECは`EC_ENABLED`で別に制御する |
 | ミドルウェア | Nginx、PHP 8.4（FPM）、**MySQL 8.0.46** |
 | 配備済みコミット | `b702ec4`（migration 24件、テーブル34個） |
-| 時刻 | OSは日本時間。`APP_TIMEZONE`は`Asia/Tokyo`だが、UTCとどちらにするか**未決定**（9章） |
+| 時刻 | OSと`APP_TIMEZONE`は日本時間（`Asia/Tokyo`、9章） |
 
 ## 2. 全体構成
 
@@ -144,7 +144,7 @@ WantedBy=multi-user.target
 APP_ENV=production
 APP_DEBUG=false
 APP_URL=https://iroca.art-full-stack.com  # メールのリンクはこの値で作られる
-APP_TIMEZONE=Asia/Tokyo                   # 未決定（下記）
+APP_TIMEZONE=Asia/Tokyo
 EC_ENABLED=false
 DB_DATABASE=ec
 DB_USERNAME=ec_user
@@ -154,14 +154,11 @@ SESSION_DOMAIN=null                       # 親ドメインへCookieを渡さな
 
 ほかに`APP_KEY`、`DB_PASSWORD`、`EC_STRIPE_SECRET`、`EC_STRIPE_WEBHOOK_SECRET`、`OPENAI_API_KEY`、`GOOGLE_*`、`MAIL_*`、`CONTACT_EMAIL`が必要。メール送信は未確認。
 
-### `APP_TIMEZONE`の選択（未決定）
+### `APP_TIMEZONE`は`Asia/Tokyo`（2026年11月7日に決定）
 
-| 値 | 無料回数と日次占いの切り替わり | 必要な対応 |
-|---|---|---|
-| `UTC` | 日本時間の朝9時 | 本番の`.env`を変更し、キャッシュを作り直す。テストはそのまま使える |
-| `Asia/Tokyo` | 日本時間の0時 | テスト4件と本書の修正 |
-
-`Asia/Tokyo`で全テストを実行した結果は685件中681件成功。失敗は、UTCであること自体を確認するテスト2件と、UTCの時刻をそのまま保存するテスト2件。保存時刻が変わるので、実データが入る前に決める。
+- 無料回数と日次占いは日本時間の0時に切り替わる。定期実行の時刻（7章）も日本時間で動く。
+- 実データが入ったあとで変更すると、保存済みの時刻が9時間ずれて読まれる。
+- Eloquentは日時の値を変換せずに保存するので、UTCのCarbonをそのまま代入すると9時間ずれる。Unix時刻は`now()->setTimestamp(...)`のように、アプリのタイムゾーンで受ける。
 
 ## 10. CI/CD（GitHub Actions）
 
@@ -276,13 +273,12 @@ Actionはコミットのハッシュで固定する。
 
 優先順に並べる。
 
-1. `APP_TIMEZONE`の決定（9章）
-2. キューワーカーとスケジューラーの設定（7章）
-3. 接続元IPの復元（4章）
-4. 偽のHostへの400の応答元の確認（4章）
-5. メール送信の設定と疎通確認
-6. テストモードのStripeで通しテスト（Webhook、照合、返金、メール）
-7. `.env`の保管と復旧手順、バックアップのcron実行の確認、復元の練習（11、12章）
-8. `deploy-ec`の確認と、配備・戻し方の手順（10、12章）
-9. 負荷の実測、占い専用プールの判断（5章）
-10. 法務・販売条件が揃ったら本番Stripeへ切り替え、`EC_ENABLED=true`
+1. キューワーカーとスケジューラーの設定（7章）
+2. 接続元IPの復元（4章）
+3. 偽のHostへの400の応答元の確認（4章）
+4. メール送信の設定と疎通確認
+5. テストモードのStripeで通しテスト（Webhook、照合、返金、メール）
+6. `.env`の保管と復旧手順、バックアップのcron実行の確認、復元の練習（11、12章）
+7. `deploy-ec`の確認と、配備・戻し方の手順（10、12章）
+8. 負荷の実測、占い専用プールの判断（5章）
+9. 法務・販売条件が揃ったら本番Stripeへ切り替え、`EC_ENABLED=true`
