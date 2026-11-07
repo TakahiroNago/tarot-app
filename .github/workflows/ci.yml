@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.4'
+          extensions: curl, fileinfo, gd, mbstring, pdo_mysql, pdo_sqlite, sqlite3
+          ini-values: memory_limit=512M
+          coverage: none
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Check code style
+        run: vendor/bin/pint --test
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install JavaScript dependencies
+        run: npm ci
+
+      # The feature tests render pages that need the Vite manifest.
+      - name: Build assets
+        run: npm run build
+
+      - name: Create a throwaway APP_KEY
+        run: echo "APP_KEY=base64:$(openssl rand -base64 32)" >> "$GITHUB_ENV"
+
+      - name: Run tests on SQLite
+        run: vendor/bin/pest
+
+      # Same disposable database as tests/Support/Concurrency/ConcurrencyHarness.php.
+      - name: Start the disposable MySQL
+        run: |
+          docker run -d --rm --name tarot-ec-concurrency-test \
+            -e MYSQL_ROOT_PASSWORD=concurrency-root -e MYSQL_DATABASE=tarot_ec_concurrency_test \
+            -e MYSQL_USER=concurrency -e MYSQL_PASSWORD=concurrency \
+            -p 127.0.0.1:33307:3306 --tmpfs /var/lib/mysql \
+            mysql:8.4 --innodb-print-all-deadlocks=ON --log-error-verbosity=3
+
+          for _ in $(seq 1 60); do
+            if docker exec tarot-ec-concurrency-test mysql -h127.0.0.1 -uconcurrency -pconcurrency \
+              tarot_ec_concurrency_test -e 'SELECT 1' >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          docker logs tarot-ec-concurrency-test
+          exit 1
+
+      - name: Run concurrency tests on MySQL
+        run: vendor/bin/pest -c phpunit.mysql.xml
+
+      # The application retries deadlocks, so the tests can pass while they happen.
+      # An empty reading also fails this step.
+      - name: Check that MySQL recorded no deadlocks
+        if: ${{ !cancelled() }}
+        run: |
+          deadlocks="$(docker exec tarot-ec-concurrency-test mysql -h127.0.0.1 -uroot -pconcurrency-root -N \
+            -e "SELECT COUNT FROM information_schema.INNODB_METRICS WHERE NAME = 'lock_deadlocks'" 2>/dev/null)"
+          echo "InnoDB deadlocks: ${deadlocks}"
+
+          if [ "${deadlocks}" != "0" ]; then
+            docker logs tarot-ec-concurrency-test 2>&1 | grep -A 80 'deadlock detected' || true
+            exit 1
+          fi
